@@ -4,8 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    THANH XUÂN RỰC RỠ
    Deluxe Career & Fashion Edition
    - 1 file App.jsx
-   - 16 mốc thời gian / ngày
-   - Không giới hạn 1 hoạt động / mốc
+   - 23 mốc thời gian / ngày
+   - Mỗi mốc 45 giây
+   - Mỗi mốc chỉ 1 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
    - 180 câu hỏi
@@ -18,51 +19,25 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v6";
-const SLOT_SECONDS = 30;
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v7";
+const SLOT_SECONDS = 45;
 
 /* =========================================================
    THỜI GIAN
 ========================================================= */
 
 const TIME_SLOTS = [
-  "06:30",
-  "07:00",
-  "07:30",
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:30",
-  "14:30",
-  "15:30",
-  "16:30",
-  "18:00",
-  "19:00",
-  "20:00",
-  "21:00",
-  "22:00",
+  "06:30","07:15","08:00","08:45","09:30","10:15",
+  "11:00","11:45","12:30","13:15","14:00","14:45",
+  "15:30","16:15","17:00","17:45","18:30","19:15",
+  "20:00","20:45","21:30","22:15","23:00"
 ];
 
 const PERIOD_NAMES = [
-  "Buổi sáng",
-  "Buổi sáng",
-  "Buổi sáng",
-  "Tiết học",
-  "Tiết học",
-  "Tiết học",
-  "Cuối buổi sáng",
-  "Nghỉ trưa",
-  "Buổi chiều",
-  "Buổi chiều",
-  "Buổi chiều",
-  "Tan học",
-  "Buổi tối",
-  "Buổi tối",
-  "Buổi tối",
-  "Buổi tối",
-  "Kết thúc ngày",
+  "Buổi sáng","Buổi sáng","Tiết học","Tiết học","Tiết học","Tiết học",
+  "Cuối buổi sáng","Cuối buổi sáng","Nghỉ trưa","Buổi chiều","Buổi chiều",
+  "Buổi chiều","Buổi chiều","Tan học","Buổi tối","Buổi tối","Buổi tối",
+  "Buổi tối","Buổi tối","Buổi tối","Kết thúc ngày","Kết thúc ngày","Kết thúc ngày"
 ];
 
 /* =========================================================
@@ -1105,6 +1080,8 @@ function createInitialState(){
     jobActions:0,
     oralChecksDone:0,
     dailyOralCheckDone:false,
+    mainActivityUsed:false,
+    mainActivityLabel:null,
 
     dailyEvent:null,
     lastEventId:null,
@@ -1158,6 +1135,8 @@ function normalizeState(raw){
 
   g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
   g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
+  g.mainActivityUsed = Boolean(g.mainActivityUsed);
+  g.mainActivityLabel = g.mainActivityLabel || null;
 
   for(const key of [
     "hp",
@@ -1196,6 +1175,11 @@ function Modal({title,onClose,children,wide=false}){
           )}
         </div>
         <div className="modal-body">{children}</div>
+        {onClose && (
+          <div className="modal-close-action">
+            <Button onClick={onClose}>✕ Đóng</Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1361,6 +1345,24 @@ export default function App(){
     });
   },[]);
 
+  const canDoMainActivity = useCallback(()=>{
+    if(game.isGameOver) return false;
+    if(game.mainActivityUsed){
+      setToast(
+        `⏱️ Mốc ${currentTime} đã dùng hoạt động chính` +
+        `${game.mainActivityLabel ? `: ${game.mainActivityLabel}` : ""}. ` +
+        `Sang mốc mới để hoạt động tiếp.`
+      );
+      return false;
+    }
+    return true;
+  },[
+    game.isGameOver,
+    game.mainActivityUsed,
+    game.mainActivityLabel,
+    currentTime
+  ]);
+
   /* -----------------------------------------
      NEXT DAY
   ----------------------------------------- */
@@ -1385,14 +1387,11 @@ export default function App(){
       next.competitionPoints += playerGain;
       next.dailyCompetition.player += playerGain;
 
-      const npcGain = {
-        lan:2 + (finishedDay % 3),
-        trieuMan:1 + (finishedDay % 4),
-        tuan:2 + (finishedDay % 2),
-        minh:1 + (finishedDay % 3),
-        linh:2 + (finishedDay % 2),
-        phong:2 + ((finishedDay + 1) % 3)
-      };
+      // Từ ngày 2 trở đi, điểm từng NPC tăng ngẫu nhiên mỗi ngày.
+      const npcGain = {};
+      NPCS.forEach(npc=>{
+        npcGain[npc.id] = 1 + Math.floor(Math.random() * 8);
+      });
 
       Object.entries(npcGain).forEach(([id,gain])=>{
         next.npcCompetition[id] =
@@ -1438,6 +1437,8 @@ export default function App(){
       next.timeIndex = 0;
 
       next.dailyOralCheckDone = false;
+      next.mainActivityUsed = false;
+      next.mainActivityLabel = null;
 
       next.dailyCompetition = emptyDailyCompetition();
 
@@ -1461,53 +1462,26 @@ export default function App(){
   ----------------------------------------- */
 
   const advanceTime = useCallback(()=>{
-    if(advancingRef.current) return;
+    if(advancingRef.current || game.isGameOver || blockingOverlay) return;
 
     advancingRef.current = true;
 
-    setGame(prev=>{
-      if(prev.isGameOver) return prev;
-
-      if(prev.timeIndex < TIME_SLOTS.length - 1){
+    if(game.timeIndex >= TIME_SLOTS.length - 1){
+      finishDay();
+    }else{
+      setGame(prev=>{
         const next = clone(prev);
         next.timeIndex += 1;
+        next.mainActivityUsed = false;
+        next.mainActivityLabel = null;
         return normalizeState(next);
-      }
-
-      return prev;
-    });
-
-    setTimeout(()=>{
-      setGame(prev=>{
-        if(prev.isGameOver) return prev;
-
-        if(prev.timeIndex >= TIME_SLOTS.length - 1){
-          return prev;
-        }
-
-        return prev;
       });
+      setSecondsLeft(SLOT_SECONDS);
+      beep(700,.07);
+    }
 
-      setTimeout(()=>{
-        setGame(prev=>{
-          if(prev.isGameOver) return prev;
-
-          if(prev.timeIndex === TIME_SLOTS.length - 1){
-            return prev;
-          }
-
-          return prev;
-        });
-
-        advancingRef.current = false;
-      },40);
-    },40);
-
-    /*
-      finishDay cần được gọi riêng nếu đang ở mốc cuối.
-      Kiểm tra game hiện tại bằng state effect bên dưới.
-    */
-  },[]);
+    setTimeout(()=>{ advancingRef.current = false; },50);
+  },[game.isGameOver,game.timeIndex,blockingOverlay,finishDay,beep]);
 
   /* -----------------------------------------
      TIMER
@@ -1528,21 +1502,7 @@ export default function App(){
           return prev - 1;
         }
 
-        if(game.timeIndex >= TIME_SLOTS.length - 1){
-          finishDay();
-        }else{
-          setGame(old=>{
-            const next = clone(old);
-            next.timeIndex = Math.min(
-              TIME_SLOTS.length - 1,
-              next.timeIndex + 1
-            );
-            return normalizeState(next);
-          });
-
-          beep(700,.07);
-        }
-
+        advanceTime();
         return SLOT_SECONDS;
       });
     },1000);
@@ -1553,8 +1513,7 @@ export default function App(){
     blockingOverlay,
     game.isGameOver,
     game.timeIndex,
-    finishDay,
-    beep
+    advanceTime
   ]);
 
   /* -----------------------------------------
@@ -1591,23 +1550,11 @@ export default function App(){
   ========================================================= */
 
   const startQuiz = useCallback((mode="quick",cert=null)=>{
+    if(!canDoMainActivity()) return;
+
     if(mode==="oral" && game.dailyOralCheckDone){
-      setToast("🧑‍🏫 Bạn đã kiểm tra miệng hôm nay rồi.");
+      setToast("🧑‍🏫 Bạn đã hoàn thành kiểm tra miệng hôm nay.");
       return;
-    }
-
-    if(mode==="oral"){
-      updateGame(g=>{
-        g.dailyOralCheckDone = true;
-        g.oralChecksDone++;
-      });
-    }
-
-    if(mode==="quick"){
-      updateGame(g=>{
-        g.studyActions++;
-        addStat(g,"energy",-3);
-      });
     }
 
     const questions =
@@ -1617,6 +1564,24 @@ export default function App(){
             id:`${cert.id}-${i}`
           }))
         : shuffle(QUIZ_BANK).slice(0,mode==="oral" ? 3 : 5);
+
+    updateGame(g=>{
+      g.mainActivityUsed = true;
+      g.mainActivityLabel =
+        mode==="oral" ? "Kiểm tra miệng" :
+        mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
+        "Quiz nhanh";
+
+      if(mode==="oral"){
+        g.dailyOralCheckDone = true;
+        g.oralChecksDone++;
+      }
+
+      if(mode==="quick"){
+        g.studyActions++;
+        addStat(g,"energy",-3);
+      }
+    });
 
     setQuiz({
       mode,
@@ -1630,7 +1595,7 @@ export default function App(){
 
     setQuizFeedback(null);
     setOverlay(mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
-  },[game.dailyOralCheckDone,updateGame]);
+  },[canDoMainActivity,game.dailyOralCheckDone,updateGame]);
 
   const answerQuiz = useCallback((choiceIndex)=>{
     if(!quiz || quizFeedback) return;
@@ -1639,17 +1604,11 @@ export default function App(){
     const correct = choiceIndex === question.answer;
 
     if(correct){
+      updateGame(g=>addCompetition(g,5));
       beep(760,.08);
     }else{
       beep(180,.13);
-
-      updateGame(g=>{
-        addStat(
-          g,
-          "study",
-          quiz.mode==="cert" ? -1 : -2
-        );
-      });
+      updateGame(g=>addStat(g,"study",-2));
     }
 
     setQuizFeedback({
@@ -1677,13 +1636,10 @@ export default function App(){
           if(finalCorrect===5){
             addStat(g,"study",5);
             addStat(g,"skill",2);
-            addCompetition(g,5);
           }else if(finalCorrect===4){
             addStat(g,"study",3);
-            addCompetition(g,3);
           }else if(finalCorrect===3){
             addStat(g,"study",1);
-            addCompetition(g,2);
           }
         });
 
@@ -1697,11 +1653,9 @@ export default function App(){
           if(finalCorrect===3){
             addStat(g,"study",5);
             addStat(g,"reputation",4);
-            addCompetition(g,6);
           }else if(finalCorrect===2){
             addStat(g,"study",2);
             addStat(g,"reputation",2);
-            addCompetition(g,4);
           }else if(finalCorrect===0){
             addStat(g,"mood",-4);
             addStat(g,"reputation",-2);
@@ -1724,7 +1678,6 @@ export default function App(){
               }
 
               addStat(g,"skill",3);
-              addCompetition(g,10);
             });
 
             setToast(`🎓 Đậu ${cert.name}!`);
@@ -1832,8 +1785,6 @@ export default function App(){
       Object.entries(asset.bonus || {}).forEach(([key,val])=>{
         addStat(g,key,val);
       });
-
-      addCompetition(g,5);
     });
 
     setToast(`🏠 Đã mua ${asset.name}!`);
@@ -1869,39 +1820,55 @@ export default function App(){
       return;
     }
 
+    if(!canDoMainActivity()) return;
+
     updateGame(g=>{
+      if(g.mainActivityUsed) return;
       job.apply(g);
       g.jobActions++;
+      g.mainActivityUsed = true;
+      g.mainActivityLabel = `Việc làm: ${job.name}`;
     });
 
+    setOverlay(null);
     setToast(
       `💼 ${job.name}: +${money(job.pay)}`
     );
   },[game,updateGame]);
 
   const interactNPC = useCallback((npc)=>{
+    if(!canDoMainActivity()) return;
+
     if(game.stats.energy < 3){
       setToast("⚡ Bạn đang quá mệt.");
       return;
     }
 
     updateGame(g=>{
+      if(g.mainActivityUsed) return;
       addStat(g,"energy",-3);
       npc.apply(g);
+      g.mainActivityUsed = true;
+      g.mainActivityLabel = npc.action;
     });
 
     setToast(`${npc.icon} ${npc.name}: ${npc.action}`);
-  },[game.stats.energy,updateGame]);
+  },[game.stats.energy,canDoMainActivity,updateGame]);
 
   const restAtHome = useCallback(()=>{
+    if(!canDoMainActivity()) return;
+
     updateGame(g=>{
+      if(g.mainActivityUsed) return;
       addStat(g,"energy",25);
       addStat(g,"hp",5);
       addStat(g,"mood",5);
+      g.mainActivityUsed = true;
+      g.mainActivityLabel = "Nghỉ ngơi";
     });
 
     setToast("🛏️ Nghỉ ngơi giúp bạn hồi phục.");
-  },[updateGame]);
+  },[canDoMainActivity,updateGame]);
 
   const useItem = useCallback((id)=>{
     updateGame(g=>{
@@ -1938,12 +1905,14 @@ export default function App(){
       return;
     }
 
+    if(!canDoMainActivity()) return;
+
     updateGame(g=>{
       addMoney(g,-cert.fee);
     });
 
     startQuiz("cert",cert);
-  },[game,updateGame,startQuiz]);
+  },[game,updateGame,startQuiz,canDoMainActivity]);
 
   /* =========================================================
      SAVE FUNCTIONS
@@ -2041,7 +2010,7 @@ export default function App(){
       title:"Kiểm tra miệng",
       desc:"3 câu / ngày",
       action:()=>startQuiz("oral"),
-      disabled:game.dailyOralCheckDone
+      disabled:false
     },
     {
       icon:"🍱",
@@ -2554,7 +2523,6 @@ export default function App(){
             : "📚 Quiz nhanh"
         }
         onClose={()=>{
-          if(!quizFeedback) return;
           setQuiz(null);
           setQuizFeedback(null);
           setOverlay(null);
@@ -2613,7 +2581,7 @@ export default function App(){
           }`}>
             <b>
               {quizFeedback.correct
-                ? "✅ Chính xác!"
+                ? "✅ Chính xác! +5 điểm thi đua"
                 : "❌ Sai! Kiến thức -2"}
             </b>
 
@@ -2934,6 +2902,11 @@ export default function App(){
               <b>
                 00:{String(secondsLeft).padStart(2,"0")}
               </b>
+              <small>
+                {game.mainActivityUsed
+                  ? `🔒 Đã dùng: ${game.mainActivityLabel || "hoạt động chính"}`
+                  : "🔓 Còn 1 hoạt động chính"}
+              </small>
             </div>
           </div>
 
@@ -3266,49 +3239,31 @@ export default function App(){
         >
           <div className="activity-grid large">
 
-            {quickActivities.map((a,i)=>(
-              <button
-                key={i}
-                className="activity-card"
-                disabled={a.disabled}
-                onClick={()=>{
-                  a.action();
+            {quickActivities.map((a,i)=>{
+              const isMain =
+                ["Quiz 5 câu","Kiểm tra miệng","Nghỉ ngơi","Việc làm"].includes(a.title);
 
-                  if(
-                    ![
-                      "fashion",
-                      "assets",
-                      "canteen",
-                      "jobs",
-                      "certs"
-                    ].includes(
-                      a.title==="Tủ đồ"
-                        ? "fashion"
-                        : a.title==="Tài sản"
-                        ? "assets"
-                        : a.title==="Căn tin"
-                        ? "canteen"
-                        : a.title==="Việc làm"
-                        ? "jobs"
-                        : a.title==="Chứng chỉ"
-                        ? "certs"
-                        : ""
-                    )
-                  ){
-                    setOverlay(null);
-                  }
-                }}
-              >
-                <span className="activity-icon">
-                  {a.icon}
-                </span>
+              const blocked =
+                Boolean(a.disabled) ||
+                (isMain && game.mainActivityUsed);
 
-                <b>{a.title}</b>
-
-                <small>{a.desc}</small>
-              </button>
-            ))}
-
+              return (
+                <button
+                  key={i}
+                  className="activity-card"
+                  disabled={blocked}
+                  onClick={()=>a.action()}
+                >
+                  <span className="activity-icon">{a.icon}</span>
+                  <b>{a.title}</b>
+                  <small>
+                    {isMain && game.mainActivityUsed
+                      ? `🔒 Đã dùng mốc ${currentTime}`
+                      : a.desc}
+                  </small>
+                </button>
+              );
+            })}
           </div>
         </Modal>
       )}
