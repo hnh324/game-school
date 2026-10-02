@@ -1890,15 +1890,23 @@ export default function App(){
   ----------------------------------------- */
 
   useEffect(()=>{
+    // Quiz 5 câu và kiểm tra miệng là các hoạt động cần tập trung:
+    // thời gian của mốc sẽ tạm dừng trong suốt lúc làm bài.
+    const quizTimePaused = overlay === "quiz" || overlay === "oral";
+
     if(
       !autoTime ||
-      game.isGameOver
+      game.isGameOver ||
+      quizTimePaused
     ){
       return;
     }
 
     const timer = setInterval(()=>{
       setSecondsLeft(prev=>{
+        // Bảo vệ thêm cho tick đã xếp hàng ngay lúc modal vừa mở.
+        if(overlay === "quiz" || overlay === "oral") return prev;
+
         if(prev > 1){
           return prev - 1;
         }
@@ -1913,6 +1921,7 @@ export default function App(){
     autoTime,
     game.isGameOver,
     game.timeIndex,
+    overlay,
     advanceTime
   ]);
 
