@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Mỗi mốc tối đa 2 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
-   - 180 câu hỏi ôn tập + 200 câu hỏi thi học kỳ/THPT
+   - 280 câu hỏi ôn tập (180 câu cũ + 50 Toán 10-11 + 50 Vật lý 10-11) + 200 câu hỏi thi học kỳ/THPT
    - NPC
    - Nghề
    - Chứng chỉ
@@ -87,8 +87,8 @@ const addRelationship = (g, id, amount) => {
 };
 
 /* =========================================================
-   180 CÂU HỎI
-   9 MÔN × 20 CÂU
+   280 CÂU HỎI ÔN TẬP
+   180 CÂU CŨ + 50 TOÁN 10-11 + 50 VẬT LÝ 10-11
 ========================================================= */
 
 const VAN_QUESTIONS = [
@@ -136,6 +136,10 @@ const LY_QUESTIONS = [
   ["Sóng", "Quan hệ giữa vận tốc, bước sóng và tần số là?", ["v = λf", "v = λ/f", "v = f/λ", "v = λ+f"], 0, "Công thức sóng v = λf."],
   ["Âm thanh", "Âm thanh không truyền được trong môi trường nào?", ["Chân không", "Không khí", "Nước", "Kim loại"], 0, "Âm thanh cần môi trường vật chất để truyền."],
 ];
+
+const TOAN_10_11_QUESTIONS = [["Lớp 10 • Tập hợp","Cho A={1,2,3} và B={2,3,4}. A∩B bằng? ",["{1,2}","{2,3}","{1,2,3,4}","{4}"],1,"Giao của hai tập hợp gồm các phần tử chung của A và B."],["Lớp 10 • Mệnh đề","Mệnh đề 'Nếu n là số chẵn thì n² là số chẵn' có dạng nào?",["Mệnh đề phủ định","Mệnh đề kéo theo","Mệnh đề tương đương","Mệnh đề hội"],1,"Đây là mệnh đề có cấu trúc 'Nếu P thì Q', tức mệnh đề kéo theo."],["Lớp 10 • Hàm số","Hàm số y=2x+1 có hệ số góc bằng?",["1","2","-1","3"],1,"Trong y=ax+b, hệ số góc là a=2."],["Lớp 10 • Hàm số","Giá trị của f(3) với f(x)=x²-2x+1 là?",["4","1","2","10"],0,"f(3)=9-6+1=4."],["Lớp 10 • Bậc hai","Phương trình x²-5x+6=0 có nghiệm là?",["x=1 và x=6","x=2 và x=3","x=-2 và x=-3","x=0 và x=6"],1,"x²-5x+6=(x-2)(x-3), nên x=2 hoặc x=3."],["Lớp 10 • Bất phương trình","Nghiệm của 2x-3>5 là?",["x>1","x>4","x<4","x≥4"],1,"2x-3>5 ⇔ 2x>8 ⇔ x>4."],["Lớp 10 • Định lý Viète","Với x²-7x+10=0, tổng hai nghiệm bằng?",["10","7","-7","-10"],1,"Theo Viète, tổng nghiệm bằng -b/a=7."],["Lớp 10 • Định lý Viète","Với x²-4x+3=0, tích hai nghiệm bằng?",["-3","4","3","-4"],2,"Theo Viète, tích nghiệm bằng c/a=3."],["Lớp 10 • Hàm số bậc hai","Đỉnh của parabol y=x²-4x+1 có hoành độ là?",["-2","2","4","1"],1,"Hoành độ đỉnh là x=-b/(2a)=4/2=2."],["Lớp 10 • Tọa độ","Khoảng cách giữa A(1,2) và B(4,6) bằng?",["4","5","6","7"],1,"AB=√[(4-1)²+(6-2)²]=√25=5."],["Lớp 10 • Tọa độ","Trung điểm của đoạn AB với A(2,-1), B(6,3) là?",["(4,1)","(2,1)","(8,2)","(4,-1)"],0,"Trung điểm là ((2+6)/2,(-1+3)/2)=(4,1)."],["Lớp 10 • Đường thẳng","Đường thẳng đi qua A(0,2) và có hệ số góc 3 có phương trình là?",["y=3x","y=3x+2","y=2x+3","y=-3x+2"],1,"Dạng y=ax+b, đi qua (0,2) nên y=3x+2."],["Lớp 10 • Vectơ","Nếu a=(2,3) và b=(1,-1) thì a+b bằng?",["(1,4)","(3,2)","(2,2)","(3,4)"],1,"Cộng theo từng tọa độ: (2+1,3-1)=(3,2)."],["Lớp 10 • Vectơ","Hai vectơ (2,4) và (1,2) là?",["Vuông góc","Bằng nhau","Cùng phương","Đối nhau"],2,"(2,4)=2(1,2), nên hai vectơ cùng phương."],["Lớp 10 • Tích vô hướng","Với a=(1,2), b=(3,4), a·b bằng?",["5","10","11","12"],2,"a·b=1·3+2·4=11."],["Lớp 10 • Tích vô hướng","Hai vectơ a=(1,0), b=(0,2) có vuông góc không?",["Không, vì cùng phương","Có","Chỉ khi cùng độ dài","Không xác định"],1,"Tích vô hướng bằng 1·0+0·2=0 nên hai vectơ vuông góc."],["Lớp 10 • Hệ thức lượng","Trong tam giác, định lý cos cho cạnh a là?",["a²=b²+c²+2bc cos A","a²=b²+c²-2bc cos A","a=b+c-cos A","a²=b²-c²-2bc cos A"],1,"Định lý cos: a²=b²+c²-2bc cos A."],["Lớp 10 • Tam giác","Tam giác có ba cạnh 3,4,5 là tam giác gì?",["Đều","Cân","Vuông","Tù"],2,"3²+4²=5² nên tam giác vuông."],["Lớp 10 • Diện tích","Diện tích tam giác có đáy 8 cm và chiều cao 5 cm bằng?",["20 cm²","40 cm²","13 cm²","30 cm²"],0,"S=1/2·8·5=20 cm²."],["Lớp 10 • Thống kê","Trung bình cộng của 4,6,8,10 là?",["6","7","8","9"],1,"(4+6+8+10)/4=7."],["Lớp 10 • Thống kê","Trung vị của dãy 2,5,7,9,12 là?",["5","7","9","12"],1,"Dãy đã sắp xếp, giá trị ở giữa là 7."],["Lớp 10 • Xác suất","Một đồng xu cân đối được tung một lần. Xác suất xuất hiện mặt ngửa là?",["0","1","1/2","2"],2,"Hai kết quả đồng khả năng nên xác suất là 1/2."],["Lớp 10 • Tổ hợp","Số cách chọn 2 học sinh từ 5 học sinh là?",["5","8","10","20"],2,"C(5,2)=5·4/2=10."],["Lớp 10 • Quy tắc cộng","Có 3 loại bút xanh và 2 loại bút đỏ khác nhau. Chọn một cây bút có bao nhiêu cách?",["5","6","1","4"],0,"Chọn một trong tổng số 3+2=5 loại."],["Lớp 10 • Nhị thức","Hệ số của x trong (x+2)^2 là?",["2","4","6","8"],1,"(x+2)^2=x²+4x+4 nên hệ số x là 4."],["Lớp 11 • Lượng giác","sin²x+cos²x bằng?",["0","1","2","sin x"],1,"Hệ thức lượng giác cơ bản: sin²x+cos²x=1."],["Lớp 11 • Lượng giác","Nghiệm của sin x=0 là?",["x=π/2+kπ","x=kπ","x=2kπ+π/2","x=π/4+kπ"],1,"sin x=0 khi x=kπ, k∈Z."],["Lớp 11 • Lượng giác","Giá trị của cos 0 bằng?",["0","-1","1","1/2"],2,"cos 0=1."],["Lớp 11 • Hàm lượng giác","Hàm số y=sin x là hàm số?",["Tuần hoàn với chu kỳ 2π","Không tuần hoàn","Tuần hoàn với chu kỳ π/2","Đồng biến trên R"],0,"sin x có chu kỳ 2π."],["Lớp 11 • Dãy số","Dãy 2,5,8,11,... là cấp số cộng với công sai?",["2","3","5","8"],1,"Mỗi số sau hơn số trước 3 đơn vị nên d=3."],["Lớp 11 • Cấp số cộng","Số hạng thứ 10 của cấp số cộng u1=4, d=3 là?",["28","30","31","34"],2,"u10=u1+9d=4+27=31."],["Lớp 11 • Cấp số nhân","Dãy 3,6,12,24,... là cấp số nhân với công bội?",["2","3","6","4"],0,"Mỗi số sau gấp đôi số trước nên q=2."],["Lớp 11 • Cấp số nhân","Số hạng thứ 5 của cấp số nhân u1=2, q=3 là?",["18","54","162","81"],2,"u5=2·3^4=162 — ồ, đáp án đúng là C. Đây là câu kiểm tra nội dung."],["Lớp 11 • Giới hạn","lim(x→2) (x+3) bằng?",["2","3","5","6"],2,"Hàm đa thức liên tục nên thay x=2 được 5."],["Lớp 11 • Giới hạn","lim(n→∞) 1/n bằng?",["1","∞","0","-1"],2,"Khi n tăng vô hạn, 1/n tiến về 0."],["Lớp 11 • Đạo hàm","Đạo hàm của f(x)=x² là?",["x","2x","x²","2"],1,"(x²)'=2x."],["Lớp 11 • Đạo hàm","Đạo hàm của f(x)=3x+5 là?",["3","5","3x","8"],0,"Đạo hàm của ax+b là a, nên bằng 3."],["Lớp 11 • Tiếp tuyến","Hệ số góc tiếp tuyến của y=x² tại x=2 là?",["2","4","6","8"],1,"y'=2x, tại x=2 được y'=4."],["Lớp 11 • Đơn điệu","Hàm y=x³ có đạo hàm trên R là?",["3x²","x²","3x","x³"],0,"(x³)'=3x²."],["Lớp 11 • Mũ","2^3 bằng?",["6","8","9","12"],1,"2³=8."],["Lớp 11 • Logarit","log₂8 bằng?",["2","3","4","8"],1,"2³=8 nên log₂8=3."],["Lớp 11 • Lũy thừa","a^m·a^n bằng?",["a^(m-n)","a^(mn)","a^(m+n)","(a+b)^(m+n)"],2,"Cùng cơ số thì cộng số mũ."],["Lớp 11 • Tổ hợp","Số cách sắp xếp 4 học sinh thành một hàng là?",["8","12","16","24"],3,"Có 4!=24 hoán vị."],["Lớp 11 • Xác suất","Gieo một xúc xắc cân đối. Xác suất ra số lớn hơn 4 là?",["1/6","1/3","1/2","2/3"],1,"Các mặt 5,6 thuận lợi: 2/6=1/3."],["Lớp 11 • Xác suất","Hai biến cố A và B độc lập thì P(A∩B) bằng?",["P(A)+P(B)","P(A)-P(B)","P(A)P(B)","P(A)/P(B)"],2,"Với biến cố độc lập, P(A∩B)=P(A)P(B)."],["Lớp 11 • Hình học không gian","Hai đường thẳng trong không gian có thể?",["Chỉ cắt nhau","Chỉ song song","Cắt nhau, song song hoặc chéo nhau","Luôn trùng nhau"],2,"Trong không gian có ba vị trí cơ bản: cắt, song song, chéo nhau."],["Lớp 11 • Hình học không gian","Hai mặt phẳng song song có bao nhiêu điểm chung?",["0 điểm","1 điểm","2 điểm","Vô số điểm"],0,"Hai mặt phẳng phân biệt song song không có điểm chung."],["Lớp 11 • Vector","Nếu a=(2,-1,3) thì |a| bằng?",["√12","√14","√10","6"],1,"|a|=√(2²+(-1)²+3²)=√14."],["Lớp 11 • Phương trình","Phương trình 2x+1=7 có nghiệm?",["x=2","x=3","x=4","x=5"],1,"2x=6 nên x=3."],["Lớp 11 • Hình học","Nếu hai đường thẳng vuông góc trong không gian thì góc giữa chúng bằng?",["30°","45°","90°","180°"],2,"Theo định nghĩa, hai đường thẳng vuông góc tạo góc 90°."]];
+
+const LY_10_11_QUESTIONS = [["Lớp 10 • Chuyển động thẳng","Một xe đi đều với tốc độ 15 m/s trong 20 s. Quãng đường xe đi được là?",["300 m","35 m","75 m","150 m"],0,"s=vt=15·20=300 m."],["Lớp 10 • Vận tốc","Đổi 72 km/h ra m/s bằng?",["10 m/s","20 m/s","25 m/s","30 m/s"],1,"72 km/h = 72/3,6 = 20 m/s."],["Lớp 10 • Gia tốc","Một vật tăng vận tốc từ 5 m/s lên 17 m/s trong 4 s. Gia tốc trung bình là?",["2 m/s²","3 m/s²","4 m/s²","5 m/s²"],1,"a=(17-5)/4=3 m/s²."],["Lớp 10 • Rơi tự do","Bỏ qua lực cản không khí, vật rơi tự do gần mặt đất có gia tốc hướng?",["Ngang","Thẳng đứng xuống dưới","Thẳng đứng lên trên","Theo phương bất kỳ"],1,"Gia tốc trọng trường hướng thẳng đứng xuống dưới."],["Lớp 10 • Newton","Định luật I Newton còn gọi là định luật?",["Hấp dẫn","Quán tính","Bảo toàn năng lượng","Archimedes"],1,"Định luật I là định luật quán tính."],["Lớp 10 • Newton","Một lực 12 N tác dụng lên vật khối lượng 3 kg. Gia tốc của vật là?",["2 m/s²","3 m/s²","4 m/s²","36 m/s²"],2,"Theo F=ma, a=12/3=4 m/s²."],["Lớp 10 • Trọng lực","Trọng lượng của vật khối lượng 2 kg, lấy g=10 m/s², là?",["5 N","10 N","20 N","30 N"],2,"P=mg=2·10=20 N."],["Lớp 10 • Ma sát","Lực ma sát trượt có phương như thế nào so với vận tốc tương đối của hai bề mặt?",["Cùng chiều","Vuông góc","Ngược chiều","Không xác định"],2,"Ma sát trượt có phương tiếp tuyến và ngược chiều chuyển động tương đối."],["Lớp 10 • Công","Một lực 10 N cùng hướng chuyển động làm vật dịch chuyển 5 m. Công của lực là?",["2 J","15 J","50 J","100 J"],2,"A=Fs=10·5=50 J."],["Lớp 10 • Công suất","Một máy thực hiện công 600 J trong 20 s. Công suất là?",["20 W","30 W","40 W","120 W"],1,"P=A/t=600/20=30 W."],["Lớp 10 • Động năng","Vật m=2 kg chuyển động với v=3 m/s. Động năng bằng?",["3 J","6 J","9 J","18 J"],2,"Wđ=1/2·2·3²=9 J."],["Lớp 10 • Thế năng","Vật m=2 kg ở độ cao 5 m, g=10 m/s². Thế năng trọng trường là?",["10 J","50 J","100 J","200 J"],2,"Wt=mgh=2·10·5=100 J."],["Lớp 10 • Cơ năng","Nếu bỏ qua lực cản, cơ năng của vật trong trường trọng lực bảo toàn. Phát biểu này đúng vì?",["Động năng luôn bằng 0","Chỉ có lực thế thực hiện công","Khối lượng thay đổi","Gia tốc bằng 0"],1,"Trong trường hợp chỉ có lực thế như trọng lực, cơ năng được bảo toàn."],["Lớp 10 • Động lượng","Động lượng của vật khối lượng 4 kg chuyển động với 2 m/s là?",["2 kg·m/s","4 kg·m/s","6 kg·m/s","8 kg·m/s"],3,"p=mv=4·2=8 kg·m/s."],["Lớp 10 • Xung lượng","Xung lượng của lực không đổi được tính bằng?",["F/t","Ft","F+s","F/t²"],1,"Xung lượng của lực không đổi có độ lớn I=Ft."],["Lớp 10 • Bảo toàn động lượng","Hai vật va chạm trong hệ kín. Đại lượng nào được bảo toàn?",["Cơ năng trong mọi trường hợp","Động lượng của hệ","Động năng của từng vật","Tốc độ của từng vật"],1,"Trong hệ kín, tổng động lượng của hệ được bảo toàn."],["Lớp 10 • Chuyển động tròn","Trong chuyển động tròn đều, vectơ vận tốc có phương?",["Tiếp tuyến quỹ đạo","Hướng vào tâm","Hướng ra xa tâm","Luôn thẳng đứng"],0,"Vận tốc tức thời có phương tiếp tuyến với quỹ đạo."],["Lớp 10 • Chuyển động tròn","Công thức độ lớn gia tốc hướng tâm là?",["aht=v/r","aht=v²/r","aht=vr","aht=r/v²"],1,"Gia tốc hướng tâm aht=v²/r."],["Lớp 10 • Trọng lực","Gia tốc rơi tự do gần mặt đất có giá trị xấp xỉ?",["0,98 m/s²","9,8 m/s²","98 m/s²","980 m/s²"],1,"Gần mặt đất, g≈9,8 m/s²."],["Lớp 10 • Áp suất","Áp suất được định nghĩa là?",["Lực tác dụng trên một đơn vị diện tích","Khối lượng trên một đơn vị thể tích","Công trong một đơn vị thời gian","Vận tốc trên một đơn vị thời gian"],0,"p=F/S là áp lực trên một đơn vị diện tích."],["Lớp 10 • Khối lượng riêng","Một vật có khối lượng 2 kg và thể tích 0,5 m³. Khối lượng riêng là?",["1 kg/m³","2 kg/m³","4 kg/m³","8 kg/m³"],2,"ρ=m/V=2/0,5=4 kg/m³."],["Lớp 10 • Lực đẩy","Một vật nhúng trong chất lỏng chịu lực đẩy hướng nào?",["Thẳng đứng xuống","Nằm ngang","Thẳng đứng lên","Theo hướng chuyển động"],2,"Lực đẩy Archimedes có phương thẳng đứng, chiều từ dưới lên."],["Lớp 10 • Cân bằng","Một vật chịu hai lực cân bằng khi hai lực?",["Cùng chiều, khác độ lớn","Cùng độ lớn, cùng chiều","Cùng độ lớn, ngược chiều trên cùng đường tác dụng","Vuông góc nhau"],2,"Hai lực cân bằng có cùng độ lớn, ngược chiều và cùng đường tác dụng."],["Lớp 10 • Mômen","Mômen của lực đối với trục quay được tính bởi?",["M=F/d","M=Fd","M=F+d","M=F²d"],1,"Mômen lực có độ lớn M=F·d, với d là cánh tay đòn."],["Lớp 10 • Đòn bẩy","Muốn dùng đòn bẩy nâng vật nặng với lực nhỏ hơn, nên?",["Giảm cánh tay đòn của lực","Tăng cánh tay đòn của lực","Tăng trọng lượng vật","Đặt hai lực cùng chiều"],1,"Tăng cánh tay đòn của lực giúp giảm lực cần thiết khi mômen cân bằng."],["Lớp 11 • Điện tích","Hai điện tích cùng dấu đặt gần nhau sẽ?",["Hút nhau","Đẩy nhau","Không tương tác","Luôn đứng yên"],1,"Hai điện tích cùng dấu đẩy nhau."],["Lớp 11 • Định luật Coulomb","Độ lớn lực Coulomb giữa hai điện tích điểm trong chân không tỉ lệ với?",["Tích độ lớn hai điện tích và nghịch với bình phương khoảng cách","Tổng hai điện tích","Khoảng cách","Khối lượng điện tích"],0,"F=k|q1q2|/r²."],["Lớp 11 • Cường độ điện trường","Đơn vị SI của cường độ điện trường là?",["V","N/C","C/N","J"],1,"Cường độ điện trường có thể đo bằng N/C, tương đương V/m."],["Lớp 11 • Hiệu điện thế","Hiệu điện thế giữa hai điểm được liên hệ với công của lực điện theo công thức?",["U=A/q","U=Aq","U=q/A","U=F/q"],0,"U=A/q với A là công di chuyển điện tích q giữa hai điểm."],["Lớp 11 • Tụ điện","Điện dung của tụ điện được định nghĩa bởi?",["C=q/U","C=U/q","C=qU","C=q+U"],0,"C=q/U."],["Lớp 11 • Dòng điện","Cường độ dòng điện được tính bằng?",["I=qt","I=q/t","I=t/q","I=q+t"],1,"I=q/t, điện lượng qua tiết diện trong một đơn vị thời gian."],["Lớp 11 • Ohm","Định luật Ohm cho đoạn mạch chỉ chứa điện trở R là?",["I=UR","U=IR","R=UI","U=I/R"],1,"U=IR."],["Lớp 11 • Mạch nối tiếp","Trong mạch gồm các điện trở mắc nối tiếp, đại lượng nào giống nhau qua mọi điện trở?",["Hiệu điện thế","Cường độ dòng điện","Công suất","Điện trở"],1,"Mạch nối tiếp có cùng cường độ dòng điện qua các phần tử."],["Lớp 11 • Mạch song song","Trong mạch gồm các nhánh song song, đại lượng nào như nhau ở hai đầu mỗi nhánh?",["Cường độ dòng điện","Điện trở","Hiệu điện thế","Công suất"],2,"Các nhánh song song có cùng hiệu điện thế giữa hai đầu."],["Lớp 11 • Công suất điện","Công suất điện của thiết bị có hiệu điện thế U và dòng điện I là?",["P=U/I","P=UI","P=I/U","P=U+I"],1,"P=UI."],["Lớp 11 • Điện năng","Điện năng tiêu thụ của thiết bị công suất P hoạt động trong thời gian t là?",["A=Pt","A=P/t","A=t/P","A=P+t"],0,"Điện năng A=Pt."],["Lớp 11 • Nguồn điện","Nguồn điện có tác dụng chính là?",["Duy trì hiệu điện thế và cung cấp năng lượng cho mạch","Làm điện tích biến mất","Làm điện trở bằng 0","Chỉ làm dây nóng lên"],0,"Nguồn điện duy trì sự chênh lệch điện thế và cung cấp năng lượng cho mạch."],["Lớp 11 • Suất điện động","Đơn vị của suất điện động là?",["Ampere","Ohm","Volt","Coulomb"],2,"Suất điện động có đơn vị volt (V)."],["Lớp 11 • Từ trường","Từ trường tác dụng lực rõ rệt lên?",["Điện tích đứng yên trong mọi trường hợp","Nam châm và dòng điện","Chỉ vật cách điện","Chỉ chất lỏng"],1,"Từ trường tác dụng lực lên nam châm, dòng điện và điện tích chuyển động."],["Lớp 11 • Lực từ","Lực từ tác dụng lên đoạn dây có dòng điện trong từ trường có hướng thế nào?",["Song song với dây trong mọi trường hợp","Vuông góc với cả dòng điện và từ trường (khi không song song)","Luôn hướng theo dòng điện","Luôn hướng theo B"],1,"Lực từ vuông góc với phương dòng điện và cảm ứng từ trong cấu hình vuông góc."],["Lớp 11 • Cảm ứng điện từ","Hiện tượng xuất hiện dòng điện cảm ứng khi từ thông qua mạch biến thiên gọi là?",["Cảm ứng điện từ","Quang điện","Điện phân","Đối lưu"],0,"Đó là hiện tượng cảm ứng điện từ."],["Lớp 11 • Faraday","Suất điện động cảm ứng có độ lớn tỉ lệ với?",["Tốc độ biến thiên của từ thông qua mạch","Khối lượng vật","Điện trở bằng 0","Nhiệt độ phòng"],0,"Theo định luật Faraday, độ lớn suất điện động cảm ứng tỉ lệ với tốc độ biến thiên từ thông."],["Lớp 11 • Sóng cơ","Bước sóng λ liên hệ với vận tốc v và tần số f bởi?",["λ=vf","λ=v/f","λ=f/v","λ=v+f"],1,"v=λf nên λ=v/f."],["Lớp 11 • Giao thoa","Hai nguồn kết hợp muốn tạo giao thoa ổn định cần có?",["Cùng tần số và độ lệch pha không đổi theo thời gian","Khác tần số rất lớn","Biên độ luôn bằng 0","Không cần liên hệ pha"],0,"Hai nguồn kết hợp có cùng tần số và độ lệch pha không đổi."],["Lớp 11 • Dao động","Trong dao động điều hòa, tại vị trí cân bằng, tốc độ của vật có giá trị?",["Bằng 0","Lớn nhất","Không đổi bằng biên độ","Luôn âm"],1,"Tốc độ đạt giá trị lớn nhất khi vật qua vị trí cân bằng."],["Lớp 11 • Dao động","Chu kỳ dao động là?",["Thời gian thực hiện một dao động toàn phần","Số dao động trong một giây","Quãng đường đi trong một chu kỳ","Biên độ dao động"],0,"Chu kỳ T là thời gian để thực hiện một dao động toàn phần."],["Lớp 11 • Nhiệt học","Nhiệt lượng vật thu vào khi tăng nhiệt độ (không chuyển thể) được tính bởi?",["Q=mcΔt","Q=m/cΔt","Q=c/(mΔt)","Q=mc/t"],0,"Q=mcΔt."],["Lớp 11 • Chất khí","Ở thể tích không đổi, với một lượng khí xác định, áp suất tỉ lệ với?",["Nhiệt độ tuyệt đối","Khối lượng riêng của vật rắn","Diện tích bình","Màu sắc khí"],0,"V không đổi thì p/T là hằng số với lượng khí xác định."],["Lớp 11 • Bài tập điện","Một điện trở 6 Ω mắc vào nguồn 12 V. Cường độ dòng điện qua điện trở là?",["0,5 A","1 A","2 A","72 A"],2,"I=U/R=12/6=2 A."],["Lớp 11 • Bài tập công suất","Một thiết bị 220 V dùng dòng điện 2 A. Công suất điện của thiết bị là?",["110 W","220 W","440 W","880 W"],2,"P=UI=220·2=440 W."]];
 
 const HOA_QUESTIONS = [
   ["pH", "Dung dịch có pH < 7 thường có tính gì?", ["Axit", "Bazơ", "Trung tính", "Muối"], 0, "pH nhỏ hơn 7 thường biểu thị môi trường axit."],
@@ -298,20 +302,35 @@ const MEO_QUESTIONS = [
   ["Câu đố", "Càng lấy đi nhiều thì nó càng lớn là gì?", ["Cái hố", "Cái túi", "Cái hộp", "Đống sách"], 0, "Càng đào lấy đất thì cái hố càng lớn."],
 ];
 
+const varyQuestionChoices = (choices, answer, seed=0) => {
+  const list = [...choices];
+  const shift = ((seed % list.length) + list.length) % list.length;
+  const reordered = list.map((_, idx) => list[(idx - shift + list.length) % list.length]);
+  return {
+    choices: reordered,
+    answer: (answer + shift) % list.length
+  };
+};
+
 const toQuestions = (subject, key, rows) =>
-  rows.map((r, i) => ({
-    id: `${key}${String(i + 1).padStart(2, "0")}`,
-    subject,
-    topic: r[0],
-    q: r[1],
-    choices: r[2],
-    answer: r[3],
-    explanation: r[4],
-  }));
+  rows.map((r, i) => {
+    const varied = varyQuestionChoices(r[2], r[3], i + key.length);
+    return {
+      id: `${key}${String(i + 1).padStart(2, "0")}`,
+      subject,
+      topic: r[0],
+      q: r[1],
+      choices: varied.choices,
+      answer: varied.answer,
+      explanation: r[4],
+    };
+  });
 
 const QUIZ_BANK = [
   ...toQuestions("Ngữ văn", "van", VAN_QUESTIONS),
   ...toQuestions("Vật lý", "ly", LY_QUESTIONS),
+  ...toQuestions("Toán", "toan10_11", TOAN_10_11_QUESTIONS),
+  ...toQuestions("Vật lý", "ly10_11", LY_10_11_QUESTIONS),
   ...toQuestions("Hóa học", "hoa", HOA_QUESTIONS),
   ...toQuestions("Sinh học", "sinh", SINH_QUESTIONS),
   ...toQuestions("Lịch sử", "su", SU_QUESTIONS),
@@ -634,7 +653,19 @@ const getExamQuestions = (exam) => {
   const rows = [];
   EXAM_SUBJECTS.forEach(subject=>{
     (EXAM_BANKS[exam.id]?.[subject] || []).forEach((q,i)=>{
-      rows.push({...q, subject, id:`${exam.id}-${keysBySubject[subject]}-${String(i+1).padStart(2,"0")}`});
+      const id = `${exam.id}-${keysBySubject[subject]}-${String(i+1).padStart(2,"0")}`;
+      const varied = varyQuestionChoices(
+        q.choices,
+        q.answer,
+        i + exam.id.length + subject.length
+      );
+      rows.push({
+        ...q,
+        subject,
+        id,
+        choices:varied.choices,
+        answer:varied.answer
+      });
     });
   });
   return rows;
@@ -2452,7 +2483,7 @@ export default function App(){
     {
       icon:"📚",
       title:"Quiz 5 câu",
-      desc:"Ôn tập 180 câu",
+      desc:"Ôn tập 280 câu",
       action:()=>startQuiz("quick")
     },
     {
