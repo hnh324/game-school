@@ -2077,6 +2077,74 @@ export default function App(){
 
   const getFashion = (id)=>FASHION.find(x=>x.id===id);
 
+  const fashionVisual = (id, slot)=>{
+    const item = getFashion(id);
+    if(!item) return {kind:slot, tone:"default", detail:""};
+
+    const idv = item.id;
+    if(slot === "shirt") {
+      let tone = "white";
+      if(/black|leather/.test(idv)) tone = "black";
+      else if(/blue|denim|jersey/.test(idv)) tone = "blue";
+      else if(/pink/.test(idv)) tone = "pink";
+      else if(/green/.test(idv)) tone = "mint";
+      else if(/red/.test(idv)) tone = "red";
+      else if(/yellow/.test(idv)) tone = "yellow";
+      else if(/gray/.test(idv)) tone = "gray";
+      else if(/cream/.test(idv)) tone = "cream";
+      const detail = /hoodie/.test(idv) ? "hoodie" : /jacket/.test(idv) ? "jacket" : /varsity/.test(idv) ? "varsity" : /cardigan/.test(idv) ? "cardigan" : /sweater/.test(idv) ? "sweater" : /jersey/.test(idv) ? "jersey" : /tee/.test(idv) ? "tee" : "shirt";
+      return {kind:"shirt",tone,detail};
+    }
+
+    if(slot === "pants") {
+      const tone = /white/.test(idv) ? "white" : /gray/.test(idv) ? "gray" : /green/.test(idv) ? "green" : /beige|kaki/.test(idv) ? "beige" : /blue/.test(idv) ? "blue" : "black";
+      const detail = /skirt/.test(idv) ? "skirt" : /short/.test(idv) ? "short" : /wide/.test(idv) ? "wide" : /cargo/.test(idv) ? "cargo" : "pants";
+      return {kind:"bottom",tone,detail};
+    }
+
+    if(slot === "shoes") {
+      const tone = /red/.test(idv) ? "red" : /pink/.test(idv) ? "pink" : /black|loafer|boots/.test(idv) ? "black" : "white";
+      return {kind:"shoes",tone,detail:/boots/.test(idv)?"boots":/loafer/.test(idv)?"loafer":"sneaker"};
+    }
+
+    if(slot === "hair") {
+      const tone = /brown/.test(idv) ? "brown" : /blue/.test(idv) ? "blue" : /pink/.test(idv) ? "pink" : "black";
+      const detail = /long/.test(idv) ? "long" : /short/.test(idv) ? "short" : /wavy/.test(idv) ? "wavy" : "long";
+      return {kind:"hair",tone,detail};
+    }
+
+    return {kind:slot,tone:"default",detail:""};
+  };
+
+  const renderOutfitAvatar = (size="large")=>{
+    const shirt = fashionVisual(game.outfit.shirt,"shirt");
+    const bottom = fashionVisual(game.outfit.pants,"pants");
+    const shoes = fashionVisual(game.outfit.shoes,"shoes");
+    const hair = fashionVisual(game.outfit.hair,"hair");
+    return (
+      <div className={`outfit-avatar outfit-avatar-${size}`}>
+        <div className={`avatar-hair hair-${hair.tone} hair-${hair.detail}`} />
+        <div className="avatar-head">😊</div>
+        <div className={`avatar-neck neck-${shirt.tone}`} />
+        <div className={`avatar-shirt shirt-${shirt.tone} shirt-${shirt.detail}`}>
+          <span className="shirt-collar" />
+          <span className="shirt-front-detail" />
+        </div>
+        <div className={`avatar-bottom bottom-${bottom.tone} bottom-${bottom.detail}`} />
+        <div className="avatar-legs">
+          <span className={`avatar-leg leg-${bottom.tone}`} />
+          <span className={`avatar-leg leg-${bottom.tone}`} />
+        </div>
+        <div className={`avatar-shoes shoes-${shoes.tone} shoes-${shoes.detail}`}>
+          <span />
+          <span />
+        </div>
+        {game.outfit.bag && <div className="avatar-bag">🎒</div>}
+        {game.outfit.accessory && <div className="avatar-accessory">{getFashion(game.outfit.accessory)?.icon}</div>}
+      </div>
+    );
+  };
+
   const characterParts = [
     getFashion(game.outfit.hair),
     getFashion(game.outfit.shirt),
@@ -2330,18 +2398,7 @@ export default function App(){
         <div className="section-title">👕 Nhân vật của bạn</div>
 
         <div className="character female-character">
-          <div className="female-avatar">👩🏻‍🎓</div>
-          <div className="worn-clothes">
-            <span className="worn-shirt">{getFashion(game.outfit.shirt)?.icon || "👕"}</span>
-            <span className="worn-bottom">{getFashion(game.outfit.pants)?.icon || "👖"}</span>
-            <span className="worn-shoes">{getFashion(game.outfit.shoes)?.icon || "👟"}</span>
-          </div>
-          {game.outfit.bag && (
-            <span className="worn-bag">{getFashion(game.outfit.bag)?.icon || "🎒"}</span>
-          )}
-          {game.outfit.accessory && (
-            <span className="worn-accessory">{getFashion(game.outfit.accessory)?.icon || ""}</span>
-          )}
+          {renderOutfitAvatar("large")}
           <div className="female-outfit-caption">
             {getFashion(game.outfit.hair)?.name || "Tóc tự nhiên"}
           </div>
@@ -3036,27 +3093,7 @@ export default function App(){
             <div className="character-card">
 
               <div className="mini-character">
-
-                <div>
-                  {getFashion(game.outfit.hair)?.icon}
-                </div>
-
-                <div>
-                  {getFashion(game.outfit.shirt)?.icon}
-                </div>
-
-                <div>
-                  {getFashion(game.outfit.pants)?.icon}
-                </div>
-
-                <div>
-                  {getFashion(game.outfit.shoes)?.icon}
-                </div>
-
-                <div className="mini-accessory">
-                  {getFashion(game.outfit.accessory)?.icon}
-                </div>
-
+                {renderOutfitAvatar("mini")}
               </div>
 
               <b>
@@ -4220,36 +4257,198 @@ button:disabled{
 .female-character{
   overflow:hidden;
   justify-content:flex-start;
-  padding-top:12px;
+  padding-top:10px;
   gap:0;
 }
 
-.female-avatar{
+.outfit-avatar{
   position:relative;
-  z-index:3;
-  font-size:58px;
-  line-height:64px;
-  filter:drop-shadow(0 3px 2px rgba(80,40,110,.12));
+  width:128px;
+  height:174px;
+  margin:4px auto 0;
+  flex:none;
 }
 
-.worn-clothes{
-  position:relative;
+.outfit-avatar-large{
+  transform:translateY(2px);
+}
+
+.avatar-head{
+  position:absolute;
+  z-index:5;
+  left:43px;
+  top:16px;
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#ffd8c7;
+  font-size:30px;
+  line-height:1;
+  box-shadow:0 2px 4px rgba(80,40,110,.12);
+  overflow:hidden;
+}
+
+.avatar-hair{
+  position:absolute;
+  z-index:6;
+  left:38px;
+  top:10px;
+  width:52px;
+  height:44px;
+  border-radius:50% 50% 38% 38%;
+  background:#2d2532;
+  pointer-events:none;
+}
+
+.avatar-hair::after{
+  content:"";
+  position:absolute;
+  left:3px;
+  right:3px;
+  top:26px;
+  height:28px;
+  border-radius:8px 8px 18px 18px;
+  background:inherit;
+}
+
+.hair-black{background:#2d2532}.hair-brown{background:#70452f}.hair-blue{background:#4779b8}.hair-pink{background:#d96d9d}
+.hair-short{height:38px}.hair-short::after{height:16px}
+.hair-long{height:48px}.hair-long::after{height:42px}
+.hair-wavy{border-radius:48% 52% 35% 35%; transform:rotate(-2deg)}
+
+.avatar-neck{
+  position:absolute;
   z-index:2;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:2px;
-  margin-top:-3px;
+  left:58px;
+  top:52px;
+  width:12px;
+  height:12px;
+  background:#f3c2ae;
+  border-radius:0 0 6px 6px;
 }
 
-.worn-shirt{font-size:42px; transform:scale(1.05);}
-.worn-bottom{font-size:39px; margin-left:-7px;}
-.worn-shoes{font-size:32px; margin-left:-4px;}
-.worn-bag{position:absolute; right:12px; top:92px; font-size:28px; z-index:4;}
-.worn-accessory{position:absolute; left:12px; top:42px; font-size:26px; z-index:5;}
+.avatar-shirt{
+  position:absolute;
+  z-index:3;
+  left:29px;
+  top:59px;
+  width:70px;
+  height:58px;
+  border-radius:16px 16px 10px 10px;
+  box-shadow:inset 0 -5px 0 rgba(0,0,0,.06),0 2px 4px rgba(70,35,90,.12);
+  overflow:hidden;
+}
+
+.avatar-shirt::before,.avatar-shirt::after{
+  content:"";
+  position:absolute;
+  top:5px;
+  width:18px;
+  height:36px;
+  background:inherit;
+  border-radius:10px;
+}
+.avatar-shirt::before{left:-9px; transform:rotate(10deg)}
+.avatar-shirt::after{right:-9px; transform:rotate(-10deg)}
+
+.shirt-white{background:#f8f8ff}.shirt-blue{background:#4f91d8}.shirt-black{background:#34313b}.shirt-pink{background:#eaa7c7}.shirt-mint{background:#8fd5c4}.shirt-red{background:#d95762}.shirt-yellow{background:#f0c95a}.shirt-gray{background:#9b9ba8}.shirt-cream{background:#e9dcc3}
+.shirt-hoodie{border-radius:18px 18px 11px 11px}.shirt-jacket{border:3px solid rgba(0,0,0,.1)}.shirt-varsity{border:3px solid rgba(255,255,255,.65)}.shirt-cardigan{box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}.shirt-sweater{border-radius:13px}.shirt-jersey::after{background:rgba(255,255,255,.25)}
+
+.shirt-collar{
+  position:absolute;
+  z-index:2;
+  left:25px;
+  top:0;
+  width:20px;
+  height:15px;
+  background:#fff;
+  clip-path:polygon(0 0,50% 70%,100% 0,82% 100%,18% 100%);
+}
+
+.shirt-front-detail{
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:17px;
+  width:2px;
+  height:33px;
+  transform:translateX(-50%);
+  background:rgba(255,255,255,.38);
+}
+
+.avatar-bottom{
+  position:absolute;
+  z-index:2;
+  left:35px;
+  top:114px;
+  width:58px;
+  height:37px;
+  border-radius:7px 7px 13px 13px;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.08);
+}
+
+.bottom-black{background:#30303a}.bottom-blue{background:#5b83bd}.bottom-white{background:#eeeef5}.bottom-gray{background:#8f909d}.bottom-green{background:#607d55}.bottom-beige{background:#cbb991}
+.bottom-skirt{height:42px; width:66px; left:31px; border-radius:5px 5px 17px 17px; transform:perspective(30px) rotateX(-2deg)}
+.bottom-short{height:29px; top:116px}.bottom-wide{width:66px; left:31px}.bottom-cargo{box-shadow:inset 0 -4px 0 rgba(0,0,0,.08), inset 0 0 0 2px rgba(255,255,255,.08)}
+
+.avatar-legs{
+  position:absolute;
+  z-index:1;
+  left:43px;
+  top:145px;
+  display:flex;
+  gap:12px;
+}
+.avatar-leg{width:13px;height:25px;border-radius:0 0 7px 7px;background:#f0c4ae}.leg-black{background:#f0c4ae}
+
+.avatar-shoes{
+  position:absolute;
+  z-index:4;
+  left:35px;
+  top:163px;
+  display:flex;
+  gap:13px;
+}
+.avatar-shoes span{display:block;width:28px;height:10px;border-radius:10px 10px 5px 5px;background:#fff;box-shadow:0 2px 3px rgba(0,0,0,.15)}
+.shoes-black span{background:#35333d}.shoes-red span{background:#d95762}.shoes-pink span{background:#e8a4c6}.shoes-white span{background:#fff}
+.shoes-boots span{height:14px;border-radius:5px 5px 8px 8px}.shoes-loafer span{height:9px;border-radius:8px}
+
+.avatar-bag{
+  position:absolute;
+  z-index:7;
+  right:3px;
+  top:91px;
+  font-size:26px;
+  transform:rotate(5deg);
+}
+
+.avatar-accessory{
+  position:absolute;
+  z-index:8;
+  left:82px;
+  top:31px;
+  font-size:22px;
+}
+
+.outfit-avatar-mini{
+  width:74px;
+  height:104px;
+  transform:scale(.58);
+  transform-origin:top center;
+  margin:0 auto -45px;
+}
+
+.outfit-avatar-profile{
+  width:150px;
+  height:205px;
+  transform:scale(1.05);
+  transform-origin:center center;
+}
 
 .female-outfit-caption{
-  margin-top:2px;
+  margin-top:0;
   padding:3px 8px;
   border-radius:999px;
   background:#f1e7ff;
@@ -4785,10 +4984,9 @@ button:disabled{
   height:43px;
 }
 
-.female-profile-character .female-avatar{
-  height:auto;
-  font-size:68px;
-  line-height:70px;
+.female-profile-character .outfit-avatar{
+  transform:scale(1.05);
+  transform-origin:center center;
 }
 
 
