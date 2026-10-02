@@ -2124,7 +2124,20 @@ export default function App(){
     return (
       <div className={`outfit-avatar outfit-avatar-${size}`}>
         <div className={`avatar-hair hair-${hair.tone} hair-${hair.detail}`} />
-        <div className="avatar-head">😊</div>
+        <div className="avatar-head">
+          <span className="avatar-ear avatar-ear-left" />
+          <span className="avatar-ear avatar-ear-right" />
+          <span className="avatar-face">
+            <span className="avatar-brow avatar-brow-left" />
+            <span className="avatar-brow avatar-brow-right" />
+            <span className="avatar-eye avatar-eye-left"><i /></span>
+            <span className="avatar-eye avatar-eye-right"><i /></span>
+            <span className="avatar-nose" />
+            <span className="avatar-mouth"><i /></span>
+            <span className="avatar-blush avatar-blush-left" />
+            <span className="avatar-blush avatar-blush-right" />
+          </span>
+        </div>
         <div className={`avatar-neck neck-${shirt.tone}`} />
         <div className={`avatar-shirt shirt-${shirt.tone} shirt-${shirt.detail}`}>
           <span className="shirt-collar" />
@@ -4277,26 +4290,112 @@ button:disabled{
   position:absolute;
   z-index:5;
   left:43px;
-  top:16px;
+  top:15px;
   width:42px;
-  height:42px;
-  display:grid;
-  place-items:center;
+  height:47px;
+  border-radius:47% 47% 43% 43% / 42% 42% 55% 55%;
+  background:linear-gradient(180deg,#ffd9c8 0%,#f5c1ad 100%);
+  box-shadow:0 2px 4px rgba(80,40,110,.12), inset 0 -2px 0 rgba(192,115,97,.10);
+  overflow:visible;
+}
+
+.avatar-face{
+  position:absolute;
+  inset:0;
+  display:block;
+}
+
+.avatar-ear{
+  position:absolute;
+  z-index:-1;
+  top:21px;
+  width:7px;
+  height:12px;
   border-radius:50%;
-  background:#ffd8c7;
-  font-size:30px;
-  line-height:1;
-  box-shadow:0 2px 4px rgba(80,40,110,.12);
+  background:#f3b9a6;
+}
+.avatar-ear-left{left:-3px}.avatar-ear-right{right:-3px}
+
+.avatar-brow{
+  position:absolute;
+  top:14px;
+  width:10px;
+  height:2px;
+  border-radius:99px;
+  background:#513934;
+}
+.avatar-brow-left{left:8px;transform:rotate(-5deg)}
+.avatar-brow-right{right:8px;transform:rotate(5deg)}
+
+.avatar-eye{
+  position:absolute;
+  top:18px;
+  width:10px;
+  height:7px;
+  border:1.5px solid #44313a;
+  border-radius:55% 55% 50% 50%;
+  background:#fff;
   overflow:hidden;
 }
+.avatar-eye-left{left:8px}.avatar-eye-right{right:8px}
+.avatar-eye i{
+  position:absolute;
+  left:3px;
+  top:1px;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:#3a2931;
+}
+
+.avatar-nose{
+  position:absolute;
+  left:19px;
+  top:25px;
+  width:5px;
+  height:7px;
+  border-right:1.5px solid rgba(167,100,87,.75);
+  border-bottom:1.5px solid rgba(167,100,87,.75);
+  border-radius:0 0 5px 0;
+  transform:rotate(12deg);
+}
+
+.avatar-mouth{
+  position:absolute;
+  left:14px;
+  top:34px;
+  width:14px;
+  height:7px;
+  border-bottom:2px solid #ad4f68;
+  border-radius:0 0 12px 12px;
+}
+.avatar-mouth i{
+  position:absolute;
+  left:2px;
+  right:2px;
+  bottom:0;
+  height:2px;
+  border-radius:50%;
+  background:#f6a2a5;
+}
+
+.avatar-blush{
+  position:absolute;
+  top:29px;
+  width:7px;
+  height:4px;
+  border-radius:50%;
+  background:rgba(239,132,143,.34);
+}
+.avatar-blush-left{left:4px}.avatar-blush-right{right:4px}
 
 .avatar-hair{
   position:absolute;
   z-index:4;
   left:38px;
-  top:10px;
+  top:9px;
   width:52px;
-  height:44px;
+  height:45px;
   border-radius:50% 50% 38% 38%;
   background:#2d2532;
   pointer-events:none;
