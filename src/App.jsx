@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Mỗi mốc tối đa 2 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
-   - 180 câu hỏi
+   - 180 câu hỏi ôn tập + 200 câu hỏi thi học kỳ/THPT
    - NPC
    - Nghề
    - Chứng chỉ
@@ -19,7 +19,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v13";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v17";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -320,6 +320,336 @@ const QUIZ_BANK = [
   ...toQuestions("GDCD", "gdcd", GDCD_QUESTIONS),
   ...toQuestions("Đố mẹo", "meo", MEO_QUESTIONS),
 ];
+
+/* =========================================================
+   CÁC KỲ THI TRONG NĂM HỌC
+   5 kỳ thi × 8 môn × 5 câu = 200 câu riêng biệt.
+   Bộ đề thi độc lập với 180 câu ôn tập phía trên.
+========================================================= */
+const EXAM_SUBJECTS = ["Ngữ văn", "Vật lý", "Hóa học", "Sinh học", "Lịch sử", "Địa lý", "Tiếng Anh", "GDCD"];
+
+const EXAM_SCHEDULE = [
+  {id:"mid1", title:"Giữa kỳ 1", icon:"📝", day:8, timeIndex:4},
+  {id:"final1", title:"Cuối kỳ 1", icon:"📕", day:17, timeIndex:4},
+  {id:"mid2", title:"Giữa kỳ 2", icon:"📝", day:26, timeIndex:4},
+  {id:"final2", title:"Cuối kỳ 2", icon:"📕", day:35, timeIndex:4},
+  {id:"thpt", title:"Thi THPT", icon:"🎓", day:45, timeIndex:4},
+];
+
+const EXAM_BANKS = {
+  mid1: {
+    "Ngữ văn": [
+      {"topic":"Truyện Kiều","q":"Truyện Kiều chủ yếu được viết bằng thể thơ nào?","choices":["Lục bát","Song thất lục bát","Thất ngôn bát cú","Tự do"],"answer":0,"explanation":"Truyện Kiều được viết chủ yếu bằng thể thơ lục bát."},
+      {"topic":"Truyện Kiều","q":"Ngôn ngữ Truyện Kiều nổi bật ở đặc điểm nào?","choices":["Giàu tính dân tộc và giàu sức biểu cảm","Chỉ dùng từ Hán Việt","Hoàn toàn khẩu ngữ","Chỉ dùng thuật ngữ khoa học"],"answer":0,"explanation":"Nguyễn Du vận dụng rất linh hoạt ngôn ngữ dân tộc và tiếng Việt giàu sức biểu cảm."},
+      {"topic":"Truyện Kiều","q":"Nhân vật nào là người chị của Thúy Vân?","choices":["Thúy Kiều","Đạm Tiên","Hoạn Thư","Giác Duyên"],"answer":0,"explanation":"Thúy Kiều là chị, Thúy Vân là em."},
+      {"topic":"Chí Phèo","q":"Sau khi trở về làng, Chí Phèo thường dùng cách nào để gây sự?","choices":["Uống rượu và rạch mặt ăn vạ","Bỏ làng đi nơi khác","Viết thư khiếu nại","Xin việc trong trường học"],"answer":0,"explanation":"Chí Phèo thường uống rượu, chửi bới và rạch mặt ăn vạ để gây sự."},
+      {"topic":"Chí Phèo","q":"Ai là người khiến Chí Phèo lần đầu cảm nhận rõ khát vọng làm người lương thiện?","choices":["Thị Nở","Bá Kiến","Lý Cường","Ông giáo"],"answer":0,"explanation":"Sự chăm sóc của Thị Nở đánh thức khát vọng lương thiện ở Chí Phèo."},
+    ],
+    "Vật lý": [
+      {"topic":"Điện lượng","q":"Đơn vị SI của điện lượng là gì?","choices":["Coulomb (C)","Volt (V)","Ampere (A)","Watt (W)"],"answer":0,"explanation":"Điện lượng có đơn vị coulomb (C)."},
+      {"topic":"Công suất","q":"Hiệu suất của một máy được tính bằng tỉ số nào?","choices":["Công có ích chia cho công toàn phần","Công toàn phần chia cho công có ích","Lực chia cho thời gian","Khối lượng chia cho thể tích"],"answer":0,"explanation":"Hiệu suất bằng công có ích chia cho công toàn phần."},
+      {"topic":"Khối lượng riêng","q":"Công thức tính khối lượng riêng là gì?","choices":["D = m/V","D = V/m","D = mV","D = F/s"],"answer":0,"explanation":"Khối lượng riêng bằng khối lượng chia thể tích."},
+      {"topic":"Áp suất","q":"Áp suất của chất rắn lên một mặt được tính bởi công thức nào?","choices":["p = F/S","p = FS","p = S/F","p = m/V"],"answer":0,"explanation":"Áp suất bằng áp lực trên diện tích bị ép."},
+      {"topic":"Lực đẩy","q":"Lực đẩy Archimedes có phương như thế nào?","choices":["Thẳng đứng, hướng lên","Nằm ngang","Thẳng đứng, hướng xuống","Luôn nghiêng 45 độ"],"answer":0,"explanation":"Lực đẩy Archimedes có phương thẳng đứng và chiều từ dưới lên."},
+    ],
+    "Hóa học": [
+      {"topic":"Mol","q":"Một mol chất chứa khoảng bao nhiêu hạt vi mô?","choices":["6,02×10²³","6,02×10²⁰","9,81×10⁸","3×10²³"],"answer":0,"explanation":"Số Avogadro xấp xỉ 6,02×10²³ hạt/mol."},
+      {"topic":"Oxidation","q":"Quá trình nhường electron được gọi là gì?","choices":["Oxi hóa","Khử","Trung hòa","Điện li"],"answer":0,"explanation":"Nhường electron là quá trình oxi hóa."},
+      {"topic":"Reduction","q":"Quá trình nhận electron được gọi là gì?","choices":["Khử","Oxi hóa","Trùng hợp","Thủy phân"],"answer":0,"explanation":"Nhận electron là quá trình khử."},
+      {"topic":"Dung dịch","q":"Nồng độ mol cho biết điều gì?","choices":["Số mol chất tan trong 1 lít dung dịch","Khối lượng dung môi trong 1 gam","Thể tích chất rắn trong 1 kg","Số electron trong nguyên tử"],"answer":0,"explanation":"Nồng độ mol là số mol chất tan có trong 1 lít dung dịch."},
+      {"topic":"Kết tủa","q":"Khi phản ứng tạo ra chất rắn không tan trong dung dịch, chất rắn đó thường gọi là gì?","choices":["Kết tủa","Dung môi","Chất xúc tác","Điện cực"],"answer":0,"explanation":"Chất rắn không tan sinh ra trong dung dịch gọi là kết tủa."},
+    ],
+    "Sinh học": [
+      {"topic":"Tế bào","q":"Bào quan nào là trung tâm hô hấp tế bào và tạo nhiều ATP?","choices":["Ti thể","Ribosome","Lục lạp","Không bào"],"answer":0,"explanation":"Ti thể là nơi diễn ra phần lớn quá trình hô hấp tế bào và tạo ATP."},
+      {"topic":"Tế bào","q":"Ribosome có vai trò chính nào?","choices":["Tổng hợp protein","Quang hợp","Lưu trữ nước","Tạo thành tế bào"],"answer":0,"explanation":"Ribosome là nơi tổng hợp protein."},
+      {"topic":"Màng sinh chất","q":"Màng sinh chất có tính chất nào giúp tế bào kiểm soát chất ra vào?","choices":["Tính thấm chọn lọc","Không thấm hoàn toàn","Chỉ cho nước qua","Chỉ cho ion qua"],"answer":0,"explanation":"Màng sinh chất có tính thấm chọn lọc."},
+      {"topic":"DNA","q":"Trong DNA, adenine bắt cặp với base nào?","choices":["Thymine","Guanine","Cytosine","Uracil"],"answer":0,"explanation":"Adenine bắt cặp với thymine trong DNA."},
+      {"topic":"RNA","q":"Trong RNA, base nào thay thymine?","choices":["Uracil","Cytosine","Guanine","Adenine"],"answer":0,"explanation":"RNA sử dụng uracil thay cho thymine."},
+    ],
+    "Lịch sử": [
+      {"topic":"Việt Nam 1945","q":"Chính phủ Việt Nam Dân chủ Cộng hòa ra mắt quốc dân tại đâu?","choices":["Quảng trường Ba Đình","Căn cứ Pác Bó","Chiến khu Việt Bắc","Huế"],"answer":0,"explanation":"Sau Cách mạng tháng Tám, lễ ra mắt Chính phủ diễn ra tại Hà Nội."},
+      {"topic":"Kháng chiến chống Pháp","q":"Chiến dịch Điện Biên Phủ kết thúc vào năm nào?","choices":["1954","1945","1968","1975"],"answer":0,"explanation":"Chiến dịch Điện Biên Phủ kết thúc ngày 7/5/1954."},
+      {"topic":"Kháng chiến chống Pháp","q":"Hiệp định Genève năm 1954 liên quan trực tiếp đến việc chấm dứt chiến tranh ở đâu?","choices":["Đông Dương","Triều Tiên","Trung Đông","Tây Âu"],"answer":0,"explanation":"Hiệp định Genève năm 1954 giải quyết vấn đề Đông Dương."},
+      {"topic":"Kháng chiến chống Mỹ","q":"Phong trào Đồng khởi bùng nổ mạnh mẽ ở miền Nam vào giai đoạn nào?","choices":["1959-1960","1945-1946","1968-1969","1974-1975"],"answer":0,"explanation":"Phong trào Đồng khởi diễn ra mạnh trong 1959-1960, tiêu biểu ở Bến Tre."},
+      {"topic":"Kháng chiến chống Mỹ","q":"Chiến thắng nào năm 1972 góp phần tạo sức ép lớn trên bàn đàm phán Paris?","choices":["Điện Biên Phủ trên không","Biên giới 1950","Việt Bắc 1947","Hòa Bình 1951"],"answer":0,"explanation":"Chiến thắng Hà Nội - Hải Phòng cuối năm 1972 thường gọi là Điện Biên Phủ trên không."},
+    ],
+    "Địa lý": [
+      {"topic":"Nông nghiệp","q":"Vùng nào đứng đầu cả nước về sản lượng lúa?","choices":["Đồng bằng sông Cửu Long","Tây Nguyên","Đông Bắc","Bắc Trung Bộ"],"answer":0,"explanation":"Đồng bằng sông Cửu Long là vùng sản xuất lúa lớn nhất cả nước."},
+      {"topic":"Công nghiệp","q":"Trung tâm công nghiệp lớn của Đông Nam Bộ là thành phố nào?","choices":["Thành phố Hồ Chí Minh","Điện Biên Phủ","Huế","Cần Thơ"],"answer":0,"explanation":"Thành phố Hồ Chí Minh là trung tâm công nghiệp lớn của vùng Đông Nam Bộ."},
+      {"topic":"Giao thông","q":"Tuyến đường sắt Bắc - Nam còn được gọi là gì?","choices":["Đường sắt Thống Nhất","Đường sắt Tây Bắc","Đường sắt Đông - Tây","Đường sắt ven biển"],"answer":0,"explanation":"Tuyến đường sắt Bắc - Nam thường gọi là đường sắt Thống Nhất."},
+      {"topic":"Khí hậu","q":"Tính chất nhiệt đới của khí hậu Việt Nam thể hiện rõ ở yếu tố nào?","choices":["Nhiệt độ trung bình năm cao","Mùa đông kéo dài quanh năm","Lượng mưa luôn dưới 500 mm","Không có bão"],"answer":0,"explanation":"Nền nhiệt trung bình năm tương đối cao là biểu hiện của tính nhiệt đới."},
+      {"topic":"Sông ngòi","q":"Sông nào có lưu vực lớn nhất trong hệ thống sông ngòi Việt Nam?","choices":["Sông Hồng","Sông Đồng Nai","Sông Thu Bồn","Sông Ba"],"answer":0,"explanation":"Hệ thống sông Hồng có lưu vực lớn và vai trò nổi bật ở miền Bắc."},
+    ],
+    "Tiếng Anh": [
+      {"topic":"Grammar","q":"Choose the correct sentence.","choices":["She has lived here since 2020.","She live here since 2020.","She has live here since 2020.","She living here since 2020."],"answer":0,"explanation":"The present perfect is used with since for an action continuing to the present."},
+      {"topic":"Grammar","q":"If I had more free time, I ___ a new language.","choices":["would learn","will learn","learned","am learning"],"answer":0,"explanation":"Second conditional: If + past simple, would + base verb."},
+      {"topic":"Grammar","q":"The book ___ by millions of readers every year.","choices":["is read","reads","is reading","has read"],"answer":0,"explanation":"Use the present simple passive for a regular action."},
+      {"topic":"Grammar","q":"By the time we arrived, the movie ___.","choices":["had started","starts","has started","will start"],"answer":0,"explanation":"Past perfect describes an earlier past action."},
+      {"topic":"Grammar","q":"I am looking forward to ___ you again.","choices":["seeing","see","saw","to see"],"answer":0,"explanation":"Look forward to is followed by a gerund."},
+    ],
+    "GDCD": [
+      {"topic":"Pháp luật","q":"Pháp luật có đặc trưng nào sau đây?","choices":["Tính bắt buộc chung","Chỉ áp dụng cho trẻ em","Chỉ dựa vào thói quen","Không có chế tài"],"answer":0,"explanation":"Pháp luật có tính bắt buộc chung và được Nhà nước bảo đảm thực hiện."},
+      {"topic":"Quyền công dân","q":"Công dân bình đẳng trước pháp luật nghĩa là gì?","choices":["Không ai bị phân biệt trong việc thực hiện quyền và nghĩa vụ theo pháp luật","Mọi người có thu nhập như nhau","Mọi người có cùng nghề nghiệp","Mọi người được miễn nghĩa vụ"],"answer":0,"explanation":"Bình đẳng trước pháp luật là nguyên tắc mọi người được đối xử bình đẳng trong khuôn khổ pháp luật."},
+      {"topic":"Trách nhiệm","q":"Hành vi nào thể hiện trách nhiệm với cộng đồng?","choices":["Tuân thủ quy định nơi công cộng","Xả rác tùy ý","Phá hoại tài sản chung","Lan truyền tin giả"],"answer":0,"explanation":"Tuân thủ quy định và giữ gìn tài sản chung là biểu hiện trách nhiệm với cộng đồng."},
+      {"topic":"Quyền riêng tư","q":"Tự ý đăng ảnh riêng tư của người khác lên mạng có thể xâm phạm quyền nào?","choices":["Quyền về đời tư và hình ảnh","Quyền sở hữu trí tuệ của Nhà nước","Quyền được nghỉ học","Quyền đăng ký xe"],"answer":0,"explanation":"Đời tư và hình ảnh cá nhân được pháp luật bảo vệ trong những điều kiện nhất định."},
+      {"topic":"Hợp đồng","q":"Một hợp đồng hợp pháp thường dựa trên yếu tố nào?","choices":["Sự tự nguyện và phù hợp pháp luật","Ép buộc một bên","Che giấu mọi thông tin","Không cần điều khoản"],"answer":0,"explanation":"Hợp đồng hợp pháp cần dựa trên sự tự nguyện và không trái quy định pháp luật."},
+    ],
+  },
+  final1: {
+    "Ngữ văn": [
+      {"topic":"Vợ nhặt","q":"Bà cụ Tứ là nhân vật nào trong Vợ nhặt?","choices":["Mẹ của Tràng","Mẹ của Thị","Hàng xóm của Tràng","Chủ nhà trọ"],"answer":0,"explanation":"Bà cụ Tứ là mẹ của Tràng."},
+      {"topic":"Vợ nhặt","q":"Chi tiết nồi cháo cám trong Vợ nhặt gợi cảm giác gì?","choices":["Khắc nghiệt của nạn đói nhưng vẫn có tình người","Sự giàu sang của gia đình","Không khí hội hè","Niềm vui chiến thắng"],"answer":0,"explanation":"Nồi cháo cám vừa cho thấy cái đói khắc nghiệt vừa làm nổi bật tình thương và hy vọng."},
+      {"topic":"Vợ chồng A Phủ","q":"Mị trong Vợ chồng A Phủ sống ở nhà ai?","choices":["Thống lí Pá Tra","Bá Kiến","Ông Hai","Bà cụ Tứ"],"answer":0,"explanation":"Mị bị bắt về làm con dâu gạt nợ trong nhà thống lí Pá Tra."},
+      {"topic":"Vợ chồng A Phủ","q":"Hành động nào thể hiện Mị phản kháng khi cứu A Phủ?","choices":["Cắt dây trói cho A Phủ rồi cùng chạy trốn","Đốt nhà thống lí","Bỏ về nhà bố mẹ ngay lập tức","Báo quan"],"answer":0,"explanation":"Mị cắt dây trói cho A Phủ rồi cùng anh chạy trốn khỏi Hồng Ngài."},
+      {"topic":"Tây Tiến","q":"Địa bàn hoạt động của đoàn quân Tây Tiến chủ yếu gắn với vùng nào?","choices":["Tây Bắc","Nam Bộ","Đồng bằng sông Cửu Long","Đông Nam Bộ"],"answer":0,"explanation":"Tây Tiến gắn với vùng núi Tây Bắc và biên giới Việt-Lào."},
+    ],
+    "Vật lý": [
+      {"topic":"Nhiệt học","q":"Nhiệt lượng vật thu vào khi tăng nhiệt độ được tính theo công thức nào?","choices":["Q = mcΔt","Q = m/cΔt","Q = c/(mΔt)","Q = mgh"],"answer":0,"explanation":"Nhiệt lượng khi không có chuyển thể được tính Q = mcΔt."},
+      {"topic":"Nhiệt nóng chảy","q":"Trong quá trình nóng chảy của chất rắn kết tinh, nhiệt độ thường như thế nào?","choices":["Không đổi","Tăng liên tục","Giảm liên tục","Bằng 0°C trong mọi trường hợp"],"answer":0,"explanation":"Với chất rắn kết tinh, trong lúc nóng chảy nhiệt độ giữ không đổi ở nhiệt độ nóng chảy."},
+      {"topic":"Nhiệt độ","q":"Dụng cụ đo nhiệt độ thông dụng là gì?","choices":["Nhiệt kế","Lực kế","Ampe kế","Vôn kế"],"answer":0,"explanation":"Nhiệt kế dùng để đo nhiệt độ."},
+      {"topic":"Ma sát","q":"Lực ma sát trượt có chiều như thế nào so với chuyển động tương đối?","choices":["Ngược chiều chuyển động tương đối","Cùng chiều chuyển động","Vuông góc với chuyển động","Không có phương xác định"],"answer":0,"explanation":"Ma sát trượt cản trở chuyển động tương đối giữa hai bề mặt."},
+      {"topic":"Đàn hồi","q":"Theo định luật Hooke trong giới hạn đàn hồi, độ lớn lực đàn hồi tỉ lệ với đại lượng nào?","choices":["Độ biến dạng","Khối lượng vật","Thời gian","Nhiệt độ"],"answer":0,"explanation":"Trong giới hạn đàn hồi, lực đàn hồi tỉ lệ với độ biến dạng."},
+    ],
+    "Hóa học": [
+      {"topic":"Điện phân","q":"Trong điện phân, catot là điện cực xảy ra quá trình nào?","choices":["Khử","Oxi hóa","Trung hòa","Bay hơi"],"answer":0,"explanation":"Catot là nơi xảy ra quá trình khử."},
+      {"topic":"Este","q":"Phản ứng giữa axit cacboxylic và ancol tạo este thường gọi là gì?","choices":["Este hóa","Trùng hợp","Cracking","Điện phân"],"answer":0,"explanation":"Axit cacboxylic phản ứng với ancol tạo este và nước là phản ứng este hóa."},
+      {"topic":"Ancol","q":"Nhóm chức đặc trưng của ancol là gì?","choices":["-OH","-COOH","-CHO","-COO-"],"answer":0,"explanation":"Ancol chứa nhóm hydroxyl -OH liên kết với carbon no."},
+      {"topic":"Axit cacboxylic","q":"Nhóm chức của axit cacboxylic là gì?","choices":["-COOH","-OH","-NH2","-CHO"],"answer":0,"explanation":"Axit cacboxylic chứa nhóm carboxyl -COOH."},
+      {"topic":"Amino acid","q":"Nhóm chức đặc trưng của amino acid là gì?","choices":["-NH2 và -COOH","-OH và -CHO","-Cl và -Br","-NO2 và -OH"],"answer":0,"explanation":"Amino acid điển hình chứa đồng thời nhóm amino và carboxyl."},
+    ],
+    "Sinh học": [
+      {"topic":"Phiên mã","q":"Phiên mã là quá trình tổng hợp phân tử nào?","choices":["RNA từ khuôn DNA","DNA từ protein","Protein từ lipid","ATP từ RNA"],"answer":0,"explanation":"Phiên mã tạo RNA dựa trên một mạch DNA khuôn."},
+      {"topic":"Dịch mã","q":"Dịch mã diễn ra chủ yếu ở đâu?","choices":["Ribosome","Nhân tế bào","Lục lạp בלבד","Màng tế bào"],"answer":0,"explanation":"Dịch mã tổng hợp protein tại ribosome."},
+      {"topic":"Nguyên phân","q":"Kết quả của một lần nguyên phân của tế bào sinh dưỡng thường là gì?","choices":["Hai tế bào con gần như giống nhau về bộ NST","Bốn tế bào con đơn bội","Một tế bào con","Hai giao tử"],"answer":0,"explanation":"Nguyên phân tạo hai tế bào con có bộ nhiễm sắc thể tương đương tế bào mẹ."},
+      {"topic":"Giảm phân","q":"Giảm phân có vai trò quan trọng trong việc tạo ra loại tế bào nào?","choices":["Giao tử","Tế bào gan","Tế bào cơ","Tế bào da"],"answer":0,"explanation":"Giảm phân tạo giao tử ở sinh vật sinh sản hữu tính."},
+      {"topic":"Di truyền","q":"Kiểu gen là gì?","choices":["Tổ hợp các allele của cá thể","Tập hợp tính trạng quan sát được","Môi trường sống","Tuổi của cá thể"],"answer":0,"explanation":"Kiểu gen là tổ hợp allele mà cá thể mang."},
+    ],
+    "Lịch sử": [
+      {"topic":"Paris","q":"Hiệp định Paris về Việt Nam được ký năm nào?","choices":["1973","1968","1972","1975"],"answer":0,"explanation":"Hiệp định Paris được ký ngày 27/1/1973."},
+      {"topic":"1975","q":"Chiến dịch Hồ Chí Minh diễn ra vào năm nào?","choices":["1975","1972","1968","1986"],"answer":0,"explanation":"Chiến dịch Hồ Chí Minh diễn ra tháng 4/1975."},
+      {"topic":"Đổi mới","q":"Đường lối Đổi mới được đề ra tại Đại hội nào?","choices":["Đại hội VI (1986)","Đại hội IV (1976)","Đại hội II (1951)","Đại hội X (2006)"],"answer":0,"explanation":"Đại hội VI năm 1986 đề ra đường lối Đổi mới."},
+      {"topic":"ASEAN","q":"Trụ sở Ban Thư ký ASEAN đặt tại thành phố nào?","choices":["Jakarta","Bangkok","Manila","Hà Nội"],"answer":0,"explanation":"Ban Thư ký ASEAN đặt tại Jakarta, Indonesia."},
+      {"topic":"Liên Hợp Quốc","q":"Tổ chức Liên Hợp Quốc được thành lập vào năm nào?","choices":["1945","1919","1954","1961"],"answer":0,"explanation":"Liên Hợp Quốc chính thức thành lập năm 1945."},
+    ],
+    "Địa lý": [
+      {"topic":"Biển","q":"Hai quần đảo lớn của Việt Nam là gì?","choices":["Hoàng Sa và Trường Sa","Cát Bà và Phú Quốc","Cô Tô và Lý Sơn","Côn Đảo và Phú Quý"],"answer":0,"explanation":"Hoàng Sa và Trường Sa là hai quần đảo lớn của Việt Nam."},
+      {"topic":"Dân số","q":"Dân số đông tạo lợi thế nào cho phát triển kinh tế?","choices":["Nguồn lao động và thị trường rộng","Không cần đầu tư cơ sở hạ tầng","Giảm nhu cầu hàng hóa","Loại bỏ đô thị hóa"],"answer":0,"explanation":"Dân số đông tạo nguồn lao động và thị trường tiêu dùng lớn."},
+      {"topic":"Đô thị","q":"Đô thị hóa quá nhanh có thể gây sức ép lên yếu tố nào?","choices":["Hạ tầng và môi trường","Chiều dài bờ biển","Trữ lượng than toàn cầu","Độ nghiêng trục Trái Đất"],"answer":0,"explanation":"Đô thị hóa nhanh có thể gây áp lực lên hạ tầng, giao thông và môi trường."},
+      {"topic":"Tây Nguyên","q":"Cà phê là cây công nghiệp lâu năm quan trọng nhất của vùng nào?","choices":["Tây Nguyên","Đồng bằng sông Hồng","Đông Bắc","Bắc Trung Bộ"],"answer":0,"explanation":"Tây Nguyên nổi tiếng với sản xuất cà phê quy mô lớn."},
+      {"topic":"Đông Nam Bộ","q":"Đông Nam Bộ mạnh về cây công nghiệp lâu năm nào?","choices":["Cao su","Chè","Thuốc lá","Cói"],"answer":0,"explanation":"Đông Nam Bộ là vùng trồng cao su lớn."},
+    ],
+    "Tiếng Anh": [
+      {"topic":"Vocabulary","q":"The word 'generous' is closest in meaning to ___.","choices":["willing to give","very quiet","easily angry","extremely tired"],"answer":0,"explanation":"Generous means willing to give or share."},
+      {"topic":"Vocabulary","q":"A person who designs buildings is an ___.","choices":["architect","accountant","athlete","artist"],"answer":0,"explanation":"An architect designs buildings."},
+      {"topic":"Vocabulary","q":"If something is 'reliable', it is ___.","choices":["dependable","expensive","dangerous","temporary"],"answer":0,"explanation":"Reliable means dependable and trustworthy."},
+      {"topic":"Vocabulary","q":"The opposite of 'ancient' is ___.","choices":["modern","narrow","distant","formal"],"answer":0,"explanation":"Modern is the opposite of ancient."},
+      {"topic":"Vocabulary","q":"To 'reduce' something means to ___.","choices":["make it smaller or less","make it disappear completely","copy it exactly","measure it"],"answer":0,"explanation":"Reduce means make smaller or less."},
+    ],
+    "GDCD": [
+      {"topic":"Tiêu dùng","q":"Khi mua hàng trực tuyến, người tiêu dùng nên làm gì?","choices":["Kiểm tra người bán, thông tin sản phẩm và điều kiện giao dịch","Gửi mật khẩu tài khoản","Bỏ qua hóa đơn","Chuyển tiền cho tài khoản không rõ nguồn"],"answer":0,"explanation":"Kiểm tra thông tin giúp giảm rủi ro và bảo vệ quyền lợi người tiêu dùng."},
+      {"topic":"Bình đẳng","q":"Bình đẳng giới không đồng nghĩa với việc gì?","choices":["Mọi người phải có nghề nghiệp giống nhau","Mọi người có cơ hội và quyền bình đẳng","Không phân biệt giới tính trái pháp luật","Tôn trọng năng lực từng người"],"answer":0,"explanation":"Bình đẳng giới không có nghĩa mọi người phải làm cùng một nghề."},
+      {"topic":"Đạo đức","q":"Trung thực trong học tập góp phần xây dựng điều gì?","choices":["Nhân cách và niềm tin","Thói quen gian lận","Môi trường thiếu công bằng","Sự bất tín"],"answer":0,"explanation":"Trung thực giúp xây dựng nhân cách, uy tín và môi trường học tập công bằng."},
+      {"topic":"Kỷ luật","q":"Tự giác chấp hành nội quy trường học thể hiện phẩm chất nào?","choices":["Kỷ luật và trách nhiệm","Vụ lợi","Ích kỷ","Thờ ơ"],"answer":0,"explanation":"Tự giác chấp hành nội quy thể hiện kỷ luật và trách nhiệm."},
+      {"topic":"Công dân","q":"Thực hiện nghĩa vụ công dân đúng pháp luật là trách nhiệm của ai?","choices":["Mỗi công dân","Chỉ cán bộ","Chỉ doanh nghiệp","Chỉ người lớn tuổi"],"answer":0,"explanation":"Mỗi công dân đều có nghĩa vụ tôn trọng và thực hiện pháp luật."},
+    ],
+  },
+  mid2: {
+    "Ngữ văn": [
+      {"topic":"Tây Tiến","q":"Hình tượng người lính Tây Tiến được khắc họa với sự kết hợp nào?","choices":["Bi tráng và lãng mạn","Hài hước và châm biếm","Khoa học và chính luận","Tả thực lạnh lùng"],"answer":0,"explanation":"Quang Dũng kết hợp vẻ đẹp lãng mạn với chất bi tráng."},
+      {"topic":"Sóng","q":"Hình tượng sóng trong bài thơ cùng tên của Xuân Quỳnh chủ yếu tượng trưng cho điều gì?","choices":["Tâm trạng và khát vọng tình yêu","Chiến tranh","Tuổi thơ nông thôn","Thiên nhiên mùa đông"],"answer":0,"explanation":"Sóng là hình tượng biểu đạt những cung bậc và khát vọng của tình yêu."},
+      {"topic":"Sóng","q":"Bài thơ Sóng chủ yếu được viết theo thể thơ nào?","choices":["Năm chữ","Lục bát","Thất ngôn","Tám chữ"],"answer":0,"explanation":"Sóng được viết chủ yếu bằng thể thơ năm chữ."},
+      {"topic":"Đồng chí","q":"Cơ sở hình thành tình đồng chí trong bài thơ Đồng chí là gì?","choices":["Cùng cảnh ngộ và cùng chung nhiệm vụ chiến đấu","Cùng quê giàu có","Cùng học một trường","Cùng làm một nghề trước chiến tranh"],"answer":0,"explanation":"Những người lính từ các miền quê có cùng cảnh ngộ và nhiệm vụ nên gắn bó với nhau."},
+      {"topic":"Bếp lửa","q":"Hình ảnh người bà trong Bếp lửa gắn với phẩm chất nào nổi bật?","choices":["Tần tảo và giàu yêu thương","Lạnh lùng và nghiêm khắc","Phiêu lưu và mạo hiểm","Giàu có và quyền lực"],"answer":0,"explanation":"Người bà hiện lên tần tảo, giàu đức hi sinh và yêu thương cháu."},
+    ],
+    "Vật lý": [
+      {"topic":"Điện thế","q":"Hiệu điện thế giữa hai điểm có thể hiểu là công của lực điện trên một đơn vị nào?","choices":["Điện tích","Khối lượng","Thể tích","Thời gian"],"answer":0,"explanation":"Hiệu điện thế liên quan đến công tính trên một đơn vị điện tích."},
+      {"topic":"Điện năng","q":"Đơn vị thường dùng của điện năng trong gia đình là gì?","choices":["kWh","N","Pa","Hz"],"answer":0,"explanation":"Điện năng tiêu thụ trong gia đình thường tính bằng kWh."},
+      {"topic":"Mạch điện","q":"Cầu chì trong mạch điện gia đình có tác dụng chính gì?","choices":["Bảo vệ mạch khi dòng điện quá lớn","Tăng điện áp","Tăng điện trở mọi lúc","Làm đèn sáng hơn"],"answer":0,"explanation":"Cầu chì nóng chảy để bảo vệ mạch khi có dòng điện quá lớn."},
+      {"topic":"Điện xoay chiều","q":"Tần số dòng điện xoay chiều dùng phổ biến trong lưới điện Việt Nam là bao nhiêu?","choices":["50 Hz","25 Hz","60 Hz","100 Hz"],"answer":0,"explanation":"Lưới điện dân dụng Việt Nam sử dụng dòng xoay chiều 50 Hz."},
+      {"topic":"Phản xạ","q":"Theo định luật phản xạ ánh sáng, góc phản xạ bằng gì?","choices":["Góc tới","Góc tạo với mặt gương","180 độ trừ góc tới","Một nửa góc tới"],"answer":0,"explanation":"Góc phản xạ bằng góc tới."},
+    ],
+    "Hóa học": [
+      {"topic":"Polymer","q":"Polyethylene được tạo thành chủ yếu từ monomer nào?","choices":["Ethene","Ethanol","Ethanoic acid","Benzene"],"answer":0,"explanation":"Polyethylene được trùng hợp từ ethene."},
+      {"topic":"Kim loại","q":"Kim loại kiềm nào có kí hiệu hóa học Na?","choices":["Natri","Nhôm","Niken","Nitơ"],"answer":0,"explanation":"Na là kí hiệu của natri."},
+      {"topic":"Phản ứng","q":"Phản ứng đốt cháy methane tạo ra những sản phẩm chính nào?","choices":["CO2 và H2O","CO và H2","C và H2","CH3OH và O2"],"answer":0,"explanation":"Methane cháy hoàn toàn tạo CO2 và H2O."},
+      {"topic":"Carbon","q":"Kim cương và than chì là hai dạng thù hình của nguyên tố nào?","choices":["Carbon","Sulfur","Oxygen","Silicon"],"answer":0,"explanation":"Kim cương và than chì đều là dạng thù hình của carbon."},
+      {"topic":"Silicate","q":"Thành phần chính của cát thạch anh là gì?","choices":["SiO2","NaCl","CaCO3","Al2O3"],"answer":0,"explanation":"Cát thạch anh chủ yếu chứa silicon dioxide SiO2."},
+    ],
+    "Sinh học": [
+      {"topic":"Di truyền","q":"Kiểu hình của cá thể chịu ảnh hưởng của yếu tố nào?","choices":["Kiểu gen và môi trường","Chỉ kiểu gen","Chỉ môi trường","Chỉ tuổi"],"answer":0,"explanation":"Kiểu hình là kết quả tương tác giữa kiểu gen và môi trường."},
+      {"topic":"Mendel","q":"Theo quy luật phân li, mỗi giao tử chỉ nhận bao nhiêu allele của một gen?","choices":["Một allele","Hai allele","Ba allele","Không có allele"],"answer":0,"explanation":"Một giao tử chỉ mang một trong các allele của một gen."},
+      {"topic":"Đột biến","q":"Đột biến gen là biến đổi xảy ra ở đâu?","choices":["Trình tự nucleotide của gen","Toàn bộ hệ sinh thái","Khối lượng cơ thể","Môi trường sống"],"answer":0,"explanation":"Đột biến gen là biến đổi trong trình tự nucleotide của gen."},
+      {"topic":"Nhiễm sắc thể","q":"Nhiễm sắc thể được cấu tạo chủ yếu từ gì?","choices":["DNA và protein histone","RNA và lipid","Glucose và nước","Tinh bột và cellulose"],"answer":0,"explanation":"Nhiễm sắc thể gồm DNA liên kết với protein, trong đó có histone."},
+      {"topic":"Máu","q":"Nhóm máu ABO do hệ thống kháng nguyên nào trên hồng cầu quyết định?","choices":["A và B","C và D","X và Y","M và N בלבד"],"answer":0,"explanation":"Hệ ABO dựa trên sự có mặt của kháng nguyên A và/hoặc B trên hồng cầu."},
+    ],
+    "Lịch sử": [
+      {"topic":"Thế giới sau chiến tranh","q":"Chiến tranh Lạnh là sự đối đầu chủ yếu giữa hai khối do nước nào đứng đầu?","choices":["Mỹ và Liên Xô","Anh và Pháp","Đức và Nhật","Trung Quốc và Ấn Độ"],"answer":0,"explanation":"Hai cực Mỹ và Liên Xô đứng đầu hai hệ thống đối lập trong Chiến tranh Lạnh."},
+      {"topic":"Cách mạng tháng Tám","q":"Thắng lợi của Cách mạng tháng Tám năm 1945 dẫn đến sự ra đời của nhà nước nào?","choices":["Việt Nam Dân chủ Cộng hòa","Cộng hòa Xã hội Chủ nghĩa Việt Nam","Đại Nam","Liên bang Đông Dương"],"answer":0,"explanation":"Thắng lợi năm 1945 dẫn tới sự ra đời của Việt Nam Dân chủ Cộng hòa."},
+      {"topic":"Việt Minh","q":"Mặt trận Việt Minh được thành lập vào năm nào?","choices":["1941","1930","1945","1954"],"answer":0,"explanation":"Mặt trận Việt Minh được thành lập tháng 5/1941."},
+      {"topic":"Đảng Cộng sản","q":"Đảng Cộng sản Việt Nam được thành lập vào năm nào?","choices":["1930","1941","1945","1951"],"answer":0,"explanation":"Đảng Cộng sản Việt Nam thành lập đầu năm 1930."},
+      {"topic":"Phong trào yêu nước","q":"Phong trào Xô viết Nghệ - Tĩnh diễn ra trong thời gian nào?","choices":["1930-1931","1925-1926","1940-1941","1945-1946"],"answer":0,"explanation":"Xô viết Nghệ - Tĩnh gắn với cao trào cách mạng 1930-1931."},
+    ],
+    "Địa lý": [
+      {"topic":"Đồng bằng sông Hồng","q":"Thế mạnh nổi bật của Đồng bằng sông Hồng là gì?","choices":["Thâm canh lúa và phát triển đô thị - công nghiệp","Khai thác bauxite lớn nhất","Nuôi trồng cây công nghiệp nhiệt đới là chủ yếu","Chỉ phát triển lâm nghiệp"],"answer":0,"explanation":"Đồng bằng sông Hồng có trình độ thâm canh cao và đô thị hóa mạnh."},
+      {"topic":"Bắc Trung Bộ","q":"Bắc Trung Bộ có thế mạnh nào gắn với biển?","choices":["Khai thác và nuôi trồng thủy sản","Trồng cà phê quy mô lớn nhất","Khai thác than lớn nhất","Trồng chè duy nhất"],"answer":0,"explanation":"Kinh tế biển, đặc biệt thủy sản, là thế mạnh của Bắc Trung Bộ."},
+      {"topic":"Duyên hải miền Trung","q":"Duyên hải miền Trung thuận lợi phát triển du lịch nhờ yếu tố nào?","choices":["Nhiều bãi biển, cảnh quan và di sản","Có nhiều băng tuyết quanh năm","Không có đô thị","Khí hậu cực lạnh"],"answer":0,"explanation":"Bờ biển dài, cảnh quan và di sản tạo lợi thế lớn cho du lịch."},
+      {"topic":"Khoáng sản","q":"Quảng Ninh nổi tiếng với loại khoáng sản nào?","choices":["Than đá","Bauxite","Apatit","Dầu khí"],"answer":0,"explanation":"Quảng Ninh là trung tâm khai thác than lớn của Việt Nam."},
+      {"topic":"Đồng bằng","q":"Đất phù sa ở các đồng bằng thuận lợi nhất cho hoạt động nào?","choices":["Trồng cây lương thực","Trồng rừng ngập mặn trên núi","Khai thác dầu khí","Làm thủy điện"],"answer":0,"explanation":"Đất phù sa màu mỡ thích hợp với cây lương thực và nhiều loại cây trồng."},
+    ],
+    "Tiếng Anh": [
+      {"topic":"Grammar","q":"Neither Tom nor his friends ___ ready.","choices":["are","is","was","be"],"answer":0,"explanation":"With neither...nor, the verb commonly agrees with the nearer plural subject here: friends are."},
+      {"topic":"Grammar","q":"She asked me where I ___.","choices":["lived","live","am live","have live"],"answer":0,"explanation":"In reported speech, the past reporting verb backshifts live to lived."},
+      {"topic":"Grammar","q":"This is the restaurant ___ we met last year.","choices":["where","who","whose","what"],"answer":0,"explanation":"Where refers to a place."},
+      {"topic":"Grammar","q":"She ___ already finished her homework.","choices":["has","have","is","was"],"answer":0,"explanation":"With she and already in the present perfect, use has + past participle."},
+      {"topic":"Grammar","q":"He is interested in ___ science.","choices":["studying","study","to studying","studied"],"answer":0,"explanation":"Be interested in is followed by a gerund."},
+    ],
+    "GDCD": [
+      {"topic":"Môi trường","q":"Hành vi nào góp phần bảo vệ môi trường?","choices":["Phân loại và giảm rác thải","Đổ hóa chất xuống sông","Đốt rác nhựa tùy tiện","Khai thác tài nguyên không kiểm soát"],"answer":0,"explanation":"Giảm và phân loại rác thải góp phần bảo vệ môi trường."},
+      {"topic":"Mạng xã hội","q":"Trước khi chia sẻ tin nóng chưa kiểm chứng, nên làm gì?","choices":["Kiểm tra nguồn và độ tin cậy","Chia sẻ ngay","Đổi tiêu đề cho giật gân","Đăng kèm thông tin cá nhân người khác"],"answer":0,"explanation":"Kiểm chứng nguồn giúp hạn chế lan truyền thông tin sai lệch."},
+      {"topic":"Quyền học tập","q":"Quyền học tập của công dân gắn với trách nhiệm nào?","choices":["Tôn trọng nội quy và tích cực học tập","Được bỏ mọi quy định","Không cần tôn trọng người khác","Không cần tham gia học tập"],"answer":0,"explanation":"Quyền luôn đi cùng trách nhiệm thực hiện nghĩa vụ liên quan."},
+      {"topic":"An toàn","q":"Khi phát hiện cháy ở nơi công cộng, hành động phù hợp đầu tiên là gì?","choices":["Báo động và tìm đường thoát an toàn","Quay video trước","Che giấu thông tin","Chạy ngược vào khu vực cháy"],"answer":0,"explanation":"Cần báo động và ưu tiên thoát hiểm, đồng thời gọi lực lượng cứu hộ."},
+      {"topic":"Quyền sở hữu","q":"Quyền sở hữu tài sản thường bao gồm những quyền nào?","choices":["Chiếm hữu, sử dụng, định đoạt","Chỉ sử dụng","Chỉ cất giữ","Chỉ cho thuê"],"answer":0,"explanation":"Quyền sở hữu thường gồm chiếm hữu, sử dụng và định đoạt."},
+    ],
+  },
+  final2: {
+    "Ngữ văn": [
+      {"topic":"Chữ người tử tù","q":"Huấn Cao nổi bật với phẩm chất nào?","choices":["Tài hoa, khí phách và thiên lương","Giỏi buôn bán","Ham danh lợi","Sống an phận"],"answer":0,"explanation":"Huấn Cao là hình tượng tài hoa, có khí phách và thiên lương trong sáng."},
+      {"topic":"Chữ người tử tù","q":"Cảnh cho chữ diễn ra ở đâu?","choices":["Trong buồng giam tăm tối","Ngoài sân đình","Trong phủ quan","Bên bờ sông"],"answer":0,"explanation":"Cảnh cho chữ diễn ra trong không gian buồng giam tăm tối, đối lập với ánh sáng của cái đẹp."},
+      {"topic":"Người lái đò sông Đà","q":"Ông lái đò được Nguyễn Tuân khắc họa chủ yếu như thế nào?","choices":["Người lao động tài hoa, dũng cảm","Một viên quan triều đình","Một nhà thơ","Một thương nhân"],"answer":0,"explanation":"Ông lái đò là hình tượng người lao động có trí nhớ, kinh nghiệm và bản lĩnh tài hoa."},
+      {"topic":"Chiếc thuyền ngoài xa","q":"Phát hiện đầu tiên của nghệ sĩ Phùng trước cảnh biển là gì?","choices":["Một cảnh đẹp như bức tranh mực tàu","Một trận bão lớn","Một vụ cháy thuyền","Một lễ hội trên biển"],"answer":0,"explanation":"Phùng bắt gặp một cảnh biển rất đẹp qua màn sương."},
+      {"topic":"Chiếc thuyền ngoài xa","q":"Phát hiện thứ hai của Phùng làm thay đổi nhận thức của anh là gì?","choices":["Cảnh bạo lực gia đình phía sau vẻ đẹp","Một con thuyền bị chìm","Một cuộc đua thuyền","Một bức ảnh bị hỏng"],"answer":0,"explanation":"Phía sau cảnh đẹp là cảnh đời đầy nghịch lí và bạo lực gia đình."},
+    ],
+    "Vật lý": [
+      {"topic":"Khúc xạ","q":"Khi tia sáng truyền từ không khí vào nước, tia khúc xạ thường lệch về phía nào?","choices":["Gần pháp tuyến hơn","Xa pháp tuyến hơn","Song song mặt nước","Luôn quay ngược lại"],"answer":0,"explanation":"Từ môi trường chiết quang kém sang mạnh, tia khúc xạ lệch gần pháp tuyến."},
+      {"topic":"Thấu kính","q":"Đơn vị SI của tiêu cự thấu kính là gì?","choices":["mét (m)","điện kế (V)","newton (N)","hertz (Hz)"],"answer":0,"explanation":"Tiêu cự là độ dài nên trong SI có đơn vị mét."},
+      {"topic":"Điện từ","q":"Nam châm điện hoạt động dựa trên tác dụng nào của dòng điện?","choices":["Tác dụng từ","Tác dụng nhiệt","Tác dụng hóa học","Tác dụng phát sáng"],"answer":0,"explanation":"Dòng điện chạy qua cuộn dây tạo ra từ trường."},
+      {"topic":"Công suất","q":"Một thiết bị công suất 100 W hoạt động trong 10 s tiêu thụ năng lượng bao nhiêu?","choices":["1000 J","100 J","10 J","10000 J"],"answer":0,"explanation":"A = Pt = 100 × 10 = 1000 J."},
+      {"topic":"Chuyển động","q":"Gia tốc được xác định bằng đại lượng nào?","choices":["Độ biến thiên vận tốc chia thời gian","Quãng đường chia khối lượng","Lực chia quãng đường","Khối lượng chia vận tốc"],"answer":0,"explanation":"Gia tốc là độ biến thiên vận tốc trong một đơn vị thời gian."},
+    ],
+    "Hóa học": [
+      {"topic":"Muối","q":"Na2CO3 có tên thông dụng là gì?","choices":["Sodium carbonate","Sodium chloride","Calcium carbonate","Potassium nitrate"],"answer":0,"explanation":"Na2CO3 là sodium carbonate, còn gọi là soda ash."},
+      {"topic":"pH","q":"Dung dịch trung tính ở 25°C có pH gần bằng bao nhiêu?","choices":["7","1","5","14"],"answer":0,"explanation":"Ở 25°C, môi trường trung tính có pH xấp xỉ 7."},
+      {"topic":"Dung dịch","q":"Thêm nước vào dung dịch muối, nồng độ chất tan thường thay đổi như thế nào?","choices":["Giảm","Tăng","Không đổi mọi trường hợp","Bằng 0 ngay"],"answer":0,"explanation":"Thêm dung môi làm thể tích tăng nên nồng độ giảm nếu lượng chất tan không đổi."},
+      {"topic":"Kim loại","q":"Kim loại nào sau đây thuộc nhóm kim loại kiềm?","choices":["Kali","Sắt","Đồng","Kẽm"],"answer":0,"explanation":"Kali thuộc nhóm kim loại kiềm."},
+      {"topic":"Ăn mòn","q":"Sơn phủ bề mặt kim loại giúp hạn chế ăn mòn bằng cách nào?","choices":["Cách li kim loại khỏi môi trường","Tăng tốc phản ứng oxi hóa","Tạo thêm nước","Tăng độ dẫn điện"],"answer":0,"explanation":"Lớp sơn ngăn kim loại tiếp xúc với nước và oxygen."},
+    ],
+    "Sinh học": [
+      {"topic":"Miễn dịch","q":"Vaccine có tác dụng chính gì?","choices":["Kích thích cơ thể hình thành đáp ứng miễn dịch","Tiêu diệt mọi vi khuẩn ngay lập tức","Thay máu","Giảm nhiệt độ cơ thể"],"answer":0,"explanation":"Vaccine giúp cơ thể tạo trí nhớ miễn dịch và đáp ứng tốt hơn khi gặp tác nhân gây bệnh."},
+      {"topic":"Quang hợp","q":"Quang hợp ở cây xanh sử dụng nguồn năng lượng nào?","choices":["Ánh sáng","Âm thanh","Điện lưới","Nhiệt từ đất"],"answer":0,"explanation":"Quang hợp sử dụng năng lượng ánh sáng."},
+      {"topic":"Hô hấp","q":"Sản phẩm cuối của hô hấp hiếu khí hoàn toàn ở tế bào thường gồm gì?","choices":["CO2, H2O và năng lượng","O2 và glucose","N2 và nước","Protein và DNA"],"answer":0,"explanation":"Hô hấp hiếu khí hoàn toàn giải phóng năng lượng và tạo CO2, H2O."},
+      {"topic":"Hormone","q":"Insulin có tác dụng chính nào?","choices":["Giúp hạ đường huyết","Tăng mạnh nhịp tim","Làm đông máu trực tiếp","Tăng nhiệt độ môi trường"],"answer":0,"explanation":"Insulin giúp tế bào sử dụng glucose và làm giảm nồng độ đường huyết."},
+      {"topic":"Thần kinh","q":"Neuron là đơn vị cấu trúc và chức năng cơ bản của hệ nào?","choices":["Hệ thần kinh","Hệ tiêu hóa","Hệ bài tiết","Hệ vận động"],"answer":0,"explanation":"Neuron là tế bào thần kinh cơ bản."},
+    ],
+    "Lịch sử": [
+      {"topic":"1946","q":"Tổng tuyển cử đầu tiên của nước Việt Nam Dân chủ Cộng hòa diễn ra vào năm nào?","choices":["1946","1945","1947","1954"],"answer":0,"explanation":"Tổng tuyển cử bầu Quốc hội đầu tiên diễn ra ngày 6/1/1946."},
+      {"topic":"Kháng chiến","q":"Lời kêu gọi Toàn quốc kháng chiến được ra vào ngày nào?","choices":["19/12/1946","2/9/1945","7/5/1954","30/4/1975"],"answer":0,"explanation":"Chủ tịch Hồ Chí Minh ra Lời kêu gọi Toàn quốc kháng chiến ngày 19/12/1946."},
+      {"topic":"Biên giới","q":"Chiến dịch Biên giới Thu - Đông diễn ra vào năm nào?","choices":["1950","1947","1954","1960"],"answer":0,"explanation":"Chiến dịch Biên giới Thu - Đông diễn ra năm 1950."},
+      {"topic":"Việt Bắc","q":"Cuộc tiến công lên Việt Bắc của Pháp năm 1947 nhằm mục tiêu chủ yếu gì?","choices":["Nhanh chóng tiêu diệt cơ quan đầu não kháng chiến","Mở rộng kinh tế","Tổ chức bầu cử","Ký hiệp định thương mại"],"answer":0,"explanation":"Pháp muốn đánh vào căn cứ địa Việt Bắc và cơ quan đầu não kháng chiến."},
+      {"topic":"Phong trào Đồng khởi","q":"Bến Tre là địa phương tiêu biểu của phong trào nào?","choices":["Đồng khởi","Xô viết Nghệ - Tĩnh","Tây Sơn","Cần Vương"],"answer":0,"explanation":"Bến Tre là điểm nổi bật của phong trào Đồng khởi."},
+    ],
+    "Địa lý": [
+      {"topic":"Lâm nghiệp","q":"Rừng ngập mặn có vai trò quan trọng nào?","choices":["Chắn sóng và bảo vệ bờ biển","Tăng xói mòn bờ biển","Làm nước biển ngọt hoàn toàn","Tăng sa mạc hóa"],"answer":0,"explanation":"Rừng ngập mặn giúp chắn sóng, chống xói lở và bảo vệ hệ sinh thái ven biển."},
+      {"topic":"Biến đổi khí hậu","q":"Mực nước biển dâng đe dọa mạnh vùng nào của Việt Nam?","choices":["Các đồng bằng ven biển thấp","Chỉ vùng núi cao","Chỉ Tây Nguyên","Chỉ Đông Bắc"],"answer":0,"explanation":"Các đồng bằng ven biển thấp dễ chịu tác động của nước biển dâng."},
+      {"topic":"Kinh tế","q":"Ngành nào thuộc khu vực dịch vụ?","choices":["Du lịch","Trồng lúa","Khai thác than","Trồng cà phê"],"answer":0,"explanation":"Du lịch là ngành dịch vụ."},
+      {"topic":"Thủy sản","q":"Vùng biển nào có ngư trường trọng điểm phía Nam?","choices":["Kiên Giang - Cà Mau","Quảng Ninh - Hải Phòng","Thanh Hóa - Nghệ An","Đà Nẵng - Quảng Nam"],"answer":0,"explanation":"Kiên Giang - Cà Mau là một ngư trường quan trọng ở phía Nam."},
+      {"topic":"Cảng biển","q":"Cảng Hải Phòng có vai trò quan trọng nhất ở khu vực nào?","choices":["Phía Bắc","Tây Nguyên","Tây Nam Bộ","Nam Trung Bộ"],"answer":0,"explanation":"Hải Phòng là cửa ngõ giao thương đường biển quan trọng của miền Bắc."},
+    ],
+    "Tiếng Anh": [
+      {"topic":"Reading","q":"If a notice says 'No entry', what does it mean?","choices":["You must not enter.","You should enter quickly.","Entry is free.","Only students may enter."],"answer":0,"explanation":"No entry means people are not allowed to enter."},
+      {"topic":"Communication","q":"A: 'Would you like some tea?' B: '___'","choices":["Yes, please.","Yes, I do yesterday.","No, I am tea.","Tea can."],"answer":0,"explanation":"Yes, please is a natural response to an offer."},
+      {"topic":"Communication","q":"A: 'Thank you for your help.' B: '___'","choices":["You're welcome.","Never mind, yesterday.","I don't help.","Yes, I thank."],"answer":0,"explanation":"You're welcome is a polite response to thanks."},
+      {"topic":"Vocabulary","q":"A 'deadline' is ___.","choices":["the latest time something must be finished","a holiday","a meeting room","a type of document"],"answer":0,"explanation":"A deadline is the final time by which a task must be completed."},
+      {"topic":"Vocabulary","q":"If a plan is 'flexible', it can be ___.","choices":["changed when necessary","completed only once","broken easily","hidden from everyone"],"answer":0,"explanation":"Flexible plans can be adjusted when needed."},
+    ],
+    "GDCD": [
+      {"topic":"Phòng chống tệ nạn","q":"Biện pháp nào giúp phòng tránh tệ nạn xã hội ở học sinh?","choices":["Xây dựng lối sống lành mạnh và biết nói không với hành vi nguy hiểm","Thử mọi thứ cho biết","Giấu vấn đề với người lớn","Bỏ học"],"answer":0,"explanation":"Lối sống lành mạnh và kỹ năng từ chối giúp giảm nguy cơ."},
+      {"topic":"Lao động","q":"Người lao động cần tôn trọng điều gì tại nơi làm việc?","choices":["Nội quy và thỏa thuận hợp pháp","Tin đồn","Tài khoản cá nhân của người khác","Mọi mệnh lệnh bất kể pháp luật"],"answer":0,"explanation":"Người lao động và người sử dụng lao động đều cần tuân thủ thỏa thuận hợp pháp và pháp luật."},
+      {"topic":"Văn hóa","q":"Giữ gìn di sản văn hóa thể hiện điều gì?","choices":["Trách nhiệm với cộng đồng và lịch sử","Thái độ thờ ơ","Phá bỏ truyền thống","Chỉ quan tâm lợi ích cá nhân"],"answer":0,"explanation":"Bảo vệ di sản là trách nhiệm chung đối với giá trị văn hóa và lịch sử."},
+      {"topic":"Quyền trẻ em","q":"Trẻ em cần được bảo vệ khỏi hành vi nào?","choices":["Bạo lực và bóc lột","Giáo dục","Chăm sóc","Khuyến khích học tập"],"answer":0,"explanation":"Trẻ em cần được bảo vệ khỏi bạo lực, bóc lột và xâm hại."},
+      {"topic":"Ứng xử","q":"Khi xảy ra mâu thuẫn với bạn, cách ứng xử phù hợp là gì?","choices":["Trao đổi bình tĩnh và tôn trọng","Đăng bài xúc phạm","Đe dọa","Lan truyền tin riêng tư"],"answer":0,"explanation":"Trao đổi bình tĩnh và tôn trọng giúp giải quyết xung đột lành mạnh."},
+    ],
+  },
+  thpt: {
+    "Ngữ văn": [
+      {"topic":"Ai đã đặt tên cho dòng sông?","q":"Dòng sông trung tâm trong bút ký Ai đã đặt tên cho dòng sông? là sông nào?","choices":["Sông Hương","Sông Hàn","Sông Cửu Long","Sông Đà"],"answer":0,"explanation":"Tác phẩm viết về vẻ đẹp và văn hóa của sông Hương ở Huế."},
+      {"topic":"Rừng xà nu","q":"Hình tượng rừng xà nu trong tác phẩm thường được hiểu là biểu tượng cho điều gì?","choices":["Sức sống và sự tiếp nối của cộng đồng","Sự cô độc","Đời sống đô thị","Sự giàu có vật chất"],"answer":0,"explanation":"Rừng xà nu biểu tượng cho sức sống bền bỉ và sự tiếp nối của các thế hệ."},
+      {"topic":"Tuyên ngôn Độc lập","q":"Tuyên ngôn Độc lập năm 1945 thuộc kiểu văn bản nào?","choices":["Văn bản chính luận","Truyện ngắn","Bút ký du lịch","Kịch"],"answer":0,"explanation":"Tuyên ngôn Độc lập là một văn bản chính luận có sức lập luận mạnh."},
+      {"topic":"Đoàn thuyền đánh cá","q":"Không khí lao động trong Đoàn thuyền đánh cá được khắc họa như thế nào?","choices":["Hào hứng, khỏe khoắn và lãng mạn","Buồn bã và tuyệt vọng","Im lặng tuyệt đối","Lạnh lẽo và bi quan"],"answer":0,"explanation":"Bài thơ thể hiện niềm vui lao động và cảm hứng lãng mạn."},
+      {"topic":"Mặt đường khát vọng","q":"Đoạn trích Đất Nước nhấn mạnh đất nước gần gũi với đời sống nào?","choices":["Đời sống nhân dân và văn hóa dân gian","Chỉ đời sống cung đình","Chỉ đời sống đô thị","Chỉ đời sống quân đội"],"answer":0,"explanation":"Nguyễn Khoa Điềm nhìn đất nước từ văn hóa, đời sống nhân dân và lịch sử cộng đồng."},
+    ],
+    "Vật lý": [
+      {"topic":"Cân bằng","q":"Một vật đứng yên cân bằng khi hợp lực tác dụng lên vật bằng bao nhiêu?","choices":["0","1 N","Khối lượng vật","Trọng lực của vật"],"answer":0,"explanation":"Điều kiện cân bằng tịnh tiến là hợp lực bằng 0."},
+      {"topic":"Khí","q":"Khi nhiệt độ của một lượng khí tăng trong điều kiện thể tích không đổi, áp suất có xu hướng thế nào?","choices":["Tăng","Giảm","Không đổi","Bằng 0"],"answer":0,"explanation":"Ở thể tích không đổi, áp suất của khí tăng khi nhiệt độ tăng."},
+      {"topic":"Dao động","q":"Trong dao động điều hòa, vận tốc của vật bằng 0 tại vị trí nào?","choices":["Biên","Cân bằng","Mọi vị trí","Chỉ khi t = 0"],"answer":0,"explanation":"Vật dừng tức thời tại hai vị trí biên."},
+      {"topic":"Sóng cơ","q":"Sóng cơ cần môi trường nào để truyền?","choices":["Môi trường vật chất","Chân không","Chỉ kim loại","Chỉ nước"],"answer":0,"explanation":"Sóng cơ là sự lan truyền dao động trong một môi trường vật chất."},
+      {"topic":"An toàn điện","q":"Khi dây điện bị hở, nguy cơ lớn nhất là gì?","choices":["Điện giật","Tăng độ ngọt thức ăn","Giảm trọng lượng vật","Tăng nhiệt độ phòng"],"answer":0,"explanation":"Dây điện hở có thể gây điện giật và chập mạch."},
+    ],
+    "Hóa học": [
+      {"topic":"Phân bón","q":"Đạm urê cung cấp chủ yếu nguyên tố dinh dưỡng nào cho cây?","choices":["Nitrogen","Phosphorus","Potassium","Calcium"],"answer":0,"explanation":"Urê là phân đạm, cung cấp chủ yếu nitrogen."},
+      {"topic":"Phản ứng","q":"Chất làm tăng tốc độ phản ứng mà sau phản ứng gần như không đổi là gì?","choices":["Chất xúc tác","Chất phản ứng","Dung môi bắt buộc","Sản phẩm"],"answer":0,"explanation":"Chất xúc tác làm thay đổi tốc độ phản ứng và không bị tiêu hao theo phương trình tổng quát."},
+      {"topic":"Hữu cơ","q":"Chất hữu cơ nào là hydrocarbon?","choices":["C2H6","C2H5OH","CH3COOH","NH2CH2COOH"],"answer":0,"explanation":"Hydrocarbon chỉ chứa carbon và hydrogen; C2H6 đáp ứng điều đó."},
+      {"topic":"Bảo quản","q":"Bảo quản thực phẩm trong tủ lạnh chủ yếu làm chậm quá trình nào?","choices":["Các phản ứng và hoạt động của vi sinh vật","Sự tạo ra oxygen","Sự tăng khối lượng","Sự phân rã nguyên tử"],"answer":0,"explanation":"Nhiệt độ thấp làm chậm nhiều phản ứng hóa học và hoạt động của vi sinh vật."},
+      {"topic":"Hóa hữu cơ","q":"Ethanol còn được gọi thông dụng là gì?","choices":["Rượu etylic","Giấm ăn","Axit fomic","Đường mía"],"answer":0,"explanation":"Ethanol có tên thông dụng là rượu etylic."},
+    ],
+    "Sinh học": [
+      {"topic":"Sinh thái","q":"Quần thể là tập hợp cá thể của cùng loài sống trong đâu?","choices":["Một khu vực nhất định vào một thời điểm nhất định","Mọi nơi trên Trái Đất","Chỉ trong phòng thí nghiệm","Chỉ trong nước"],"answer":0,"explanation":"Quần thể gồm các cá thể cùng loài sống trong một không gian và thời gian xác định."},
+      {"topic":"Sinh thái","q":"Bậc dinh dưỡng đầu tiên trong chuỗi thức ăn thường là gì?","choices":["Sinh vật sản xuất","Sinh vật tiêu thụ bậc 1","Động vật ăn thịt","Sinh vật phân giải"],"answer":0,"explanation":"Sinh vật sản xuất là bậc dinh dưỡng đầu tiên."},
+      {"topic":"Tiến hóa","q":"Chọn lọc tự nhiên tác động trực tiếp lên đặc điểm nào?","choices":["Kiểu hình và khả năng sống sót, sinh sản","Chỉ DNA trong phòng thí nghiệm","Chỉ tuổi đời","Chỉ số lượng tế bào"],"answer":0,"explanation":"Chọn lọc tự nhiên tác động thông qua khác biệt về kiểu hình, sống sót và sinh sản."},
+      {"topic":"Trao đổi chất","q":"Enzyme trong tế bào có vai trò chủ yếu gì?","choices":["Xúc tác các phản ứng sinh hóa","Lưu trữ thông tin di truyền","Tạo bộ nhiễm sắc thể","Thay thế nước"],"answer":0,"explanation":"Enzyme là chất xúc tác sinh học, thường là protein."},
+      {"topic":"Sinh thái","q":"Yếu tố nào sau đây là yếu tố vô sinh?","choices":["Ánh sáng","Vi khuẩn","Cây cỏ","Động vật"],"answer":0,"explanation":"Ánh sáng là nhân tố vô sinh của môi trường."},
+    ],
+    "Lịch sử": [
+      {"topic":"Tổ chức quốc tế","q":"Hội nghị Ianta năm 1945 diễn ra giữa nguyên thủ của những cường quốc nào?","choices":["Mỹ, Anh, Liên Xô","Mỹ, Pháp, Đức","Anh, Nhật, Trung Quốc","Liên Xô, Nhật, Ý"],"answer":0,"explanation":"Hội nghị Ianta có sự tham dự của Roosevelt, Churchill và Stalin."},
+      {"topic":"Thế giới","q":"Mốc nào thường được xem là sự khởi đầu của Chiến tranh Lạnh?","choices":["1947","1939","1954","1975"],"answer":0,"explanation":"Năm 1947 thường được dùng làm mốc mở đầu Chiến tranh Lạnh."},
+      {"topic":"Châu Âu","q":"Kế hoạch Marshall của Mỹ sau Chiến tranh thế giới thứ hai nhằm mục tiêu chủ yếu gì?","choices":["Phục hồi kinh tế Tây Âu và tăng ảnh hưởng của Mỹ","Khôi phục Nhật Bản","Chấm dứt ASEAN","Thành lập Liên Hợp Quốc"],"answer":0,"explanation":"Kế hoạch Marshall hỗ trợ phục hồi kinh tế Tây Âu và củng cố ảnh hưởng của Mỹ."},
+      {"topic":"Hội nhập","q":"Việt Nam chính thức gia nhập WTO vào năm nào?","choices":["2007","1995","1986","2015"],"answer":0,"explanation":"Việt Nam trở thành thành viên WTO năm 2007."},
+      {"topic":"Hội nhập","q":"Việt Nam trở thành thành viên của APEC vào năm nào?","choices":["1998","1995","2007","1986"],"answer":0,"explanation":"Việt Nam gia nhập Diễn đàn Hợp tác Kinh tế châu Á - Thái Bình Dương (APEC) năm 1998."},
+    ],
+    "Địa lý": [
+      {"topic":"Tài nguyên","q":"Khoáng sản nào tập trung đáng kể ở Tây Nguyên?","choices":["Bauxite","Than đá","Dầu khí biển","Apatit Lào Cai"],"answer":0,"explanation":"Tây Nguyên có trữ lượng bauxite lớn."},
+      {"topic":"Năng lượng","q":"Thủy điện phát triển mạnh ở vùng nào nhờ hệ thống sông có độ dốc lớn?","choices":["Trung du và miền núi Bắc Bộ","Đồng bằng sông Hồng","Đồng bằng sông Cửu Long","Ven biển Nam Bộ"],"answer":0,"explanation":"Trung du và miền núi Bắc Bộ có địa hình dốc và sông nhiều tiềm năng thủy điện."},
+      {"topic":"Xuất khẩu","q":"Sản phẩm nào là mặt hàng xuất khẩu nông nghiệp nổi bật của Việt Nam?","choices":["Cà phê","Dầu thô của tất cả các vùng","Than đá duy nhất","Muối biển duy nhất"],"answer":0,"explanation":"Cà phê là một trong các mặt hàng nông sản xuất khẩu quan trọng của Việt Nam."},
+      {"topic":"Dịch vụ","q":"Trung tâm dịch vụ lớn nhất cả nước là nơi nào?","choices":["Hà Nội và Thành phố Hồ Chí Minh","Điện Biên và Lai Châu","Cao Bằng và Bắc Kạn","Kon Tum và Gia Lai"],"answer":0,"explanation":"Hà Nội và Thành phố Hồ Chí Minh là hai trung tâm dịch vụ lớn nhất."},
+      {"topic":"Phân bố dân cư","q":"Dân cư nước ta tập trung đông nhất ở khu vực nào?","choices":["Đồng bằng và đô thị","Núi cao","Các đảo nhỏ","Rừng đặc dụng"],"answer":0,"explanation":"Đồng bằng và đô thị có mật độ dân cư cao hơn miền núi."},
+    ],
+    "Tiếng Anh": [
+      {"topic":"Grammar","q":"I have known Lan ___ five years.","choices":["for","since","from","during"],"answer":0,"explanation":"For is used with a duration such as five years."},
+      {"topic":"Grammar","q":"He ___ to school when it started raining.","choices":["was walking","walks","has walked","will walk"],"answer":0,"explanation":"Past continuous describes an action in progress when another past event occurred."},
+      {"topic":"Vocabulary","q":"'Environment' refers to ___.","choices":["the natural world around us","a person's salary","a school subject only","a type of machine"],"answer":0,"explanation":"Environment means the natural and surrounding conditions in which we live."},
+      {"topic":"Grammar","q":"The students are studying hard ___ they want to pass the exam.","choices":["because","although","unless","while"],"answer":0,"explanation":"Because introduces the reason."},
+      {"topic":"Vocabulary","q":"To 'encourage' someone means to ___.","choices":["give support or confidence","make them afraid","ignore them","punish them"],"answer":0,"explanation":"Encourage means give someone support or confidence."},
+    ],
+    "GDCD": [
+      {"topic":"Dân chủ","q":"Dân chủ trong trường học có thể thể hiện qua việc nào?","choices":["Tham gia góp ý và bầu chọn theo quy định","Ép buộc người khác","Không cho ai phát biểu","Phá nội quy"],"answer":0,"explanation":"Tham gia góp ý và bầu chọn theo quy định là biểu hiện của dân chủ."},
+      {"topic":"Kinh tế","q":"Tiết kiệm trong chi tiêu cá nhân giúp đạt mục tiêu nào?","choices":["Sử dụng nguồn lực hợp lý và dự phòng cho tương lai","Luôn mua hàng đắt nhất","Không cần lập kế hoạch","Tăng chi tiêu vô hạn"],"answer":0,"explanation":"Tiết kiệm giúp sử dụng nguồn lực hợp lý và tạo khoản dự phòng."},
+      {"topic":"Pháp luật","q":"Chế tài pháp luật được đặt ra nhằm mục đích nào?","choices":["Bảo đảm và xử lý việc tuân thủ pháp luật","Khuyến khích vi phạm","Xóa bỏ quyền con người","Thay thế đạo đức hoàn toàn"],"answer":0,"explanation":"Chế tài góp phần bảo đảm việc tuân thủ pháp luật và xử lý hành vi vi phạm."},
+      {"topic":"Tự do","q":"Quyền tự do ngôn luận không có nghĩa là gì?","choices":["Muốn nói gì cũng được mà không chịu trách nhiệm","Được trình bày ý kiến theo pháp luật","Được góp ý xây dựng","Được trao đổi quan điểm"],"answer":0,"explanation":"Tự do ngôn luận được thực hiện trong khuôn khổ pháp luật và đi kèm trách nhiệm."},
+      {"topic":"Trách nhiệm số","q":"Bảo vệ tài khoản trực tuyến nên ưu tiên việc gì?","choices":["Dùng mật khẩu mạnh và bảo vệ mã xác thực","Chia sẻ mật khẩu với mọi người","Dùng một mật khẩu cho mọi nơi","Công khai mã OTP"],"answer":0,"explanation":"Mật khẩu mạnh và bảo vệ mã xác thực là nguyên tắc an toàn cơ bản."},
+    ],
+  },
+};
+
+const getExamQuestions = (exam) => {
+  if(!exam) return [];
+  const rows = [];
+  EXAM_SUBJECTS.forEach(subject=>{
+    (EXAM_BANKS[exam.id]?.[subject] || []).forEach((q,i)=>{
+      rows.push({...q, subject, id:`${exam.id}-${keysBySubject[subject]}-${String(i+1).padStart(2,"0")}`});
+    });
+  });
+  return rows;
+};
+
+const keysBySubject = {
+  "Ngữ văn":"van",
+  "Vật lý":"ly",
+  "Hóa học":"hoa",
+  "Sinh học":"sinh",
+  "Lịch sử":"su",
+  "Địa lý":"dia",
+  "Tiếng Anh":"anh",
+  "GDCD":"gdcd",
+};
 
 /* =========================================================
    THỜI TRANG
@@ -926,7 +1256,7 @@ const TITLES = [
   {id:"diligent",name:"Người Chăm Chỉ",icon:"📚",desc:"8 lần học",condition:g=>g.studyActions>=8},
   {id:"scholar",name:"Học Bá",icon:"🏆",desc:"Kiến thức ≥ 85",condition:g=>g.stats.study>=85},
   {id:"social",name:"Tâm Điểm Lớp",icon:"🤝",desc:"Bạn bè ≥ 85",condition:g=>g.stats.friends>=85},
-  {id:"skill",name:"Đa Năng",icon:"⚡",desc:"Kỹ năng ≥ 80",condition:g=>g.stats.skill>=80},
+  {id:"skill",name:"Đa Năng",icon:"🛠️",desc:"Kỹ năng ≥ 80",condition:g=>g.stats.skill>=80},
   {id:"love",name:"Thanh Xuân Có Đôi",icon:"💗",desc:"Tình cảm ≥ 80",condition:g=>g.stats.love>=80},
   {id:"certificate",name:"Bộ Sưu Tập Chứng Chỉ",icon:"🎓",desc:"Có ≥ 3 chứng chỉ",condition:g=>g.certificates.length>=3},
   {id:"fashion",name:"Fashionista Học Đường",icon:"👗",desc:"Có ≥ 15 món thời trang",condition:g=>g.wardrobe.length>=15},
@@ -1003,7 +1333,7 @@ function emptyDailyCompetition(){
 
 function createInitialState(){
   const g = {
-    version:6,
+    version:17,
     isGameOver:false,
     day:1,
     totalDays:45,
@@ -1067,6 +1397,8 @@ function createInitialState(){
 
     dailyCompetition:emptyDailyCompetition(),
 
+    examResults:{},
+
     relationships:{
       lan:45,
       trieuMan:30,
@@ -1124,6 +1456,10 @@ function normalizeState(raw){
     dailyCompetition:{
       ...base.dailyCompetition,
       ...(raw?.dailyCompetition || {})
+    },
+    examResults:{
+      ...base.examResults,
+      ...(raw?.examResults || {})
     },
     relationships:{
       ...base.relationships,
@@ -1253,10 +1589,20 @@ export default function App(){
   const [audioOn,setAudioOn] = useState(false);
 
   const advancingRef = useRef(false);
+  const examAutoOpenedRef = useRef(null);
+  const examDismissedRef = useRef(null);
 
   const currentTime = TIME_SLOTS[game.timeIndex];
   const nextTime =
     TIME_SLOTS[Math.min(game.timeIndex + 1,TIME_SLOTS.length - 1)];
+
+  const currentExam = EXAM_SCHEDULE.find(
+    exam=>exam.day===game.day && exam.timeIndex===game.timeIndex
+  ) || null;
+
+  const todayExam = EXAM_SCHEDULE.find(
+    exam=>exam.day===game.day
+  ) || null;
 
   const currentTitle =
     TITLES.find(t=>t.id===game.selectedTitle) || TITLES[0];
@@ -1373,11 +1719,23 @@ export default function App(){
      NEXT DAY
   ----------------------------------------- */
 
-  const finishDay = useCallback(()=>{
+  const finishDay = useCallback((grantFinalSlotNpcGain=false)=>{
     setGame(prev=>{
       const next = clone(prev);
 
       const finishedDay = next.day;
+
+      // Mỗi mốc thời gian, NPC nhận điểm thi đua ngẫu nhiên.
+      // Mốc cuối cùng được cộng ngay trước khi chuyển sang ngày mới.
+      if(grantFinalSlotNpcGain){
+        NPCS.forEach(npc=>{
+          const gain = 1 + Math.floor(Math.random() * 5);
+          next.npcCompetition[npc.id] =
+            (next.npcCompetition[npc.id] || 0) + gain;
+          next.dailyCompetition[npc.id] =
+            (next.dailyCompetition[npc.id] || 0) + gain;
+        });
+      }
       const before = next.dayStart || snapshotDay(next);
 
       const playerGain = Math.max(
@@ -1392,19 +1750,6 @@ export default function App(){
 
       next.competitionPoints += playerGain;
       next.dailyCompetition.player += playerGain;
-
-      // Từ ngày 2 trở đi, điểm từng NPC tăng ngẫu nhiên mỗi ngày.
-      const npcGain = {};
-      NPCS.forEach(npc=>{
-        npcGain[npc.id] = 1 + Math.floor(Math.random() * 8);
-      });
-
-      Object.entries(npcGain).forEach(([id,gain])=>{
-        next.npcCompetition[id] =
-          (next.npcCompetition[id] || 0) + gain;
-
-        next.dailyCompetition[id] = gain;
-      });
 
       const deltas = {
         study:next.stats.study-before.stats.study,
@@ -1475,10 +1820,21 @@ export default function App(){
     advancingRef.current = true;
 
     if(game.timeIndex >= TIME_SLOTS.length - 1){
-      finishDay();
+      finishDay(true);
     }else{
       setGame(prev=>{
         const next = clone(prev);
+
+        // Mỗi lần đồng hồ chuyển sang mốc mới, tất cả NPC đều
+        // nhận thêm điểm thi đua ngẫu nhiên (1–5 điểm).
+        NPCS.forEach(npc=>{
+          const gain = 1 + Math.floor(Math.random() * 5);
+          next.npcCompetition[npc.id] =
+            (next.npcCompetition[npc.id] || 0) + gain;
+          next.dailyCompetition[npc.id] =
+            (next.dailyCompetition[npc.id] || 0) + gain;
+        });
+
         next.timeIndex += 1;
 
         // Mốc mới = 2 lượt hoạt động chính mới.
@@ -1530,6 +1886,23 @@ export default function App(){
   ]);
 
   /* -----------------------------------------
+     TỰ ĐỘNG MỞ KỲ THI TẠI ĐÚNG MỐC
+  ----------------------------------------- */
+
+  useEffect(()=>{
+    if(!currentExam || game.isGameOver) return;
+
+    const examKey = `${currentExam.day}-${currentExam.timeIndex}`;
+
+    if(examAutoOpenedRef.current === examKey) return;
+    if(game.examResults?.[currentExam.id]) return;
+    if(examDismissedRef.current === examKey) return;
+
+    examAutoOpenedRef.current = examKey;
+    startQuiz("exam",null,currentExam);
+  },[currentExam,game.isGameOver,game.examResults,startQuiz]);
+
+  /* -----------------------------------------
      DAY CHANGE TOAST
   ----------------------------------------- */
 
@@ -1562,8 +1935,20 @@ export default function App(){
      ACTIONS
   ========================================================= */
 
-  const startQuiz = useCallback((mode="quick",cert=null)=>{
-    if(!canDoMainActivity()) return;
+  const startQuiz = useCallback((mode="quick",cert=null,exam=null)=>{
+    if(mode==="exam") {
+      if(!exam) {
+        setToast("📝 Không xác định được kỳ thi.");
+        return;
+      }
+
+      if(game.examResults?.[exam.id]) {
+        setToast(`✅ ${exam.title} đã hoàn thành.`);
+        return;
+      }
+    }else if(!canDoMainActivity()){
+      return;
+    }
 
     if(mode==="oral" && game.dailyOralCheckDone){
       setToast("🧑‍🏫 Bạn đã hoàn thành kiểm tra miệng hôm nay.");
@@ -1576,11 +1961,19 @@ export default function App(){
             ...q,
             id:`${cert.id}-${i}`
           }))
+        : mode==="exam"
+        ? getExamQuestions(exam)
         : shuffle(QUIZ_BANK).slice(0,mode==="oral" ? 3 : 5);
+
+    if(!questions.length){
+      setToast("❌ Không tìm thấy bộ đề.");
+      return;
+    }
 
     updateGame(g=>{
       g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel =
+        mode==="exam" ? `📝 ${exam.title}` :
         mode==="oral" ? "Kiểm tra miệng" :
         mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
         "Quiz nhanh";
@@ -1605,15 +1998,22 @@ export default function App(){
       mode,
       certId:cert?.id || null,
       certName:cert?.name || null,
+      examId:exam?.id || null,
+      examTitle:exam?.title || null,
       questions,
       index:0,
       correct:0,
       wrong:0
     });
 
+    if(mode==="exam") {
+      setAutoTime(false);
+      examDismissedRef.current = null;
+    }
+
     setQuizFeedback(null);
-    setOverlay(mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
-  },[canDoMainActivity,game.dailyOralCheckDone,updateGame]);
+    setOverlay(mode==="exam" ? "exam" : mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
+  },[canDoMainActivity,game.dailyOralCheckDone,game.examResults,updateGame]);
 
   const answerQuiz = useCallback((choiceIndex)=>{
     if(!quiz || quizFeedback) return;
@@ -1648,6 +2048,29 @@ export default function App(){
     const finalCorrect = quiz.correct;
 
     if(quiz.index >= quiz.questions.length - 1){
+
+      if(quiz.mode==="exam"){
+        const exam = EXAM_SCHEDULE.find(e=>e.id===quiz.examId);
+
+        updateGame(g=>{
+          if(quiz.examId){
+            g.examResults = g.examResults || {};
+            g.examResults[quiz.examId] = {
+              title:quiz.examTitle || exam?.title || "Kỳ thi",
+              correct:finalCorrect,
+              wrong:quiz.wrong,
+              total:quiz.questions.length,
+              competition:finalCorrect * 5,
+              day:g.day
+            };
+          }
+        });
+
+        setToast(
+          `🎓 ${exam?.title || "Kỳ thi"}: ${finalCorrect}/${quiz.questions.length} câu đúng • +${finalCorrect*5} điểm thi đua`
+        );
+        setAutoTime(true);
+      }
 
       if(quiz.mode==="quick"){
         updateGame(g=>{
@@ -2014,6 +2437,8 @@ export default function App(){
     setQuiz(null);
     setQuizFeedback(null);
     setSaveCode("");
+    examAutoOpenedRef.current = null;
+    examDismissedRef.current = null;
 
     setToast("🌱 Hành trình mới bắt đầu!");
   };
@@ -2606,13 +3031,21 @@ export default function App(){
     return (
       <Modal
         title={
-          quiz.mode==="oral"
-            ? "🧑‍🏫 Kiểm tra miệng — 15 phút"
+          quiz.mode==="exam"
+            ? `📝 ${quiz.examTitle || "Kỳ thi"}`
+            : quiz.mode==="oral"
+            ? "🧑‍🏫 Kiểm tra miệng — 3 câu"
             : quiz.mode==="cert"
             ? `🎓 Thi ${quiz.certName}`
             : "📚 Quiz nhanh"
         }
         onClose={()=>{
+          if(quiz.mode==="exam") {
+            examDismissedRef.current = currentExam
+              ? `${currentExam.day}-${currentExam.timeIndex}`
+              : null;
+            setAutoTime(true);
+          }
           setQuiz(null);
           setQuizFeedback(null);
           setOverlay(null);
@@ -2626,6 +3059,12 @@ export default function App(){
           <span>
             ✅ {quiz.correct} &nbsp; ❌ {quiz.wrong}
           </span>
+
+          {quiz.mode==="exam" && (
+            <span className="exam-live-badge">
+              ⏸️ Thời gian đang tạm dừng
+            </span>
+          )}
         </div>
 
         <div className="quiz-question">
@@ -2841,6 +3280,132 @@ export default function App(){
     </Modal>
   );
 
+  const renderGuideModal = ()=> (
+    <Modal
+      title="📖 Hướng dẫn chơi"
+      onClose={()=>setOverlay(null)}
+      wide
+    >
+      <div className="guide-wrap">
+        <div className="guide-hero">
+          <div className="guide-hero-icon">🌸</div>
+          <div>
+            <h2>Chào mừng đến với Thanh Xuân Rực Rỡ!</h2>
+            <p>
+              Bạn sẽ trải qua 45 ngày học tập, kết bạn, kiếm tiền,
+              săn chứng chỉ, phối đồ và tích điểm thi đua.
+            </p>
+          </div>
+        </div>
+
+        <div className="guide-grid">
+          <div className="guide-card">
+            <h3>⏱️ 1. Thời gian</h3>
+            <p>
+              Mỗi mốc kéo dài <b>30 giây</b> và đồng hồ chạy liên tục.
+              Mở tủ đồ, túi, nhật ký hay hồ sơ <b>không làm dừng thời gian</b>.
+            </p>
+            <p>
+              Khi sang mốc mới, bạn nhận lại <b>2 lượt hoạt động chính</b>.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>📝 2. Kỳ thi trong hành trình</h3>
+            <p>
+              Có <b>5 kỳ thi</b>: Giữa kỳ 1 (ngày 8), Cuối kỳ 1 (ngày 17),
+              Giữa kỳ 2 (ngày 26), Cuối kỳ 2 (ngày 35) và Thi THPT (ngày 45).
+            </p>
+            <p>
+              Mỗi kỳ có <b>5 câu cho 8 môn học = 40 câu</b>. Mỗi kỳ dùng một bộ đề riêng,
+              không lấy lại câu trong 180 câu ôn tập. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>⚡ 3. Hoạt động chính</h3>
+            <p>
+              Mỗi mốc được làm tối đa <b>2 việc chính</b>.
+            </p>
+            <p>
+              Ví dụ: Quiz 5 câu, Kiểm tra miệng, Nghỉ ngơi, Việc làm,
+              tương tác NPC hoặc thi chứng chỉ.
+            </p>
+            <p>
+              Khi đủ 2 lượt, chờ sang mốc tiếp theo để làm tiếp.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>📚 4. Học tập</h3>
+            <p>
+              <b>Quiz 5 câu</b> giúp tăng kiến thức và điểm thi đua.
+              Mỗi câu đúng được <b>+5 điểm thi đua</b>; mỗi câu sai bị
+              <b> -2 kiến thức</b>.
+            </p>
+            <p>
+              <b>Kiểm tra miệng</b> có thể thực hiện 1 lần mỗi ngày.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>🏆 5. Thi đua</h3>
+            <p>
+              Điểm thi đua của bạn dùng để so với các NPC trên bảng xếp hạng.
+            </p>
+            <p>
+              Mỗi khi đồng hồ sang mốc mới, mỗi NPC nhận ngẫu nhiên
+              <b> +1 đến +5 điểm</b> thi đua.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>🛠️ 6. Kỹ năng & ⚡ Năng lượng</h3>
+            <p>
+              <b>Kỹ năng</b> và <b>Năng lượng</b> là 2 chỉ số khác nhau.
+            </p>
+            <p>
+              Kỹ năng giúp mở một số công việc; Năng lượng bị tiêu hao khi
+              làm các hoạt động và có thể phục hồi bằng Nghỉ ngơi hoặc đồ ăn.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>💼 7. Việc làm & 🎓 Chứng chỉ</h3>
+            <p>
+              Việc làm giúp kiếm tiền và có thể tăng một số chỉ số.
+              Một số nghề yêu cầu chứng chỉ hoặc mức kỹ năng nhất định.
+            </p>
+            <p>
+              Mua và thi chứng chỉ để mở thêm lựa chọn nghề nghiệp.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>👕 8. Tủ đồ</h3>
+            <p>
+              Mua quần áo trong cửa hàng, sau đó vào <b>Tủ đồ</b> để mặc.
+              Bạn có thể thay áo, quần, giày, tóc và phụ kiện.
+            </p>
+          </div>
+
+          <div className="guide-card">
+            <h3>💾 9. Lưu game</h3>
+            <p>
+              Dùng mục <b>Lưu</b> để tạo mã lưu game và tải lại hành trình sau.
+              Nên lưu trước khi thử một lựa chọn quan trọng.
+            </p>
+          </div>
+        </div>
+
+        <div className="guide-tip">
+          💡 <b>Mẹo:</b> Hãy để ý đồng hồ, ưu tiên 2 hoạt động chính mỗi mốc,
+          giữ năng lượng đủ dùng và kiểm tra bảng thi đua thường xuyên.
+        </div>
+      </div>
+    </Modal>
+  );
+
   const renderDiaryModal = ()=>(
     <Modal
       title="📔 Nhật ký thanh xuân"
@@ -2994,10 +3559,25 @@ export default function App(){
               </b>
               <small>
                 {`🔓 ${Math.max(0, 2 - (game.mainActivityCount || 0))}/2 hoạt động chính còn lại`}
+                <span className="muted"> • NPC +1–5 điểm/mốc</span>
                 {game.mainActivityLabels?.length
                   ? ` • ${game.mainActivityLabels.join(" • ")}`
                   : ""}
               </small>
+
+              {todayExam && !game.examResults?.[todayExam.id] && (
+                <div className="exam-hint">
+                  {todayExam.icon} <b>{todayExam.title}</b> tại {TIME_SLOTS[todayExam.timeIndex]}
+                  {currentExam && quiz?.mode!=="exam" && (
+                    <Button
+                      onClick={()=>startQuiz("exam",null,currentExam)}
+                    >
+                      📝 Mở bài thi
+                    </Button>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
 
@@ -3010,19 +3590,27 @@ export default function App(){
           </div>
 
           <div className="schedule-row">
-            {TIME_SLOTS.map((time,index)=>(
-              <div
-                key={time}
-                className={`schedule-dot ${
-                  index===game.timeIndex ? "current" : ""
-                } ${
-                  index<game.timeIndex ? "passed" : ""
-                }`}
-                title={time}
-              >
-                <span>{time}</span>
-              </div>
-            ))}
+            {TIME_SLOTS.map((time,index)=>{
+              const scheduledExam = EXAM_SCHEDULE.find(
+                exam=>exam.day===game.day && exam.timeIndex===index
+              );
+
+              return (
+                <div
+                  key={time}
+                  className={`schedule-dot ${
+                    index===game.timeIndex ? "current" : ""
+                  } ${
+                    index<game.timeIndex ? "passed" : ""
+                  } ${scheduledExam ? "exam-dot" : ""}`}
+                  title={scheduledExam
+                    ? `${time} — ${scheduledExam.title}`
+                    : time}
+                >
+                  <span>{scheduledExam ? `📝 ${time}` : time}</span>
+                </div>
+              );
+            })}
           </div>
 
         </div>
@@ -3158,6 +3746,10 @@ export default function App(){
                   💾 Lưu game
                 </button>
 
+                <button onClick={()=>setOverlay("guide")}>
+                  📖 Hướng dẫn
+                </button>
+
                 <button onClick={()=>setOverlay("profile")}>
                   👤 Nhân vật
                 </button>
@@ -3287,6 +3879,13 @@ export default function App(){
             <span>Lưu</span>
           </button>
 
+          <button
+            onClick={()=>setOverlay("guide")}
+          >
+            📖
+            <span>Hướng dẫn</span>
+          </button>
+
         </footer>
 
       </div>
@@ -3361,6 +3960,8 @@ export default function App(){
 
       {overlay==="diary" && renderDiaryModal()}
 
+      {overlay==="guide" && renderGuideModal()}
+
       {overlay==="canteen" && (
         <Modal
           title="🍱 Căn tin"
@@ -3403,7 +4004,8 @@ export default function App(){
 
       {(overlay==="quiz" ||
         overlay==="oral" ||
-        overlay==="certExam") &&
+        overlay==="certExam" ||
+        overlay==="exam") &&
         renderQuizOverlay()
       }
 
@@ -4785,6 +5387,26 @@ button:disabled{
   margin-bottom:8px;
 }
 
+.exam-live-badge{
+  padding:4px 8px;
+  border-radius:999px;
+  background:#fff4d8;
+  color:#8a5a00;
+  font-weight:700;
+}
+
+.exam-hint{
+  margin-top:7px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.exam-dot span{
+  font-weight:800;
+}
+
 .quiz-question{
   padding:12px;
   border-radius:13px;
@@ -5010,6 +5632,86 @@ button:disabled{
 }
 
 /* DIARY */
+
+
+.guide-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.guide-hero{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px;
+  border:1px solid rgba(120,90,170,.16);
+  border-radius:18px;
+  background:rgba(255,255,255,.78);
+}
+
+.guide-hero-icon{
+  width:58px;
+  height:58px;
+  flex:0 0 58px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:16px;
+  font-size:30px;
+  background:rgba(255,240,250,.95);
+}
+
+.guide-hero h2{
+  margin:0 0 4px;
+  font-size:20px;
+}
+
+.guide-hero p{
+  margin:0;
+  color:#5f5b70;
+  line-height:1.5;
+}
+
+.guide-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+
+.guide-card{
+  padding:14px;
+  border-radius:16px;
+  border:1px solid rgba(120,90,170,.13);
+  background:#fff;
+  box-shadow:0 4px 18px rgba(75,50,120,.05);
+}
+
+.guide-card h3{
+  margin:0 0 8px;
+  font-size:15px;
+}
+
+.guide-card p{
+  margin:6px 0 0;
+  color:#625d72;
+  line-height:1.5;
+  font-size:13px;
+}
+
+.guide-tip{
+  padding:13px 14px;
+  border-radius:14px;
+  background:rgba(245,239,255,.92);
+  color:#5d5475;
+  line-height:1.5;
+}
+
+@media (max-width: 760px){
+  .guide-grid{
+    grid-template-columns:1fr;
+  }
+}
 
 .diary-list{
   display:flex;
