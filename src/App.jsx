@@ -1,451 +1,648 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/* =========================================================
-   THANH XUÂN RỰC RỠ
-   Deluxe Career & Assets Edition
-   React/Vite version
-   ========================================================= */
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v3";
 
-const SAVE_KEY = "thanh_xuan_jrpg_save_v2";
+const TIMES = ["07:30", "09:15", "11:30", "14:00", "17:00", "20:30"];
 
-const TIME_PERIODS = [
-  { text: "07:30", name: "Buổi sáng • Tiết 1-2" },
-  { text: "09:15", name: "Giờ ra chơi" },
-  { text: "11:30", name: "Tan trường trưa" },
-  { text: "14:00", name: "Buổi chiều • Hoạt động" },
-  { text: "17:00", name: "Chiều muộn • Đi làm" },
-  { text: "20:30", name: "Buổi tối • Góc cá nhân" },
-];
+const LOCATION_META = {
+  class: { name: "Lớp học", icon: "🏫" },
+  canteen: { name: "Căn tin", icon: "🍜" },
+  job: { name: "Việc làm", icon: "💼" },
+  cert: { name: "Phòng chứng chỉ", icon: "🎓" },
+  prop: { name: "Cửa hàng tài sản", icon: "🏠" },
+  home: { name: "Nhà", icon: "🏡" }
+};
 
-const DAYS_OF_WEEK = [
-  "THỨ HAI",
-  "THỨ BA",
-  "THỨ TƯ",
-  "THỨ NĂM",
-  "THỨ SÁU",
-  "THỨ BẢY",
-  "CHỦ NHẬT",
-];
+const NPCS = {
+  lan: {
+    id: "lan",
+    name: "Lan",
+    avatar: "👧",
+    color: "#ff7aa2",
+    description: "Bạn thân, chăm chỉ và khá cạnh tranh.",
+  },
+  trieu_man: {
+    id: "trieu_man",
+    name: "Triệu Mẫn",
+    avatar: "👩",
+    color: "#9b7cff",
+    description: "Học sinh nổi bật, thông minh và tự tin.",
+  },
+  tuan: {
+    id: "tuan",
+    name: "Tuấn",
+    avatar: "👦",
+    color: "#4ca9ff",
+    description: "Bạn cùng lớp, năng động và thích thử thách.",
+  }
+};
 
-const LOCATIONS = [
-  { id: "class", icon: "🏫", name: "Lớp Học" },
-  { id: "canteen", icon: "🍜", name: "Căn Tin" },
-  { id: "job", icon: "💼", name: "Làm Thêm" },
-  { id: "cert", icon: "📜", name: "Chứng Chỉ" },
-  { id: "prop", icon: "🏎️", name: "Nhà & Xe" },
-  { id: "home", icon: "🏠", name: "Về Nhà" },
-];
-
-const CERTIFICATES = [
+const JOBS = [
   {
-    id: "cert_driver",
-    name: "GPLX Ô Tô Hạng B2",
+    id: "canteen",
+    name: "Phụ căn tin",
+    icon: "🍜",
+    income: 25000,
+    energy: -12,
+    mood: 3,
+    skill: 1,
+    description: "Phụ giúp căn tin sau giờ học."
+  },
+  {
+    id: "flyer",
+    name: "Phát tờ rơi",
+    icon: "📄",
+    income: 30000,
+    energy: -18,
+    mood: -2,
+    skill: 2,
+    description: "Công việc đơn giản, nhận tiền nhanh."
+  },
+  {
+    id: "excel",
+    name: "Nhập dữ liệu Excel",
+    icon: "💻",
+    income: 70000,
+    energy: -18,
+    mood: 1,
+    skill: 4,
+    requirement: 35,
+    requirementText: "Kỹ năng ≥ 35",
+    description: "Công việc văn phòng bán thời gian."
+  },
+  {
+    id: "driver",
+    name: "Lái xe VIP",
     icon: "🚗",
-    fee: 120000,
-    reqSkill: 20,
-    desc: "Mở khóa việc lái xe VIP và mua ô tô.",
-    questions: [
-      {
-        q: "Khi gặp đèn vàng, người điều khiển ô tô phải làm gì?",
-        opts: [
-          "Dừng trước vạch dừng, trừ khi đã đi quá vạch",
-          "Tăng tốc vượt giao lộ",
-          "Bấm còi rồi rẽ phải",
-          "Tắt máy dắt bộ",
-        ],
-        c: 0,
-      },
-      {
-        q: "Khi lái ô tô, sử dụng rượu bia rồi điều khiển phương tiện là hành vi:",
-        opts: [
-          "Bị nghiêm cấm",
-          "Được phép nếu uống ít",
-          "Chỉ bị phạt khi gây tai nạn",
-          "Chỉ bị nhắc nhở",
-        ],
-        c: 0,
-      },
-      {
-        q: "Bộ phận nào giúp người lái kiểm soát hướng chuyển động của ô tô?",
-        opts: ["Vô lăng", "Còi", "Gương chiếu hậu", "Đèn hậu"],
-        c: 0,
-      },
-    ],
+    income: 120000,
+    energy: -25,
+    mood: 3,
+    skill: 3,
+    requirementCert: "cert_driver",
+    requirementText: "Có bằng lái",
+    description: "Công việc có thu nhập cao nhưng yêu cầu chứng chỉ."
   },
   {
-    id: "cert_toeic",
-    name: "TOEIC 650+",
-    icon: "🇬🇧",
-    fee: 150000,
-    reqSkill: 35,
-    desc: "Chứng chỉ tiếng Anh mở khóa nghề song ngữ.",
-    questions: [
-      {
-        q: 'Complete: "The director suggested that we _____ the meeting."',
-        opts: ["postpone", "postpones", "postponing", "postponed"],
-        c: 0,
-      },
-      {
-        q: 'Closest meaning to "SUBSTANTIAL":',
-        opts: ["Significant", "Minor", "Tiny", "Doubtful"],
-        c: 0,
-      },
-      {
-        q: "The report must be submitted _____ Friday.",
-        opts: ["by", "with", "during", "from"],
-        c: 0,
-      },
-    ],
+    id: "interpreter",
+    name: "Trợ lý phiên dịch",
+    icon: "🌐",
+    income: 200000,
+    energy: -25,
+    mood: 4,
+    skill: 5,
+    requirementCert: "cert_toeic",
+    requirementText: "Có TOEIC",
+    description: "Hỗ trợ phiên dịch cho sự kiện."
   },
   {
-    id: "cert_mos",
-    name: "MOS Excel",
-    icon: "📊",
-    fee: 80000,
-    reqSkill: 15,
-    desc: "Mở khóa công việc Excel và nhập liệu doanh nghiệp.",
-    questions: [
-      {
-        q: "Hàm nào thường dùng để tìm kiếm dữ liệu theo cột?",
-        opts: ["VLOOKUP / XLOOKUP", "COUNTIF", "AVERAGE", "SUM"],
-        c: 0,
-      },
-      {
-        q: "Cách cố định tuyệt đối ô B5 trong Excel là:",
-        opts: ["$B$5", "B5", "#B#5", "&B&5"],
-        c: 0,
-      },
-      {
-        q: "Công cụ nào dùng để tổng hợp dữ liệu nhiều chiều?",
-        opts: ["PivotTable", "WordArt", "Data Validation", "Format Painter"],
-        c: 0,
-      },
-    ],
-  },
-  {
-    id: "cert_finance",
-    name: "Chứng Chỉ Tài Chính & Chứng Khoán",
+    id: "broker",
+    name: "Cộng tác viên tài chính",
     icon: "📈",
-    fee: 250000,
-    reqSkill: 40,
-    desc: "Mở khóa nghề môi giới và phân tích tài chính trong game.",
-    questions: [
-      {
-        q: "P/E phản ánh điều gì?",
-        opts: [
-          "Mức giá thị trường nhà đầu tư trả cho một đồng lợi nhuận",
-          "Tổng số nợ ngân hàng",
-          "Khối lượng giao dịch",
-          "Tỷ lệ cổ tức",
-        ],
-        c: 0,
-      },
-      {
-        q: "Margin Call thường xảy ra khi:",
-        opts: [
-          "Tỷ lệ ký quỹ giảm dưới ngưỡng an toàn",
-          "Cổ phiếu tăng trần",
-          "Doanh nghiệp chia cổ tức",
-          "Nhà đầu tư nộp thêm tiền",
-        ],
-        c: 0,
-      },
-      {
-        q: "MA 50 thường được sử dụng để quan sát:",
-        opts: ["Xu hướng trung hạn", "Thanh khoản", "EPS", "Cổ tức"],
-        c: 0,
-      },
-    ],
-  },
+    income: 300000,
+    energy: -28,
+    mood: 5,
+    skill: 7,
+    requirementCert: "cert_finance",
+    requirementText: "Có chứng chỉ tài chính",
+    description: "Công việc phân tích và hỗ trợ tài chính."
+  }
 ];
 
 const PROPERTIES = [
   {
     id: "asset_bike",
-    name: "Xe Tay Ga Air Blade 160cc",
-    type: "vehicle",
-    price: 450000,
-    icon: "🛵",
-    desc: "Đi học chủ động hơn.",
-    buff: "+10 Năng lượng khi về nhà.",
-    license: null,
+    name: "Xe đạp",
+    icon: "🚲",
+    price: 1000000,
+    effect: "Di chuyển nhanh hơn.",
+    reputation: 2
   },
   {
     id: "asset_car_sedan",
-    name: "Ô Tô Sedan Mazda 3",
-    type: "vehicle",
-    price: 1800000,
-    icon: "🚗",
-    desc: "Xe che mưa che nắng.",
-    buff: "+25 Tình cảm & +10 Danh tiếng.",
-    license: "cert_driver",
+    name: "Ô tô Sedan",
+    icon: "🚘",
+    price: 1650000,
+    effect: "Tăng hình ảnh cá nhân.",
+    reputation: 6,
+    skill: 2
   },
   {
     id: "asset_car_super",
-    name: "Porsche 911 Targa",
-    type: "vehicle",
-    price: 6500000,
+    name: "Siêu xe",
     icon: "🏎️",
-    desc: "Siêu xe thể thao.",
-    buff: "+50 Danh tiếng & +30 Tâm trạng.",
-    license: "cert_driver",
+    price: 5500000,
+    effect: "Tài sản đáng mơ ước.",
+    reputation: 12,
+    mood: 8
   },
   {
     id: "asset_condo",
-    name: "Căn Hộ Studio View Thành Phố",
-    type: "house",
-    price: 3200000,
-    icon: "🏙️",
-    desc: "Không gian học tập riêng.",
-    buff: "+15 Học tập & hồi năng lượng.",
-    license: null,
+    name: "Căn hộ",
+    icon: "🏢",
+    price: 50000000,
+    effect: "Có nơi ở riêng.",
+    reputation: 15,
+    mood: 10
   },
   {
     id: "asset_villa",
-    name: "Biệt Thự Vườn Thảo Điền",
-    type: "house",
-    price: 12000000,
-    icon: "🏰",
-    desc: "Biệt thự sang trọng.",
-    buff: "Danh hiệu tài phú cuối game.",
-    license: null,
-  },
+    name: "Biệt thự",
+    icon: "🏡",
+    price: 120000000,
+    effect: "Đẳng cấp tài sản cao nhất.",
+    reputation: 25,
+    mood: 15
+  }
 ];
 
-const JOBS = [
-  {
-    id: "job_canteen",
-    name: "Phụ việc Căn tin Cô Năm",
-    icon: "🍜",
-    salary: 25000,
-    energy: 25,
-    hp: 5,
-    skill: 4,
-    condition: () => true,
-    requirement: "Dành cho mọi học sinh",
-    diary: "Phụ cô Năm bán bánh tráng và dọn bàn. Mệt nhưng vui vì có thêm tiền.",
-  },
-  {
-    id: "job_flyer",
-    name: "Phát tờ rơi & Pha chế trà sữa",
-    icon: "🧋",
-    salary: 35000,
-    energy: 30,
-    hp: 6,
-    skill: 5,
-    condition: (s) => s.stats.energy >= 30,
-    requirement: "Cần đủ năng lượng",
-    diary: "Làm việc tại quán trà sữa, tay chân thoăn thoắt nhận tiền công.",
-  },
-  {
-    id: "job_office_excel",
-    name: "Xử lý bảng tính & nhập liệu",
-    icon: "📊",
-    salary: 95000,
-    energy: 20,
-    hp: 0,
-    skill: 8,
-    condition: (s) => s.certificates.includes("cert_mos"),
-    requirement: "Cần chứng chỉ MOS",
-    diary: "Ứng dụng Excel và PivotTable xử lý dữ liệu doanh nghiệp.",
-  },
-  {
-    id: "job_driver_vip",
-    name: "Tài xế Công nghệ & VIP",
+const CERTS = {
+  cert_driver: {
+    id: "cert_driver",
+    name: "Bằng lái xe",
     icon: "🚘",
-    salary: 180000,
-    energy: 25,
-    hp: 2,
-    skill: 10,
-    condition: (s) =>
-      s.certificates.includes("cert_driver") &&
-      (s.assets.includes("asset_car_sedan") ||
-        s.assets.includes("asset_car_super")),
-    requirement: "Cần B2 + ô tô",
-    diary: "Lái xe VIP và tranh thủ đưa Mẫn đi dạo.",
+    fee: 100000,
+    skill: 140,
+    questions: [
+      {
+        q: "Khi gặp đèn đỏ, người điều khiển xe phải làm gì?",
+        options: ["Tăng tốc", "Dừng trước vạch", "Bấm còi", "Đi tiếp"],
+        answer: 1
+      },
+      {
+        q: "Biển báo hình tròn viền đỏ thường biểu thị?",
+        options: ["Cấm", "Chỉ dẫn", "Nguy hiểm", "Thông tin"],
+        answer: 0
+      },
+      {
+        q: "Khi lái xe cần ưu tiên điều gì?",
+        options: ["Tốc độ", "An toàn", "Âm nhạc", "Hình thức"],
+        answer: 1
+      }
+    ]
   },
-  {
-    id: "job_interpreter",
-    name: "Trợ lý Song ngữ",
-    icon: "🎙️",
-    salary: 220000,
-    energy: 22,
-    hp: 0,
-    skill: 12,
-    condition: (s) => s.certificates.includes("cert_toeic"),
-    requirement: "Cần TOEIC 650+",
-    diary: "Tự tin giao tiếp tại một hội thảo quốc tế.",
+
+  cert_toeic: {
+    id: "cert_toeic",
+    name: "TOEIC",
+    icon: "🌐",
+    fee: 150000,
+    skill: 500,
+    questions: [
+      {
+        q: "Choose: She ___ to school every day.",
+        options: ["go", "goes", "going", "gone"],
+        answer: 1
+      },
+      {
+        q: "Opposite of 'expensive' is:",
+        options: ["cheap", "large", "fast", "strong"],
+        answer: 0
+      },
+      {
+        q: "I have lived here ___ 2020.",
+        options: ["for", "since", "at", "on"],
+        answer: 1
+      }
+    ]
   },
-  {
-    id: "job_broker",
-    name: "Môi giới & Phân tích Chứng khoán",
+
+  cert_mos: {
+    id: "cert_mos",
+    name: "MOS Office",
+    icon: "💻",
+    fee: 120000,
+    skill: 800,
+    questions: [
+      {
+        q: "Phím tắt sao chép trong Windows?",
+        options: ["Ctrl + C", "Ctrl + V", "Ctrl + X", "Ctrl + Z"],
+        answer: 0
+      },
+      {
+        q: "Excel dùng để làm gì?",
+        options: ["Tính toán dữ liệu", "Chụp ảnh", "Nghe nhạc", "Vẽ tranh"],
+        answer: 0
+      },
+      {
+        q: "Hàm SUM trong Excel dùng để?",
+        options: ["Đếm", "Tính tổng", "Tìm chữ", "Đổi màu"],
+        answer: 1
+      }
+    ]
+  },
+
+  cert_finance: {
+    id: "cert_finance",
+    name: "Tài chính cơ bản",
     icon: "📈",
-    salary: 450000,
-    energy: 28,
-    hp: 3,
-    skill: 16,
-    condition: (s) => s.certificates.includes("cert_finance"),
-    requirement: "Cần chứng chỉ tài chính",
-    diary: "Phân tích thị trường và hoàn thành một ngày làm việc hiệu quả.",
-  },
-];
-
-const CANTEEN = [
-  {
-    id: "f1",
-    name: "Bánh tráng trộn bò khô",
-    price: 15000,
-    energy: 25,
-    mood: 15,
-    love: 0,
-    icon: "🥣",
-  },
-  {
-    id: "f2",
-    name: "Milo dầm trân châu",
-    price: 20000,
-    energy: 30,
-    mood: 20,
-    love: 0,
-    icon: "🍫",
-  },
-  {
-    id: "f3",
-    name: "Trà sữa Full Topping cho Mẫn",
-    price: 45000,
-    energy: 20,
-    mood: 30,
-    love: 12,
-    icon: "💖",
-  },
-];
-
-const TEACHERS = {
-  toan: { name: "Thầy Minh", avatar: "👨‍🏫", subject: "TOÁN HỌC" },
-  anh: { name: "Cô Jennifer", avatar: "👱‍♀️", subject: "TIẾNG ANH" },
-  ly: { name: "Thầy Tuấn", avatar: "👨‍🔬", subject: "VẬT LÝ" },
-  hoa: { name: "Cô Hương", avatar: "👩‍🔬", subject: "HÓA HỌC" },
-  sinh: { name: "Cô Mai", avatar: "👩‍🔬", subject: "SINH HỌC" },
-  su: { name: "Thầy Sơn", avatar: "👨‍🏫", subject: "LỊCH SỬ" },
-  dia: { name: "Cô Lan", avatar: "👩‍🏫", subject: "ĐỊA LÝ" },
-  gdcd: { name: "Thầy Nam", avatar: "👨‍🏫", subject: "GDCD" },
+    fee: 200000,
+    skill: 1000,
+    questions: [
+      {
+        q: "Lợi nhuận được hiểu đơn giản là?",
+        options: [
+          "Doanh thu + chi phí",
+          "Doanh thu - chi phí",
+          "Chi phí - doanh thu",
+          "Tài sản + nợ"
+        ],
+        answer: 1
+      },
+      {
+        q: "Đa dạng hóa danh mục nhằm mục đích gì?",
+        options: [
+          "Tăng mọi rủi ro",
+          "Giảm rủi ro tập trung",
+          "Không cần theo dõi",
+          "Đảm bảo lợi nhuận"
+        ],
+        answer: 1
+      },
+      {
+        q: "ROI thường liên quan đến?",
+        options: ["Hiệu quả đầu tư", "Thời tiết", "Dân số", "Điểm danh"],
+        answer: 0
+      }
+    ]
+  }
 };
+
+const CANTEEN_ITEMS = [
+  {
+    id: "snack",
+    name: "Bánh mì",
+    icon: "🥪",
+    price: 15000,
+    energy: 10,
+    mood: 2
+  },
+  {
+    id: "meal",
+    name: "Cơm phần",
+    icon: "🍱",
+    price: 30000,
+    energy: 22,
+    hp: 5,
+    mood: 3
+  },
+  {
+    id: "milk",
+    name: "Sữa",
+    icon: "🥛",
+    price: 12000,
+    energy: 8,
+    hp: 3
+  },
+  {
+    id: "coffee",
+    name: "Cà phê",
+    icon: "☕",
+    price: 18000,
+    energy: 18,
+    mood: -1
+  },
+  {
+    id: "fruit",
+    name: "Trái cây",
+    icon: "🍎",
+    price: 20000,
+    energy: 12,
+    hp: 8,
+    mood: 4
+  }
+];
 
 const QUIZ_BANK = [
   {
     id: "m1",
-    sub: "toan",
-    q: "Đạo hàm của y = e^(2x) là gì?",
-    opts: ["2e^(2x)", "e^(2x)", "2xe^(2x)", "e^(2x)/2"],
-    c: 0,
+    subject: "Toán",
+    q: "Đạo hàm của y = x² là gì?",
+    options: ["x", "2x", "x²", "2"],
+    answer: 1,
+    explain: "Theo quy tắc đạo hàm, (x²)' = 2x."
   },
   {
     id: "m2",
-    sub: "toan",
-    q: "Cấp số cộng có u₁ = 3, d = 4. u₅ bằng?",
-    opts: ["19", "15", "23", "20"],
-    c: 0,
+    subject: "Toán",
+    q: "Cấp số cộng có công sai d = 3, a₁ = 2. a₄ bằng?",
+    options: ["8", "9", "11", "12"],
+    answer: 2,
+    explain: "a₄ = a₁ + 3d = 2 + 9 = 11."
   },
   {
-    id: "ta1",
-    sub: "anh",
-    q: "If she _____ harder, she would pass the exam.",
-    opts: ["studied", "studies", "study", "had studied"],
-    c: 0,
+    id: "m3",
+    subject: "Toán",
+    q: "Tổng ba số tự nhiên liên tiếp 10, 11, 12 bằng?",
+    options: ["31", "32", "33", "34"],
+    answer: 2,
+    explain: "10 + 11 + 12 = 33."
   },
   {
     id: "l1",
-    sub: "ly",
-    q: "Đơn vị đo công suất trong hệ SI là?",
-    opts: ["Watt", "Joule", "Volt", "Ampe"],
-    c: 0,
+    subject: "Vật lý",
+    q: "Đơn vị của công suất là gì?",
+    options: ["J", "N", "W", "Pa"],
+    answer: 2,
+    explain: "Công suất có đơn vị Watt (W)."
+  },
+  {
+    id: "l2",
+    subject: "Vật lý",
+    q: "Vận tốc được tính bằng?",
+    options: ["s/t", "t/s", "s × t", "m × s"],
+    answer: 0,
+    explain: "v = s/t."
+  },
+  {
+    id: "l3",
+    subject: "Vật lý",
+    q: "Đơn vị của lực là?",
+    options: ["J", "N", "W", "V"],
+    answer: 1,
+    explain: "Lực được đo bằng Newton (N)."
   },
   {
     id: "h1",
-    sub: "hoa",
-    q: "Chất nào sau đây là axit mạnh?",
-    opts: ["HCl", "CH₃COOH", "H₂CO₃", "H₂O"],
-    c: 0,
+    subject: "Hóa",
+    q: "Công thức hóa học của nước là?",
+    options: ["CO₂", "H₂O", "O₂", "NaCl"],
+    answer: 1,
+    explain: "Nước gồm hai nguyên tử H và một nguyên tử O."
   },
   {
     id: "h2",
-    sub: "hoa",
-    q: "Công thức của glucose là:",
-    opts: ["C₆H₁₂O₆", "C₂H₅OH", "CH₄", "C₁₂H₂₂O₁₁"],
-    c: 0,
+    subject: "Hóa",
+    q: "NaCl thường được gọi là?",
+    options: ["Đường", "Muối ăn", "Giấm", "Vôi"],
+    answer: 1,
+    explain: "NaCl là natri clorua, thành phần chính của muối ăn."
+  },
+  {
+    id: "h3",
+    subject: "Hóa",
+    q: "pH < 7 thường biểu thị môi trường?",
+    options: ["Axit", "Bazơ", "Trung tính", "Kim loại"],
+    answer: 0,
+    explain: "Dung dịch có pH < 7 có tính axit."
   },
   {
     id: "s1",
-    sub: "sinh",
-    q: "Đơn vị cơ bản của sự sống là:",
-    opts: ["Tế bào", "Mô", "Cơ quan", "DNA"],
-    c: 0,
+    subject: "Sinh",
+    q: "Đơn vị cơ bản của sự sống là?",
+    options: ["Mô", "Cơ quan", "Tế bào", "Hệ cơ quan"],
+    answer: 2,
+    explain: "Tế bào là đơn vị cấu trúc và chức năng cơ bản của sự sống."
   },
   {
     id: "s2",
-    sub: "sinh",
-    q: "Quá trình quang hợp chủ yếu diễn ra ở:",
-    opts: ["Lục lạp", "Ti thể", "Ribosome", "Nhân"],
-    c: 0,
+    subject: "Sinh",
+    q: "DNA có vai trò chính nào?",
+    options: ["Lưu trữ thông tin di truyền", "Tiêu hóa", "Hô hấp", "Vận động"],
+    answer: 0,
+    explain: "DNA mang và lưu trữ thông tin di truyền."
+  },
+  {
+    id: "s3",
+    subject: "Sinh",
+    q: "Quang hợp ở thực vật chủ yếu diễn ra tại?",
+    options: ["Rễ", "Lục lạp", "Không bào", "Nhân"],
+    answer: 1,
+    explain: "Quang hợp chủ yếu diễn ra ở lục lạp."
   },
   {
     id: "su1",
-    sub: "su",
-    q: "Ngày Quốc khánh Việt Nam là:",
-    opts: ["2/9", "30/4", "19/8", "7/5"],
-    c: 0,
+    subject: "Lịch sử",
+    q: "Cách mạng tháng Tám ở Việt Nam diễn ra vào năm nào?",
+    options: ["1930", "1945", "1954", "1975"],
+    answer: 1,
+    explain: "Cách mạng tháng Tám thành công năm 1945."
   },
   {
     id: "su2",
-    sub: "su",
-    q: "Chiến thắng Điện Biên Phủ diễn ra năm:",
-    opts: ["1954", "1945", "1968", "1975"],
-    c: 0,
+    subject: "Lịch sử",
+    q: "Chiến thắng Điện Biên Phủ diễn ra năm?",
+    options: ["1945", "1954", "1968", "1975"],
+    answer: 1,
+    explain: "Chiến thắng Điện Biên Phủ diễn ra năm 1954."
   },
   {
-    id: "dia1",
-    sub: "dia",
-    q: "Việt Nam nằm trong khu vực khí hậu:",
-    opts: ["Nhiệt đới gió mùa", "Ôn đới", "Hàn đới", "Hoang mạc"],
-    c: 0,
+    id: "su3",
+    subject: "Lịch sử",
+    q: "Ngày Quốc khánh Việt Nam là?",
+    options: ["30/4", "2/9", "19/8", "7/5"],
+    answer: 1,
+    explain: "Ngày 2/9/1945 là ngày Quốc khánh Việt Nam."
   },
   {
-    id: "dia2",
-    sub: "dia",
-    q: "Đồng bằng lớn nhất Việt Nam là:",
-    opts: [
-      "Đồng bằng sông Cửu Long",
+    id: "d1",
+    subject: "Địa lý",
+    q: "Việt Nam thuộc khu vực nào của châu Á?",
+    options: ["Đông Á", "Đông Nam Á", "Nam Á", "Tây Á"],
+    answer: 1,
+    explain: "Việt Nam thuộc khu vực Đông Nam Á."
+  },
+  {
+    id: "d2",
+    subject: "Địa lý",
+    q: "Đồng bằng lớn nhất Việt Nam là?",
+    options: [
       "Đồng bằng sông Hồng",
-      "Đồng bằng Thanh Hóa",
-      "Đồng bằng Nghệ An",
+      "Đồng bằng sông Cửu Long",
+      "Đồng bằng ven biển miền Trung",
+      "Cao nguyên"
     ],
-    c: 0,
+    answer: 1,
+    explain: "Đồng bằng sông Cửu Long là đồng bằng lớn nhất Việt Nam."
   },
   {
-    id: "gdcd1",
-    sub: "gdcd",
-    q: "Pháp luật có đặc điểm cơ bản nào?",
-    opts: [
-      "Tính bắt buộc chung",
-      "Chỉ áp dụng cho học sinh",
-      "Không có chế tài",
-      "Chỉ mang tính khuyên nhủ",
-    ],
-    c: 0,
+    id: "d3",
+    subject: "Địa lý",
+    q: "Khí hậu Việt Nam nhìn chung mang tính chất?",
+    options: ["Nhiệt đới gió mùa", "Ôn đới", "Hàn đới", "Hoang mạc"],
+    answer: 0,
+    explain: "Việt Nam có khí hậu nhiệt đới gió mùa."
   },
   {
-    id: "gdcd2",
-    sub: "gdcd",
-    q: "Công dân bình đẳng trước pháp luật nghĩa là:",
-    opts: [
-      "Mọi người đều được đối xử theo quy định pháp luật",
-      "Mọi người có cùng thu nhập",
-      "Mọi người có cùng nghề",
-      "Mọi người có cùng tài sản",
-    ],
-    c: 0,
+    id: "a1",
+    subject: "Tiếng Anh",
+    q: "If I were you, I ___ harder.",
+    options: ["study", "studied", "would study", "will study"],
+    answer: 2,
+    explain: "Câu điều kiện loại 2 dùng would + V."
   },
+  {
+    id: "a2",
+    subject: "Tiếng Anh",
+    q: "She ___ English for five years.",
+    options: ["learns", "has learned", "learned", "learning"],
+    answer: 1,
+    explain: "For five years phù hợp với hiện tại hoàn thành."
+  },
+  {
+    id: "a3",
+    subject: "Tiếng Anh",
+    q: "Opposite of 'difficult' is?",
+    options: ["easy", "hard", "slow", "late"],
+    answer: 0,
+    explain: "Difficult trái nghĩa với easy."
+  },
+  {
+    id: "gd1",
+    subject: "GDCD",
+    q: "Pháp luật có tính chất nào?",
+    options: [
+      "Bắt buộc chung",
+      "Tự nguyện tuyệt đối",
+      "Chỉ dành cho học sinh",
+      "Không cần tuân thủ"
+    ],
+    answer: 0,
+    explain: "Pháp luật có tính bắt buộc chung."
+  },
+  {
+    id: "gd2",
+    subject: "GDCD",
+    q: "Công dân bình đẳng trước pháp luật nghĩa là?",
+    options: [
+      "Mọi người đều có quyền và nghĩa vụ theo quy định pháp luật",
+      "Không cần tuân thủ pháp luật",
+      "Chỉ người giàu có quyền",
+      "Chỉ cán bộ mới chịu pháp luật"
+    ],
+    answer: 0,
+    explain: "Mọi công dân đều bình đẳng về quyền và nghĩa vụ trước pháp luật."
+  },
+  {
+    id: "gd3",
+    subject: "GDCD",
+    q: "Hành vi nào thể hiện trách nhiệm?",
+    options: [
+      "Giữ lời hứa",
+      "Đổ lỗi",
+      "Trốn tránh",
+      "Gian dối"
+    ],
+    answer: 0,
+    explain: "Giữ lời hứa là biểu hiện của trách nhiệm."
+  },
+  {
+    id: "r1",
+    subject: "Đố mẹo",
+    q: "Cái gì càng lấy đi càng lớn?",
+    options: ["Cái hố", "Cái túi", "Cái bàn", "Quả bóng"],
+    answer: 0,
+    explain: "Càng đào/lấy đất đi thì cái hố càng lớn."
+  },
+  {
+    id: "r2",
+    subject: "Đố mẹo",
+    q: "Con gì không có chân nhưng vẫn đi khắp nơi?",
+    options: ["Con rắn", "Đám mây", "Con mèo", "Con chó"],
+    answer: 1,
+    explain: "Đám mây có thể trôi đi khắp nơi."
+  },
+  {
+    id: "r3",
+    subject: "Đố mẹo",
+    q: "Cái gì có cổ nhưng không có đầu?",
+    options: ["Cái chai", "Cái bàn", "Cái ghế", "Cái quạt"],
+    answer: 0,
+    explain: "Chai có cổ chai nhưng không có đầu."
+  }
 ];
+
+const TITLES = [
+  {
+    id: "first_step",
+    icon: "🌱",
+    name: "Tân Binh Thanh Xuân",
+    desc: "Đạt 100 điểm thi đua.",
+    condition: s => s.competitionScore >= 100
+  },
+  {
+    id: "hard_worker",
+    icon: "📚",
+    name: "Học Sinh Chăm Chỉ",
+    desc: "Đạt 700 điểm thi đua.",
+    condition: s => s.competitionScore >= 300
+  },
+  {
+    id: "all_rounder",
+    icon: "⭐",
+    name: "Học Sinh Toàn Diện",
+    desc: "Học tập, kỹ năng và bạn bè đều từ 70.",
+    condition: s =>
+      s.stats.study >= 70 &&
+      s.stats.skill >= 70 &&
+      s.stats.friends >= 70
+  },
+  {
+    id: "top3",
+    icon: "🥉",
+    name: "Ngôi Sao Top 3",
+    desc: "Có ít nhất một lần lọt Top 3.",
+    condition: s => s.titleFlags.includes("top3")
+  },
+  {
+    id: "champion",
+    icon: "🥇",
+    name: "Quán Quân Thi Đua",
+    desc: "Có ít nhất một lần đứng đầu bảng.",
+    condition: s => s.titleFlags.includes("champion")
+  },
+  {
+    id: "rich_student",
+    icon: "💰",
+    name: "Đại Gia Học Đường",
+    desc: "Sở hữu từ 1.000.000đ.",
+    condition: s => s.stats.money >= 1000000
+  },
+  {
+    id: "skill_master",
+    icon: "🧠",
+    name: "Bậc Thầy Kỹ Năng",
+    desc: "Đạt 90 điểm kỹ năng.",
+    condition: s => s.stats.skill >= 90
+  },
+  {
+    id: "love_master",
+    icon: "💖",
+    name: "Người Được Yêu Mến",
+    desc: "Đạt 90 điểm tình cảm.",
+    condition: s => s.stats.love >= 90
+  },
+  {
+    id: "scholar",
+    icon: "🎓",
+    name: "Học Bá Thanh Xuân",
+    desc: "Đạt 90 điểm học tập.",
+    condition: s => s.stats.study >= 90
+  },
+  {
+    id: "asset_master",
+    icon: "🏠",
+    name: "Ông Trùm Tài Sản",
+    desc: "Sở hữu ít nhất 3 tài sản.",
+    condition: s => s.assets.length >= 3
+  },
+  {
+    id: "certificate_master",
+    icon: "📜",
+    name: "Bộ Sưu Tập Chứng Chỉ",
+    desc: "Sở hữu đủ 4 chứng chỉ.",
+    condition: s => s.certificates.length >= 4
+  },
+  {
+    id: "graduation_star",
+    icon: "🎉",
+    name: "Ngôi Sao Thanh Xuân",
+    desc: "Hoàn thành hành trình 45 ngày.",
+    condition: s => s.isGameOver
+  }
+];
+
+const clamp = (value, min = 0, max = 100) =>
+  Math.min(max, Math.max(min, Number(value) || 0));
 
 function createInitialState() {
   return {
@@ -454,6 +651,7 @@ function createInitialState() {
     totalDays: 45,
     timeIndex: 0,
     location: "class",
+
     stats: {
       hp: 85,
       energy: 100,
@@ -463,28 +661,55 @@ function createInitialState() {
       love: 20,
       reputation: 30,
       skill: 25,
-      money: 150000,
+      money: 50000
     },
+
     certificates: [],
     assets: [],
+
     bag: [
       {
         id: "math_note",
         name: "Sổ Công Thức",
         icon: "📘",
         count: 1,
-        desc: "+8 Điểm học tập",
+        desc: "+8 Điểm học tập"
       },
       {
         id: "gift_strawberry",
         name: "Kẹo Dâu Tây",
         icon: "🍬",
         count: 2,
-        desc: "+8% Tình cảm",
-      },
+        desc: "+8% Tình cảm"
+      }
     ],
+
     todayEvents: [],
     diaryEntries: [],
+
+    competitionScore: 0,
+
+    npcScores: {
+      lan: 42,
+      trieu_man: 48,
+      tuan: 45
+    },
+
+    competitionHistory: [],
+    currentRank: 4,
+    bestRank: 4,
+    competitionStreak: 0,
+
+    titleFlags: [],
+    unlockedTitles: [],
+
+    lastHomeRestKey: null,
+
+    npcRelationships: {
+      lan: 40,
+      trieu_man: 20,
+      tuan: 35
+    }
   };
 }
 
@@ -493,1011 +718,1171 @@ function normalizeState(raw) {
 
   if (!raw || typeof raw !== "object") return base;
 
-  return {
+  const state = {
     ...base,
     ...raw,
     stats: {
       ...base.stats,
-      ...(raw.stats || {}),
+      ...(raw.stats || {})
     },
+    npcScores: {
+      ...base.npcScores,
+      ...(raw.npcScores || {})
+    },
+    npcRelationships: {
+      ...base.npcRelationships,
+      ...(raw.npcRelationships || {})
+    },
+    bag: Array.isArray(raw.bag) ? raw.bag : base.bag,
     certificates: Array.isArray(raw.certificates)
       ? raw.certificates
-      : base.certificates,
-    assets: Array.isArray(raw.assets) ? raw.assets : base.assets,
-    bag: Array.isArray(raw.bag) ? raw.bag : base.bag,
-    todayEvents: Array.isArray(raw.todayEvents) ? raw.todayEvents : [],
-    diaryEntries: Array.isArray(raw.diaryEntries) ? raw.diaryEntries : [],
+      : [],
+    assets: Array.isArray(raw.assets) ? raw.assets : [],
+    diaryEntries: Array.isArray(raw.diaryEntries)
+      ? raw.diaryEntries
+      : [],
+    competitionHistory: Array.isArray(raw.competitionHistory)
+      ? raw.competitionHistory
+      : [],
+    titleFlags: Array.isArray(raw.titleFlags)
+      ? raw.titleFlags
+      : [],
+    unlockedTitles: Array.isArray(raw.unlockedTitles)
+      ? raw.unlockedTitles
+      : []
   };
+
+  Object.keys(state.stats).forEach(key => {
+    if (key === "money") {
+      state.stats.money = Math.max(
+        0,
+        Number(state.stats.money) || 0
+      );
+    } else {
+      state.stats[key] = clamp(state.stats[key]);
+    }
+  });
+
+  state.day = Math.max(1, Number(state.day) || 1);
+  state.timeIndex = Math.min(
+    TIMES.length - 1,
+    Math.max(0, Number(state.timeIndex) || 0)
+  );
+
+  state.competitionScore =
+    Math.max(0, Number(state.competitionScore) || 0);
+
+  return state;
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function encodeSaveCode(data) {
+  const json = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(json);
+
+  let binary = "";
+  const chunk = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, i + chunk)
+    );
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodeSaveCode(code) {
+  let b64 = String(code || "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  while (b64.length % 4) b64 += "=";
+
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return JSON.parse(
+    new TextDecoder().decode(bytes)
+  );
 }
 
 function formatMoney(value) {
-  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+  return new Intl.NumberFormat("vi-VN").format(
+    Math.round(value || 0)
+  ) + "đ";
 }
 
-/* =========================================================
-   AUDIO
-   ========================================================= */
+function getPlayerDailyScore(state) {
+  let score = 0;
 
-class RetroAudio {
-  constructor() {
-    this.ctx = null;
-    this.enabled = true;
-  }
+  score += Math.floor(state.stats.study / 10);
+  score += Math.floor(state.stats.skill / 15);
+  score += Math.floor(state.stats.friends / 20);
+  score += Math.floor(state.stats.love / 25);
+  score += Math.floor(state.stats.reputation / 15);
 
-  init() {
-    if (!this.enabled) return false;
+  if (state.stats.mood >= 70) score += 3;
+  if (state.stats.energy >= 70) score += 2;
 
-    try {
-      if (!this.ctx) {
-        const AudioContext =
-          window.AudioContext || window.webkitAudioContext;
+  score += state.certificates.length * 5;
+  score += state.assets.length * 3;
 
-        if (!AudioContext) return false;
+  return Math.max(5, score);
+}
 
-        this.ctx = new AudioContext();
-      }
+function calculateCompetition(state, dailyScore) {
+  const npcGain = {
+    lan: Math.floor(Math.random() * 9) + 5,
+    trieu_man: Math.floor(Math.random() * 11) + 6,
+    tuan: Math.floor(Math.random() * 10) + 5
+  };
 
-      if (this.ctx.state === "suspended") {
-        this.ctx.resume();
-      }
+  const playerTotal =
+    state.competitionScore + dailyScore;
 
-      return true;
-    } catch {
-      return false;
+  const npcScores = {
+    lan: state.npcScores.lan + npcGain.lan,
+    trieu_man:
+      state.npcScores.trieu_man +
+      npcGain.trieu_man,
+    tuan:
+      state.npcScores.tuan +
+      npcGain.tuan
+  };
+
+  const ranking = [
+    {
+      id: "player",
+      name: "Bạn",
+      score: playerTotal
+    },
+    {
+      id: "lan",
+      name: "Lan",
+      score: npcScores.lan
+    },
+    {
+      id: "trieu_man",
+      name: "Triệu Mẫn",
+      score: npcScores.trieu_man
+    },
+    {
+      id: "tuan",
+      name: "Tuấn",
+      score: npcScores.tuan
     }
+  ].sort((a, b) => b.score - a.score);
+
+  const rank =
+    ranking.findIndex(
+      item => item.id === "player"
+    ) + 1;
+
+  const flags = [
+    ...(state.titleFlags || [])
+  ];
+
+  if (rank <= 3 && !flags.includes("top3")) {
+    flags.push("top3");
   }
 
-  playTone(freq, type = "square", duration = 0.12, volume = 0.08) {
-    if (!this.enabled || !this.init()) return;
-
-    try {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, now);
-
-      gain.gain.setValueAtTime(volume, now);
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        now + duration
-      );
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + duration);
-    } catch {}
+  if (rank === 1 && !flags.includes("champion")) {
+    flags.push("champion");
   }
 
-  success() {
-    [523, 659, 784].forEach((f, i) => {
-      setTimeout(
-        () => this.playTone(f, "triangle", 0.16, 0.08),
-        i * 70
-      );
-    });
+  let streak = state.competitionStreak || 0;
+
+  if (rank < (state.currentRank || 4)) {
+    streak += 1;
+  } else if (rank > (state.currentRank || 4)) {
+    streak = 0;
   }
 
-  wrong() {
-    [260, 190].forEach((f, i) => {
-      setTimeout(
-        () => this.playTone(f, "sawtooth", 0.18, 0.07),
-        i * 90
-      );
-    });
-  }
-
-  bell() {
-    [440, 554, 659, 880].forEach((f, i) => {
-      setTimeout(
-        () => this.playTone(f, "sine", 0.25, 0.06),
-        i * 110
-      );
-    });
-  }
+  return {
+    npcScores,
+    competitionScore: playerTotal,
+    currentRank: rank,
+    bestRank: Math.min(
+      state.bestRank || 99,
+      rank
+    ),
+    competitionStreak: streak,
+    titleFlags: flags,
+    npcGain,
+    dailyScore,
+    history: {
+      day: state.day,
+      playerGain: dailyScore,
+      playerTotal,
+      lanGain: npcGain.lan,
+      lanTotal: npcScores.lan,
+      trieuManGain: npcGain.trieu_man,
+      trieuManTotal: npcScores.trieu_man,
+      tuanGain: npcGain.tuan,
+      tuanTotal: npcScores.tuan,
+      rank
+    }
+  };
 }
 
-/* =========================================================
-   APP
-   ========================================================= */
+function App() {
+  const [game, setGame] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SAVE_KEY);
 
-export default function App() {
-  const audioRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const loadedRef = useRef(false);
-  const previousDayRef = useRef(1);
+      if (saved) {
+        return normalizeState(
+          JSON.parse(saved)
+        );
+      }
+    } catch {}
 
-  const [state, setState] = useState(createInitialState);
-  const [view, setView] = useState("class");
-  const [drawer, setDrawer] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+    return createInitialState();
+  });
+
+  const [overlay, setOverlay] = useState(null);
+  const [toast, setToast] = useState("");
+  const [audioEnabled, setAudioEnabled] =
+    useState(true);
 
   const [quiz, setQuiz] = useState(null);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizScore, setQuizScore] = useState(0);
 
   const [certExam, setCertExam] = useState(null);
+  const [certIndex, setCertIndex] = useState(0);
+  const [certScore, setCertScore] = useState(0);
 
-  const [saveModal, setSaveModal] = useState(null);
   const [saveCode, setSaveCode] = useState("");
+  const [saveCodeInput, setSaveCodeInput] =
+    useState("");
 
-  const [dialogue, setDialogue] = useState(null);
+  const [drawer, setDrawer] = useState(null);
 
-  const [manualDiary, setManualDiary] = useState(false);
-  const [showEnding, setShowEnding] = useState(false);
-
-  const [pendingDiary, setPendingDiary] = useState(null);
-
-  /* -------------------------------------------------------
-     INIT
-     ------------------------------------------------------- */
+  const fileInputRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
-    audioRef.current = new RetroAudio();
-
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-
-      if (raw) {
-        const loaded = normalizeState(JSON.parse(raw));
-
-        setState(loaded);
-        setView(loaded.location || "class");
-        previousDayRef.current = loaded.day;
-      }
-    } catch {
-      // Nếu save hỏng thì bắt đầu game mới.
-    }
-
-    loadedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!loadedRef.current) return;
-
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-    } catch {}
-  }, [state]);
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 2800);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
-  /* -------------------------------------------------------
-     AUDIO
-     ------------------------------------------------------- */
-
-  function playSuccess() {
-    audioRef.current?.success();
-  }
-
-  function playWrong() {
-    audioRef.current?.wrong();
-  }
-
-  function toggleAudio() {
-    const next = !audioEnabled;
-
-    setAudioEnabled(next);
-
-    if (audioRef.current) {
-      audioRef.current.enabled = next;
-    }
-
-    if (next) {
-      audioRef.current?.playTone(660);
-    }
-  }
-
-  /* -------------------------------------------------------
-     TOAST
-     ------------------------------------------------------- */
-
-  function showToast(message, type = "success") {
-    setToast({ message, type });
-  }
-
-  /* -------------------------------------------------------
-     STATE
-     ------------------------------------------------------- */
-
-  function updateStats(changes) {
-    setState((prev) => {
-      const stats = { ...prev.stats };
-
-      Object.entries(changes).forEach(([key, amount]) => {
-        const current = Number(stats[key] || 0);
-        let next = current + Number(amount);
-
-        if (
-          ["hp", "energy", "mood", "friends", "love", "reputation", "skill"].includes(
-            key
-          )
-        ) {
-          next = clamp(next, 0, 100);
-        }
-
-        if (key === "study") {
-          next = Math.max(0, next);
-        }
-
-        if (key === "money") {
-          next = Math.max(0, next);
-        }
-
-        stats[key] = next;
-      });
-
-      return {
-        ...prev,
-        stats,
-      };
-    });
-  }
-
-  function addEvent(text) {
-    setState((prev) => ({
-      ...prev,
-      todayEvents: [...prev.todayEvents, text],
-    }));
-  }
-
-  /* -------------------------------------------------------
-     LOCATION
-     ------------------------------------------------------- */
-
-  function changeLocation(location) {
-    setView(location);
-
-    setState((prev) => ({
-      ...prev,
-      location,
-    }));
-
-    setDrawer(null);
-    setQuiz(null);
-    setCertExam(null);
-    setDialogue(null);
-    setManualDiary(false);
-
-    if (location === "home") {
-      const hasCondo = state.assets.includes("asset_condo");
-
-      if (hasCondo) {
-        updateStats({
-          energy: 25,
-          study: 15,
-        });
-
-        showToast(
-          "🏙️ Về căn hộ: +25⚡ +15📚",
-          "info"
-        );
-      }
-    }
-  }
-
-  function navigateLocation(direction) {
-    const index = LOCATIONS.findIndex((x) => x.id === view);
-
-    const nextIndex =
-      (index + direction + LOCATIONS.length) %
-      LOCATIONS.length;
-
-    const next = LOCATIONS[nextIndex];
-
-    changeLocation(next.id);
-  }
-
-  /* -------------------------------------------------------
-     TIME
-     ------------------------------------------------------- */
-
-  function advanceTime() {
-    setState((prev) => {
-      if (prev.isGameOver) return prev;
-
-      if (prev.timeIndex < TIME_PERIODS.length - 1) {
-        return {
-          ...prev,
-          timeIndex: prev.timeIndex + 1,
-        };
-      }
-
-      const diaryText =
-        prev.todayEvents.length > 0
-          ? prev.todayEvents.join(" ")
-          : "Một ngày học tập và tích lũy trôi qua bình yên.";
-
-      const diaryEntry = {
-        day: prev.day,
-        text: `Ngày thứ ${prev.day}: ${diaryText}`,
-      };
-
-      const isFinalDay = prev.day >= prev.totalDays;
-
-      if (isFinalDay) {
-        setTimeout(() => {
-          setPendingDiary(diaryEntry);
-          setShowEnding(true);
-        }, 0);
-
-        return {
-          ...prev,
-          isGameOver: true,
-          diaryEntries: [...prev.diaryEntries, diaryEntry],
-          todayEvents: [],
-          stats: {
-            ...prev.stats,
-            energy: 100,
-            money: prev.stats.money + 20000,
-          },
-        };
-      }
-
-      setTimeout(() => {
-        setPendingDiary(diaryEntry);
-      }, 0);
-
-      return {
-        ...prev,
-        day: prev.day + 1,
-        timeIndex: 0,
-        diaryEntries: [...prev.diaryEntries, diaryEntry],
-        todayEvents: [],
-        stats: {
-          ...prev.stats,
-          energy: 100,
-          money: prev.stats.money + 20000,
-        },
-      };
-    });
-
-    playSuccess();
-  }
-
-  function quickSleep() {
-    if (state.isGameOver) return;
-
-    if (
-      window.confirm(
-        "Đi ngủ sớm để sang ngày mới?\nBạn sẽ nhận 20.000đ tiền sinh hoạt."
-      )
-    ) {
-      advanceTime();
-    }
-  }
-
-  /* -------------------------------------------------------
-     CLASSROOM
-     ------------------------------------------------------- */
-
-  function startClassroomLesson() {
-    if (state.isGameOver) return;
-
-    if (state.stats.energy < 15) {
-      showToast("⚠️ Không đủ năng lượng để học.", "error");
-      playWrong();
-      return;
-    }
-
-    const q =
-      QUIZ_BANK[Math.floor(Math.random() * QUIZ_BANK.length)];
-
-    setQuiz(q);
-    setDrawer(null);
-    playSuccess();
-  }
-
-  function answerQuiz(index) {
-    if (!quiz) return;
-
-    const teacher = TEACHERS[quiz.sub];
-
-    if (index === quiz.c) {
-      updateStats({
-        study: 8,
-        mood: 5,
-        energy: -15,
-        reputation: 3,
-      });
-
-      showToast(
-        `✅ ${teacher.name}: Chính xác! +8📚`,
-        "success"
-      );
-
-      playSuccess();
-    } else {
-      updateStats({
-        study: 2,
-        mood: -5,
-        energy: -15,
-      });
-
-      showToast(
-        `❌ ${teacher.name}: Hãy xem lại kiến thức!`,
-        "error"
-      );
-
-      playWrong();
-    }
-
-    setQuiz(null);
-    advanceTime();
-  }
-
-  function skipClass() {
-    updateStats({
-      energy: 10,
-      study: -4,
-      reputation: -2,
-    });
-
-    showToast(
-      "😴 Gục đầu ngủ trong lớp: +10⚡ nhưng -4📚",
-      "warning"
-    );
-
-    playWrong();
-    setQuiz(null);
-    advanceTime();
-  }
-
-  /* -------------------------------------------------------
-     CANTEEN
-     ------------------------------------------------------- */
-
-  function buyFood(item) {
-    if (state.stats.money < item.price) {
-      showToast("💸 Không đủ tiền!", "error");
-      playWrong();
-      return;
-    }
-
-    updateStats({
-      money: -item.price,
-      energy: item.energy,
-      mood: item.mood,
-      love: item.love,
-    });
-
-    showToast(`😋 Đã mua ${item.name}!`, "success");
-    playSuccess();
-    advanceTime();
-  }
-
-  /* -------------------------------------------------------
-     JOBS
-     ------------------------------------------------------- */
-
-  function doJob(job) {
-    if (!job.condition(state)) {
-      showToast(`⛔ ${job.requirement}`, "error");
-      playWrong();
-      return;
-    }
-
-    if (state.stats.energy < job.energy) {
-      showToast("⚠️ Bạn quá mệt để làm công việc này.", "error");
-      playWrong();
-      return;
-    }
-
-    updateStats({
-      money: job.salary,
-      energy: -job.energy,
-      hp: -job.hp,
-      skill: job.skill,
-      mood: -2,
-    });
-
-    addEvent(job.diary);
-
-    showToast(
-      `💰 +${formatMoney(job.salary)} | 🧠 +${job.skill}`,
-      "success"
-    );
-
-    playSuccess();
-    advanceTime();
-  }
-
-  /* -------------------------------------------------------
-     CERTIFICATES
-     ------------------------------------------------------- */
-
-  function startCertificate(cert) {
-    if (state.certificates.includes(cert.id)) {
-      showToast("Bạn đã có chứng chỉ này rồi.", "info");
-      return;
-    }
-
-    if (state.stats.money < cert.fee) {
-      showToast("💸 Không đủ tiền nộp lệ phí.", "error");
-      playWrong();
-      return;
-    }
-
-    if (state.stats.skill < cert.reqSkill) {
-      showToast(
-        `⚠️ Cần Kỹ năng ≥ ${cert.reqSkill}.`,
-        "warning"
-      );
-      playWrong();
-      return;
-    }
-
-    if (state.stats.energy < 25) {
-      showToast("⚠️ Cần ít nhất 25 năng lượng.", "warning");
-      playWrong();
-      return;
-    }
-
-    updateStats({
-      money: -cert.fee,
-      energy: -25,
-    });
-
-    setCertExam({
-      certId: cert.id,
-      index: 0,
-      score: 0,
-    });
-
-    playSuccess();
-  }
-
-  function answerCertificate(index) {
-    if (!certExam) return;
-
-    const cert = CERTIFICATES.find(
-      (c) => c.id === certExam.certId
-    );
-
-    const question = cert.questions[certExam.index];
-    const correct = index === question.c;
-
-    const nextScore = correct
-      ? certExam.score + 1
-      : certExam.score;
-
-    if (correct) {
-      playSuccess();
-    } else {
-      playWrong();
-    }
-
-    const nextIndex = certExam.index + 1;
-
-    if (nextIndex < cert.questions.length) {
-      setCertExam({
-        ...certExam,
-        index: nextIndex,
-        score: nextScore,
-      });
-
-      return;
-    }
-
-    finishCertificate(cert, nextScore);
-  }
-
-  function finishCertificate(cert, score) {
-    const passed = score >= 2;
-
-    if (passed) {
-      setState((prev) => ({
-        ...prev,
-        certificates: prev.certificates.includes(cert.id)
-          ? prev.certificates
-          : [...prev.certificates, cert.id],
-        stats: {
-          ...prev.stats,
-          reputation: clamp(
-            prev.stats.reputation + 20,
-            0,
-            100
-          ),
-          mood: clamp(prev.stats.mood + 20, 0, 100),
-          skill: clamp(prev.stats.skill + 10, 0, 100),
-        },
-        todayEvents: [
-          ...prev.todayEvents,
-          `Đỗ chứng chỉ ${cert.name}.`,
-        ],
-      }));
-
-      showToast(
-        `🎉 ĐỖ ${cert.name}! ${score}/3 câu đúng.`,
-        "success"
-      );
-
-      playSuccess();
-    } else {
-      updateStats({ mood: -10 });
-
-      addEvent(`Trượt kỳ thi ${cert.name}.`);
-
-      showToast(
-        `😢 Trượt ${cert.name}: ${score}/3. Cố gắng lần sau!`,
-        "error"
-      );
-
-      playWrong();
-    }
-
-    setCertExam(null);
-    advanceTime();
-  }
-
-  /* -------------------------------------------------------
-     PROPERTY
-     ------------------------------------------------------- */
-
-  function buyProperty(item) {
-    if (state.assets.includes(item.id)) {
-      showToast("Bạn đã sở hữu tài sản này.", "info");
-      return;
-    }
-
-    if (
-      item.license &&
-      !state.certificates.includes(item.license)
-    ) {
-      showToast(
-        "⛔ Cần có bằng lái ô tô trước.",
-        "error"
-      );
-      playWrong();
-      return;
-    }
-
-    if (state.stats.money < item.price) {
-      showToast("💸 Không đủ tiền mua tài sản.", "error");
-      playWrong();
-      return;
-    }
-
-    let changes = {
-      money: -item.price,
-      reputation: 30,
-      mood: 35,
-    };
-
-    if (
-      item.id === "asset_car_sedan" ||
-      item.id === "asset_car_super"
-    ) {
-      changes.love = 25;
-    }
-
-    setState((prev) => ({
-      ...prev,
-      assets: [...prev.assets, item.id],
-      stats: {
-        ...prev.stats,
-        ...Object.fromEntries(
-          Object.entries(changes).map(([key, value]) => [
-            key,
-            ["money", "study"].includes(key)
-              ? Math.max(
-                  0,
-                  (prev.stats[key] || 0) + value
-                )
-              : clamp(
-                  (prev.stats[key] || 0) + value,
-                  0,
-                  100
-                ),
-          ])
-        ),
-      },
-      todayEvents: [
-        ...prev.todayEvents,
-        `Mua thành công ${item.name}.`,
-      ],
-    }));
-
-    showToast(`🏡 Đã mua ${item.name}!`, "success");
-    playSuccess();
-  }
-
-  /* -------------------------------------------------------
-     NPC
-     ------------------------------------------------------- */
-
-  function interactNPC(who) {
-    if (state.isGameOver) return;
-
-    if (who === "lan") {
-      updateStats({
-        energy: -10,
-        mood: 15,
-        friends: 6,
-      });
-
-      addEvent("Tám chuyện cùng Lan sau giờ học.");
-
-      showToast(
-        "👧 Lan: Có bạn thân thật vui! +6👥",
-        "info"
-      );
-
-      advanceTime();
-      return;
-    }
-
-    if (who === "tuan") {
-      updateStats({
-        energy: -15,
-        hp: 6,
-        mood: 10,
-      });
-
-      addEvent("Ném bóng cùng Tuấn.");
-
-      showToast(
-        "🏀 Chơi bóng cùng Tuấn: +6❤️ +10😊",
-        "info"
-      );
-
-      advanceTime();
-      return;
-    }
-
-    if (who === "crush") {
-      const hasCar =
-        state.assets.includes("asset_car_sedan") ||
-        state.assets.includes("asset_car_super");
-
-      setDialogue({
-        hasCar,
-      });
-    }
-  }
-
-  function chooseDialogue(withCar) {
-    if (withCar) {
-      updateStats({
-        love: 15,
-        mood: 25,
-        energy: -8,
-      });
-
-      addEvent(
-        "Lái ô tô chở Triệu Mẫn đi dạo cuối ngày."
-      );
-
-      showToast(
-        "💕 Mẫn rất vui khi được bạn chở đi chơi!",
-        "success"
-      );
-    } else {
-      updateStats({
-        love: 8,
-        mood: 15,
-        energy: -5,
-      });
-
-      addEvent(
-        "Cùng Triệu Mẫn động viên nhau cố gắng."
-      );
-
-      showToast(
-        "💕 Tình cảm Triệu Mẫn +8%",
-        "success"
-      );
-    }
-
-    playSuccess();
-    setDialogue(null);
-    advanceTime();
-  }
-
-  /* -------------------------------------------------------
-     BAG
-     ------------------------------------------------------- */
-
-  function useBagItem(item) {
-    if (!item.count || item.count <= 0) {
-      showToast("Vật phẩm đã hết.", "error");
-      return;
-    }
-
-    if (item.id === "math_note") {
-      updateStats({ study: 8 });
-
-      setState((prev) => ({
-        ...prev,
-        bag: prev.bag.map((x) =>
-          x.id === item.id
-            ? { ...x, count: x.count - 1 }
-            : x
-        ),
-      }));
-
-      showToast("📘 Ôn sổ công thức: +8📚", "success");
-      return;
-    }
-
-    if (item.id === "gift_strawberry") {
-      updateStats({ love: 8 });
-
-      setState((prev) => ({
-        ...prev,
-        bag: prev.bag.map((x) =>
-          x.id === item.id
-            ? { ...x, count: x.count - 1 }
-            : x
-        ),
-      }));
-
-      showToast("🍬 Tặng kẹo dâu: +8💕", "success");
-    }
-  }
-
-  /* -------------------------------------------------------
-     SAVE CODE
-     ------------------------------------------------------- */
-
-  function encodeSave(data) {
-    try {
-      const json = JSON.stringify(data);
-      const bytes = new TextEncoder().encode(json);
-
-      let binary = "";
-
-      const chunkSize = 0x8000;
-
-      for (
-        let i = 0;
-        i < bytes.length;
-        i += chunkSize
-      ) {
-        binary += String.fromCharCode(
-          ...bytes.subarray(i, i + chunkSize)
-        );
-      }
-
-      return btoa(binary)
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/g, "");
-    } catch {
-      return "";
-    }
-  }
-
-  function decodeSave(code) {
-    try {
-      let base64 = code
-        .trim()
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-
-      while (base64.length % 4 !== 0) {
-        base64 += "=";
-      }
-
-      const binary = atob(base64);
-
-      const bytes = new Uint8Array(binary.length);
-
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-
-      const json = new TextDecoder().decode(bytes);
-
-      return normalizeState(JSON.parse(json));
-    } catch {
-      return null;
-    }
-  }
-
-  function openSaveCode() {
-    const code = encodeSave(state);
-
-    setSaveCode(code);
-    setSaveModal("export");
-  }
-
-  async function copySaveCode() {
-    try {
-      await navigator.clipboard.writeText(saveCode);
-
-      showToast("🔑 Đã copy mã lưu game!", "success");
-    } catch {
-      showToast(
-        "Không thể copy tự động. Hãy bôi đen mã rồi copy.",
-        "warning"
-      );
-    }
-  }
-
-  function importSaveCode() {
-    const loaded = decodeSave(saveCode);
-
-    if (!loaded) {
-      showToast("❌ Mã lưu game không hợp lệ.", "error");
-      playWrong();
-      return;
-    }
-
-    setState(loaded);
-    setView(loaded.location || "class");
-    setSaveModal(null);
-
-    showToast("📂 Đã khôi phục game từ mã lưu!", "success");
-    playSuccess();
-  }
-
-  /* -------------------------------------------------------
-     FILE SAVE / LOAD
-     ------------------------------------------------------- */
-
-  function saveGame() {
     try {
       localStorage.setItem(
         SAVE_KEY,
-        JSON.stringify(state)
+        JSON.stringify(game)
       );
+    } catch {}
+  }, [game]);
 
-      showToast("💾 Đã lưu game!", "success");
-      playSuccess();
-    } catch {
-      showToast("❌ Không thể lưu game.", "error");
-    }
-  }
+  useEffect(() => {
+    if (!toast) return;
 
-  function loadGame() {
+    const timer = setTimeout(
+      () => setToast(""),
+      2500
+    );
+
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    setGame(prev => {
+      const unlocked = [
+        ...(prev.unlockedTitles || [])
+      ];
+
+      let changed = false;
+
+      TITLES.forEach(title => {
+        let passed = false;
+
+        try {
+          passed = title.condition(prev);
+        } catch {}
+
+        if (
+          passed &&
+          !unlocked.includes(title.id)
+        ) {
+          unlocked.push(title.id);
+          changed = true;
+        }
+      });
+
+      if (!changed) return prev;
+
+      return {
+        ...prev,
+        unlockedTitles: unlocked
+      };
+    });
+  }, [
+    game.competitionScore,
+    game.stats.study,
+    game.stats.skill,
+    game.stats.friends,
+    game.stats.love,
+    game.stats.money,
+    game.stats.reputation,
+    game.certificates.length,
+    game.assets.length,
+    game.isGameOver,
+    game.titleFlags
+  ]);
+
+  const ranking = useMemo(() => {
+    return [
+      {
+        id: "player",
+        name: "Bạn",
+        avatar: "🧑‍🎓",
+        score: game.competitionScore
+      },
+      {
+        id: "lan",
+        name: "Lan",
+        avatar: NPCS.lan.avatar,
+        score: game.npcScores.lan
+      },
+      {
+        id: "trieu_man",
+        name: "Triệu Mẫn",
+        avatar: NPCS.trieu_man.avatar,
+        score: game.npcScores.trieu_man
+      },
+      {
+        id: "tuan",
+        name: "Tuấn",
+        avatar: NPCS.tuan.avatar,
+        score: game.npcScores.tuan
+      }
+    ]
+      .sort((a, b) => b.score - a.score)
+      .map((item, index) => ({
+        ...item,
+        rank: index + 1
+      }));
+  }, [game]);
+
+  const playTone = (
+    frequency = 440,
+    duration = 0.08,
+    type = "square"
+  ) => {
+    if (!audioEnabled) return;
+
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
+      const AudioContext =
+        window.AudioContext ||
+        window.webkitAudioContext;
 
-      if (!raw) {
-        showToast("📂 Chưa có dữ liệu lưu.", "warning");
-        return;
+      if (!AudioContext) return;
+
+      const ctx =
+        audioRef.current ||
+        new AudioContext();
+
+      audioRef.current = ctx;
+
+      if (ctx.state === "suspended") {
+        ctx.resume();
       }
 
-      const loaded = normalizeState(JSON.parse(raw));
+      const oscillator =
+        ctx.createOscillator();
 
-      setState(loaded);
-      setView(loaded.location || "class");
+      const gain =
+        ctx.createGain();
 
-      showToast("📂 Đã tải game!", "success");
-      playSuccess();
-    } catch {
-      showToast("❌ File lưu bị lỗi.", "error");
-      playWrong();
-    }
-  }
+      oscillator.type = type;
+      oscillator.frequency.value =
+        frequency;
 
-  function exportFile() {
-    try {
-      const blob = new Blob(
-        [JSON.stringify(state, null, 2)],
-        {
-          type: "application/json;charset=utf-8",
+      gain.gain.setValueAtTime(
+        0.035,
+        ctx.currentTime
+      );
+
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        ctx.currentTime + duration
+      );
+
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start();
+
+      oscillator.stop(
+        ctx.currentTime + duration
+      );
+    } catch {}
+  };
+
+  const modifyStats = delta => {
+    setGame(prev => {
+      const stats = {
+        ...prev.stats
+      };
+
+      Object.entries(delta).forEach(
+        ([key, value]) => {
+          if (key === "money") {
+            stats.money = Math.max(
+              0,
+              stats.money + value
+            );
+          } else {
+            stats[key] = clamp(
+              stats[key] + value
+            );
+          }
         }
       );
 
-      const url = URL.createObjectURL(blob);
+      return {
+        ...prev,
+        stats
+      };
+    });
+  };
 
-      const a = document.createElement("a");
+  const showToast = message => {
+    setToast(message);
+  };
+
+  const advanceTime = () => {
+    playTone(660, 0.06);
+
+    setGame(prev => {
+      if (prev.isGameOver) return prev;
+
+      if (
+        prev.timeIndex <
+        TIMES.length - 1
+      ) {
+        return {
+          ...prev,
+          timeIndex:
+            prev.timeIndex + 1
+        };
+      }
+
+      const dailyScore =
+        getPlayerDailyScore(prev);
+
+      const competition =
+        calculateCompetition(
+          prev,
+          dailyScore
+        );
+
+      const nextHistory = [
+        ...(prev.competitionHistory || []),
+        competition.history
+      ];
+
+      const newDiary = [
+        ...(prev.diaryEntries || []),
+        {
+          day: prev.day,
+          text:
+            `Ngày ${prev.day}: ` +
+            `Bạn nhận +${dailyScore} điểm thi đua. ` +
+            `Kết thúc ngày ở hạng #${competition.currentRank}.`
+        }
+      ];
+
+      const next = {
+        ...prev,
+
+        ...competition,
+
+        competitionHistory:
+          nextHistory,
+
+        diaryEntries: newDiary,
+
+        lastHomeRestKey: null
+      };
+
+      if (
+        prev.day >= prev.totalDays
+      ) {
+        return {
+          ...next,
+          isGameOver: true
+        };
+      }
+
+      return {
+        ...next,
+        day: prev.day + 1,
+        timeIndex: 0,
+        location: "class",
+        todayEvents: []
+      };
+    });
+
+    setOverlay(null);
+  };
+
+  const goLocation = location => {
+    playTone(500, 0.05);
+
+    if (location === "class") {
+      setGame(prev => ({
+        ...prev,
+        location: "class"
+      }));
+    } else {
+      setGame(prev => ({
+        ...prev,
+        location
+      }));
+    }
+
+    setOverlay(null);
+    setDrawer(null);
+  };
+
+  const restAtHome = () => {
+    const restKey =
+      `${game.day}-${game.timeIndex}`;
+
+    if (game.lastHomeRestKey === restKey) {
+      showToast(
+        "Bạn đã nghỉ ở nhà trong khung giờ này rồi."
+      );
+      return;
+    }
+
+    modifyStats({
+      energy: 25,
+      mood: 4,
+      hp: 4
+    });
+
+    setGame(prev => ({
+      ...prev,
+      lastHomeRestKey: restKey
+    }));
+
+    showToast(
+      "🏡 Bạn nghỉ ngơi và hồi phục năng lượng."
+    );
+
+    advanceTime();
+  };
+
+  const studyAction = () => {
+    if (game.stats.energy < 8) {
+      showToast(
+        "⚡ Không đủ năng lượng để học."
+      );
+      return;
+    }
+
+    modifyStats({
+      energy: -10,
+      study: 5,
+      skill: 2,
+      mood: 1
+    });
+
+    showToast(
+      "📚 Học tập hiệu quả! +5 học tập."
+    );
+
+    advanceTime();
+  };
+
+  const startQuiz = () => {
+    const shuffled = [...QUIZ_BANK]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5);
+
+    setQuiz(shuffled);
+    setQuizIndex(0);
+    setQuizScore(0);
+    setOverlay("quiz");
+  };
+
+  const answerQuiz = index => {
+    if (!quiz) return;
+
+    const current =
+      quiz[quizIndex];
+
+    const correct =
+      index === current.answer;
+
+    if (correct) {
+      setQuizScore(
+        score => score + 1
+      );
+
+      modifyStats({
+        study: 5,
+        skill: 1,
+        mood: 1
+      });
+
+      showToast(
+        `✅ Chính xác! ${current.explain}`
+      );
+    } else {
+      modifyStats({
+        study: 1,
+        mood: -3
+      });
+
+      showToast(
+        `❌ Chưa đúng. ${current.explain}`
+      );
+    }
+
+    if (
+      quizIndex >= quiz.length - 1
+    ) {
+      const finalScore =
+        quizScore + (correct ? 1 : 0);
+
+      setTimeout(() => {
+        setQuiz(null);
+        setOverlay(null);
+
+        showToast(
+          `📝 Hoàn thành quiz: ${finalScore}/${quiz.length}`
+        );
+
+        advanceTime();
+      }, 650);
+
+      return;
+    }
+
+    setQuizIndex(
+      index => index + 1
+    );
+  };
+
+  const buyFood = item => {
+    if (game.stats.money < item.price) {
+      showToast("💸 Bạn không đủ tiền.");
+      return;
+    }
+
+    setGame(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        money:
+          prev.stats.money - item.price,
+        energy: clamp(
+          prev.stats.energy +
+            (item.energy || 0)
+        ),
+        hp: clamp(
+          prev.stats.hp +
+            (item.hp || 0)
+        ),
+        mood: clamp(
+          prev.stats.mood +
+            (item.mood || 0)
+        )
+      }
+    }));
+
+    showToast(
+      `${item.icon} Đã mua ${item.name}.`
+    );
+  };
+
+  const workJob = job => {
+    if (
+      job.requirement &&
+      game.stats.skill < job.requirement
+    ) {
+      showToast(
+        `🔒 Cần kỹ năng ≥ ${job.requirement}.`
+      );
+      return;
+    }
+
+    if (
+      job.requirementCert &&
+      !game.certificates.includes(
+        job.requirementCert
+      )
+    ) {
+      showToast(
+        `🔒 ${job.requirementText}.`
+      );
+      return;
+    }
+
+    if (game.stats.energy < Math.abs(job.energy)) {
+      showToast(
+        "⚡ Không đủ năng lượng."
+      );
+      return;
+    }
+
+    setGame(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        money:
+          prev.stats.money + job.income,
+        energy: clamp(
+          prev.stats.energy + job.energy
+        ),
+        mood: clamp(
+          prev.stats.mood + job.mood
+        ),
+        skill: clamp(
+          prev.stats.skill + job.skill
+        ),
+        reputation: clamp(
+          prev.stats.reputation +
+            (job.income >= 180000 ? 2 : 1)
+        )
+      }
+    }));
+
+    showToast(
+      `💼 Làm việc xong! +${formatMoney(
+        job.income
+      )}`
+    );
+
+    advanceTime();
+  };
+
+  const buyProperty = property => {
+    if (
+      game.assets.includes(property.id)
+    ) {
+      showToast(
+        "🏠 Bạn đã sở hữu tài sản này."
+      );
+      return;
+    }
+
+    if (
+      game.stats.money < property.price
+    ) {
+      showToast(
+        "💸 Không đủ tiền mua tài sản."
+      );
+      return;
+    }
+
+    setGame(prev => ({
+      ...prev,
+      assets: [
+        ...prev.assets,
+        property.id
+      ],
+      stats: {
+        ...prev.stats,
+        money:
+          prev.stats.money -
+          property.price,
+        reputation: clamp(
+          prev.stats.reputation +
+            (property.reputation || 0)
+        ),
+        skill: clamp(
+          prev.stats.skill +
+            (property.skill || 0)
+        ),
+        mood: clamp(
+          prev.stats.mood +
+            (property.mood || 0)
+        )
+      }
+    }));
+
+    showToast(
+      `🏠 Đã mua ${property.name}!`
+    );
+  };
+
+  const startCertificateExam = cert => {
+    if (
+      game.certificates.includes(cert.id)
+    ) {
+      showToast(
+        "🎓 Bạn đã có chứng chỉ này."
+      );
+      return;
+    }
+
+    if (game.stats.skill < cert.skill) {
+      showToast(
+        `🔒 Cần kỹ năng ≥ ${cert.skill}.`
+      );
+      return;
+    }
+
+    if (game.stats.money < cert.fee) {
+      showToast(
+        "💸 Không đủ lệ phí thi."
+      );
+      return;
+    }
+
+    setGame(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        money:
+          prev.stats.money - cert.fee
+      }
+    }));
+
+    setCertExam(cert);
+    setCertIndex(0);
+    setCertScore(0);
+    setOverlay("certExam");
+  };
+
+  const answerCertificate = index => {
+    if (!certExam) return;
+
+    const question =
+      certExam.questions[certIndex];
+
+    const correct =
+      index === question.answer;
+
+    const nextScore =
+      certScore + (correct ? 1 : 0);
+
+    if (correct) {
+      showToast("✅ Đúng!");
+      setCertScore(nextScore);
+    } else {
+      showToast("❌ Chưa đúng!");
+    }
+
+    if (
+      certIndex >=
+      certExam.questions.length - 1
+    ) {
+      setTimeout(() => {
+        const passed =
+          nextScore >= 2;
+
+        if (passed) {
+          setGame(prev => ({
+            ...prev,
+            certificates: [
+              ...prev.certificates,
+              certExam.id
+            ],
+            stats: {
+              ...prev.stats,
+              skill: clamp(
+                prev.stats.skill + 5
+              ),
+              reputation: clamp(
+                prev.stats.reputation + 5
+              )
+            }
+          }));
+
+          showToast(
+            `🎓 Đậu chứng chỉ ${certExam.name}!`
+          );
+        } else {
+          showToast(
+            `📄 Chưa đạt. Cần ít nhất 2/3 câu đúng.`
+          );
+        }
+
+        setCertExam(null);
+        setOverlay(null);
+        advanceTime();
+      }, 500);
+
+      return;
+    }
+
+    setCertIndex(
+      value => value + 1
+    );
+  };
+
+  const interactNPC = id => {
+    const npc = NPCS[id];
+
+    if (!npc) return;
+
+    if (id === "lan") {
+      setGame(prev => ({
+        ...prev,
+        stats: {
+          ...prev.stats,
+          friends: clamp(
+            prev.stats.friends + 6
+          ),
+          mood: clamp(
+            prev.stats.mood + 4
+          )
+        },
+        npcRelationships: {
+          ...prev.npcRelationships,
+          lan: clamp(
+            prev.npcRelationships.lan + 5
+          )
+        }
+      }));
+
+      showToast(
+        "👧 Lan vui vẻ nói chuyện với bạn. +6 bạn bè."
+      );
+    }
+
+    if (id === "trieu_man") {
+      setGame(prev => ({
+        ...prev,
+        stats: {
+          ...prev.stats,
+          love: clamp(
+            prev.stats.love + 5
+          ),
+          friends: clamp(
+            prev.stats.friends + 2
+          ),
+          mood: clamp(
+            prev.stats.mood + 5
+          )
+        },
+        npcRelationships: {
+          ...prev.npcRelationships,
+          trieu_man: clamp(
+            prev.npcRelationships.trieu_man + 6
+          )
+        }
+      }));
+
+      showToast(
+        "💖 Triệu Mẫn có vẻ rất vui khi gặp bạn."
+      );
+    }
+
+    if (id === "tuan") {
+      setGame(prev => ({
+        ...prev,
+        stats: {
+          ...prev.stats,
+          skill: clamp(
+            prev.stats.skill + 3
+          ),
+          reputation: clamp(
+            prev.stats.reputation + 3
+          ),
+          friends: clamp(
+            prev.stats.friends + 3
+          )
+        },
+        npcRelationships: {
+          ...prev.npcRelationships,
+          tuan: clamp(
+            prev.npcRelationships.tuan + 5
+          )
+        }
+      }));
+
+      showToast(
+        "👦 Tuấn rủ bạn cùng luyện kỹ năng."
+      );
+    }
+  };
+
+  const useBagItem = id => {
+    const item =
+      game.bag.find(
+        x => x.id === id
+      );
+
+    if (
+      !item ||
+      item.count <= 0
+    ) {
+      showToast(
+        "🎒 Không còn vật phẩm."
+      );
+      return;
+    }
+
+    setGame(prev => {
+      const bag =
+        prev.bag.map(item => {
+          if (item.id !== id) return item;
+
+          return {
+            ...item,
+            count: Math.max(
+              0,
+              item.count - 1
+            )
+          };
+        });
+
+      const stats = {
+        ...prev.stats
+      };
+
+      if (id === "math_note") {
+        stats.study = clamp(
+          stats.study + 8
+        );
+      }
+
+      if (
+        id === "gift_strawberry"
+      ) {
+        stats.love = clamp(
+          stats.love + 8
+        );
+      }
+
+      return {
+        ...prev,
+        bag,
+        stats
+      };
+    });
+
+    showToast(
+      `🎒 Đã sử dụng ${item.name}.`
+    );
+  };
+
+  const saveNow = () => {
+    try {
+      localStorage.setItem(
+        SAVE_KEY,
+        JSON.stringify(game)
+      );
+
+      showToast(
+        "💾 Đã lưu game."
+      );
+
+      playTone(880, 0.08);
+    } catch {
+      showToast(
+        "❌ Không thể lưu game."
+      );
+    }
+  };
+
+  const generateSaveCode = () => {
+    try {
+      const code =
+        encodeSaveCode(game);
+
+      setSaveCode(code);
+      setSaveCodeInput(code);
+      setOverlay("saveCode");
+
+      playTone(880, 0.08);
+    } catch {
+      showToast(
+        "❌ Không tạo được mã lưu."
+      );
+    }
+  };
+
+  const importSaveCode = () => {
+    try {
+      if (!saveCodeInput.trim()) {
+        showToast(
+          "⚠️ Hãy nhập mã lưu."
+        );
+        return;
+      }
+
+      const decoded =
+        decodeSaveCode(
+          saveCodeInput
+        );
+
+      const normalized =
+        normalizeState(decoded);
+
+      setGame(normalized);
+
+      localStorage.setItem(
+        SAVE_KEY,
+        JSON.stringify(normalized)
+      );
+
+      setOverlay(null);
+
+      showToast(
+        "✅ Đã tải game từ mã lưu."
+      );
+
+      playTone(880, 0.1);
+    } catch {
+      showToast(
+        "❌ Mã lưu không hợp lệ hoặc đã bị hỏng."
+      );
+    }
+  };
+
+  const copySaveCode = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        saveCode
+      );
+
+      showToast(
+        "📋 Đã sao chép mã lưu."
+      );
+    } catch {
+      showToast(
+        "Không thể tự sao chép. Hãy bôi đen và copy mã."
+      );
+    }
+  };
+
+  const exportSave = () => {
+    try {
+      const blob = new Blob(
+        [
+          JSON.stringify(
+            game,
+            null,
+            2
+          )
+        ],
+        {
+          type: "application/json"
+        }
+      );
+
+      const url =
+        URL.createObjectURL(blob);
+
+      const a =
+        document.createElement("a");
 
       a.href = url;
-      a.download = `thanh-xuan-ngay-${state.day}.json`;
+      a.download =
+        "thanh-xuan-ruc-ro-save.json";
 
       document.body.appendChild(a);
       a.click();
@@ -1505,1281 +1890,1787 @@ export default function App() {
 
       URL.revokeObjectURL(url);
 
-      showToast("📤 Đã xuất file save!", "success");
+      showToast(
+        "📦 Đã xuất file save."
+      );
     } catch {
-      showToast("❌ Không thể xuất file.", "error");
+      showToast(
+        "❌ Không thể xuất file."
+      );
     }
-  }
+  };
 
-  function importFile(event) {
-    const file = event.target.files?.[0];
+  const importSaveFile = event => {
+    const file =
+      event.target.files?.[0];
 
     if (!file) return;
 
-    const reader = new FileReader();
+    const reader =
+      new FileReader();
 
-    reader.onload = () => {
+    reader.onload = e => {
       try {
-        const loaded = normalizeState(
-          JSON.parse(reader.result)
-        );
+        const parsed =
+          JSON.parse(
+            e.target.result
+          );
 
-        setState(loaded);
-        setView(loaded.location || "class");
+        const normalized =
+          normalizeState(parsed);
+
+        setGame(normalized);
 
         localStorage.setItem(
           SAVE_KEY,
-          JSON.stringify(loaded)
+          JSON.stringify(normalized)
         );
 
         showToast(
-          "📥 Nhập file save thành công!",
-          "success"
+          "✅ Đã tải file save."
         );
-
-        playSuccess();
       } catch {
         showToast(
-          "❌ File không đúng định dạng save.",
-          "error"
+          "❌ File save không hợp lệ."
         );
-
-        playWrong();
       }
 
       event.target.value = "";
     };
 
     reader.readAsText(file);
-  }
+  };
 
-  /* -------------------------------------------------------
-     RESTART
-     ------------------------------------------------------- */
+  const restartGame = () => {
+    const ok =
+      window.confirm(
+        "Bạn có chắc muốn bắt đầu lại từ đầu?"
+      );
 
-  function restartGame() {
-    if (
-      !window.confirm(
-        "Bạn chắc chắn muốn xóa game hiện tại và chơi lại?"
-      )
-    ) {
-      return;
-    }
+    if (!ok) return;
 
-    const fresh = createInitialState();
+    const fresh =
+      createInitialState();
 
-    setState(fresh);
-    setView("class");
-    setQuiz(null);
-    setCertExam(null);
-    setDialogue(null);
-    setShowEnding(false);
-    setPendingDiary(null);
+    setGame(fresh);
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify(fresh)
+    );
 
-    localStorage.removeItem(SAVE_KEY);
-
-    showToast("🌸 Đã bắt đầu một thanh xuân mới!", "success");
-  }
-
-  /* -------------------------------------------------------
-     DIARY
-     ------------------------------------------------------- */
-
-  function openDiary() {
+    setOverlay(null);
     setDrawer(null);
-    setManualDiary(true);
-  }
 
-  function closeDiary() {
-    setManualDiary(false);
-  }
+    showToast(
+      "🔄 Đã bắt đầu lại hành trình."
+    );
+  };
 
-  function continueDiary() {
-    setPendingDiary(null);
-    setManualDiary(false);
+  const handleA = () => {
+    playTone(760, 0.06);
 
-    if (showEnding) {
-      setShowEnding(false);
+    if (game.location === "class") {
+      startQuiz();
       return;
     }
 
-    setView("class");
-  }
-
-  /* -------------------------------------------------------
-     DRAWER
-     ------------------------------------------------------- */
-
-  function toggleDrawer(type) {
-    setDrawer((prev) => (prev === type ? null : type));
-  }
-
-  /* -------------------------------------------------------
-     ENDING
-     ------------------------------------------------------- */
-
-  const ending = useMemo(() => {
-    const s = state.stats;
-
-    if (
-      state.assets.includes("asset_villa") ||
-      s.money >= 5000000
-    ) {
-      return {
-        title: "👑 ĐẠI GIA BẤT ĐỘNG SẢN & TÀI CHÍNH",
-        sub: "Tuổi trẻ tài cao, sở hữu dinh cơ đáng mơ ước",
-        desc:
-          "Bạn vừa tốt nghiệp với khối tài sản khổng lồ nhờ chăm chỉ học tập, làm thêm và tích lũy.",
-      };
+    if (game.location === "home") {
+      restAtHome();
+      return;
     }
 
-    if (state.certificates.length >= 3) {
-      return {
-        title: "🌟 CHUYÊN GIA TOÀN NĂNG",
-        sub: "Bộ sưu tập chứng chỉ cực kỳ ấn tượng",
-        desc:
-          "Bạn sở hữu nhiều chứng chỉ và kỹ năng đa dạng, sẵn sàng bước vào hành trình nghề nghiệp.",
-      };
+    setOverlay("competition");
+  };
+
+  const handleB = () => {
+    playTone(380, 0.06);
+    setDrawer("bag");
+  };
+
+  const navLeft = () => {
+    const locations =
+      Object.keys(
+        LOCATION_META
+      );
+
+    const current =
+      locations.indexOf(
+        game.location
+      );
+
+    const next =
+      current <= 0
+        ? locations.length - 1
+        : current - 1;
+
+    goLocation(
+      locations[next]
+    );
+  };
+
+  const navRight = () => {
+    const locations =
+      Object.keys(
+        LOCATION_META
+      );
+
+    const current =
+      locations.indexOf(
+        game.location
+      );
+
+    const next =
+      current >= locations.length - 1
+        ? 0
+        : current + 1;
+
+    goLocation(
+      locations[next]
+    );
+  };
+
+  const renderLocation = () => {
+    if (game.location === "class") {
+      return (
+        <div className="location-panel">
+          <div className="pixel-scene class-scene">
+            <div className="scene-cloud">☁️</div>
+            <div className="scene-school">🏫</div>
+            <div className="scene-student">🧑‍🎓</div>
+          </div>
+
+          <div className="location-content">
+            <h2>🏫 Lớp học</h2>
+
+            <p>
+              Một ngày học mới bắt đầu.
+              Hãy học tập, giao lưu và tích
+              lũy điểm thi đua.
+            </p>
+
+            <div className="action-grid">
+              <button
+                className="primary-btn"
+                onClick={startQuiz}
+              >
+                📝 Làm quiz
+              </button>
+
+              <button
+                className="secondary-btn"
+                onClick={studyAction}
+              >
+                📚 Tự học
+              </button>
+
+              <button
+                className="secondary-btn"
+                onClick={() =>
+                  setOverlay("npc")
+                }
+              >
+                👥 Gặp bạn bè
+              </button>
+            </div>
+          </div>
+        </div>
+      );
     }
 
-    if (
-      s.love >= 80 &&
-      (state.assets.includes("asset_car_sedan") ||
-        state.assets.includes("asset_car_super"))
-    ) {
-      return {
-        title: "💕 CHUYỆN TÌNH XE HOA",
-        sub: "Thanh xuân trọn vẹn bên người mình thương",
-        desc:
-          "Những ngày tháng học tập, làm thêm và cố gắng đã tạo nên một câu chuyện thanh xuân đáng nhớ.",
-      };
+    if (game.location === "canteen") {
+      return (
+        <div className="location-panel">
+          <div className="pixel-scene canteen-scene">
+            <div className="scene-food">🍜🥪🥛</div>
+            <div className="scene-student">🧑‍🎓</div>
+          </div>
+
+          <div className="location-content">
+            <h2>🍜 Căn tin</h2>
+
+            <p>
+              Ăn uống để hồi phục năng lượng.
+            </p>
+
+            <div className="shop-grid">
+              {CANTEEN_ITEMS.map(item => (
+                <div
+                  className="shop-card"
+                  key={item.id}
+                >
+                  <div className="shop-icon">
+                    {item.icon}
+                  </div>
+
+                  <strong>
+                    {item.name}
+                  </strong>
+
+                  <small>
+                    {formatMoney(item.price)}
+                  </small>
+
+                  <button
+                    onClick={() =>
+                      buyFood(item)
+                    }
+                  >
+                    Mua
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
     }
 
-    return {
-      title: "🌸 THANH XUÂN TỰ LẬP & TRƯỞNG THÀNH",
-      sub: "Vững bước vào đời bằng chính thực lực",
-      desc:
-        "Bạn đã trải qua một thời học sinh đầy trải nghiệm: học tập, làm thêm, thi chứng chỉ và xây dựng tương lai.",
-    };
-  }, [state]);
+    if (game.location === "job") {
+      return (
+        <div className="location-panel">
+          <div className="location-content">
+            <h2>💼 Việc làm</h2>
 
-  /* -------------------------------------------------------
-     RENDER HELPERS
-     ------------------------------------------------------- */
+            <p>
+              Kiếm tiền và tăng kỹ năng.
+              Mỗi công việc sẽ tiêu hao
+              năng lượng.
+            </p>
 
-  const currentPeriod =
-    TIME_PERIODS[state.timeIndex] || TIME_PERIODS[0];
+            <div className="job-list">
+              {JOBS.map(job => {
+                const locked =
+                  (
+                    job.requirement &&
+                    game.stats.skill <
+                      job.requirement
+                  ) ||
+                  (
+                    job.requirementCert &&
+                    !game.certificates.includes(
+                      job.requirementCert
+                    )
+                  );
 
-  const locationInfo =
-    LOCATIONS.find((x) => x.id === view) ||
-    LOCATIONS[0];
+                return (
+                  <div
+                    className="job-card"
+                    key={job.id}
+                  >
+                    <div className="job-icon">
+                      {job.icon}
+                    </div>
 
-  const latestDiary =
-    state.diaryEntries[state.diaryEntries.length - 1];
+                    <div className="job-main">
+                      <strong>
+                        {job.name}
+                      </strong>
+
+                      <p>
+                        {job.description}
+                      </p>
+
+                      <span>
+                        💰 {formatMoney(job.income)}
+                        {" • "}
+                        ⚡ {Math.abs(job.energy)}
+                      </span>
+
+                      {job.requirementText && (
+                        <small>
+                          🔒 {job.requirementText}
+                        </small>
+                      )}
+                    </div>
+
+                    <button
+                      disabled={locked}
+                      onClick={() =>
+                        workJob(job)
+                      }
+                    >
+                      {locked
+                        ? "🔒"
+                        : "Làm"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (game.location === "cert") {
+      return (
+        <div className="location-panel">
+          <div className="location-content">
+            <h2>🎓 Phòng chứng chỉ</h2>
+
+            <p>
+              Học đủ kỹ năng rồi thi chứng
+              chỉ để mở khóa công việc mới.
+            </p>
+
+            <div className="cert-grid">
+              {Object.values(CERTS).map(cert => {
+                const owned =
+                  game.certificates.includes(
+                    cert.id
+                  );
+
+                return (
+                  <div
+                    className={
+                      `cert-card ${
+                        owned
+                          ? "owned"
+                          : ""
+                      }`
+                    }
+                    key={cert.id}
+                  >
+                    <div className="cert-icon">
+                      {cert.icon}
+                    </div>
+
+                    <strong>
+                      {cert.name}
+                    </strong>
+
+                    <p>
+                      Kỹ năng: {cert.skill}
+                    </p>
+
+                    <p>
+                      Lệ phí:{" "}
+                      {formatMoney(cert.fee)}
+                    </p>
+
+                    <button
+                      disabled={owned}
+                      onClick={() =>
+                        startCertificateExam(
+                          cert
+                        )
+                      }
+                    >
+                      {owned
+                        ? "✓ Đã có"
+                        : "Thi ngay"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (game.location === "prop") {
+      return (
+        <div className="location-panel">
+          <div className="location-content">
+            <h2>🏠 Cửa hàng tài sản</h2>
+
+            <p>
+              Dùng tiền kiếm được để xây dựng
+              tài sản cá nhân.
+            </p>
+
+            <div className="property-grid">
+              {PROPERTIES.map(property => {
+                const owned =
+                  game.assets.includes(
+                    property.id
+                  );
+
+                return (
+                  <div
+                    className={
+                      `property-card ${
+                        owned
+                          ? "owned"
+                          : ""
+                      }`
+                    }
+                    key={property.id}
+                  >
+                    <div className="property-icon">
+                      {property.icon}
+                    </div>
+
+                    <strong>
+                      {property.name}
+                    </strong>
+
+                    <p>
+                      {property.effect}
+                    </p>
+
+                    <b>
+                      {formatMoney(
+                        property.price
+                      )}
+                    </b>
+
+                    <button
+                      disabled={owned}
+                      onClick={() =>
+                        buyProperty(
+                          property
+                        )
+                      }
+                    >
+                      {owned
+                        ? "✓ Đã sở hữu"
+                        : "Mua"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (game.location === "home") {
+      return (
+        <div className="location-panel">
+          <div className="pixel-scene home-scene">
+            <div>🏡</div>
+            <div className="scene-bed">
+              🛏️
+            </div>
+          </div>
+
+          <div className="location-content">
+            <h2>🏡 Nhà</h2>
+
+            <p>
+              Nghỉ ngơi để hồi phục năng lượng.
+              Mỗi khung giờ chỉ nhận thưởng
+              nghỉ một lần.
+            </p>
+
+            <button
+              className="primary-btn large"
+              onClick={restAtHome}
+            >
+              😴 Nghỉ ngơi +25 năng lượng
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <>
       <style>{CSS}</style>
 
-      <div className="game-page">
-        <div className="console">
-          {/* TOP BAR */}
-          <div className="topbar">
+      <div className="app">
+        <header className="topbar">
+          <div>
             <div className="brand">
-              <span className="status-dot" />
-              <span>THANH XUÂN RỰC RỠ</span>
+              ✨ Thanh Xuân Rực Rỡ
             </div>
 
-            <div className="top-actions">
+            <div className="subtitle">
+              Deluxe Career & Assets Edition
+            </div>
+          </div>
+
+          <div className="top-actions">
+            <button
+              onClick={() =>
+                setAudioEnabled(
+                  value => !value
+                )
+              }
+              title="Âm thanh"
+            >
+              {audioEnabled
+                ? "🔊"
+                : "🔇"}
+            </button>
+
+            <button
+              onClick={saveNow}
+              title="Lưu"
+            >
+              💾
+            </button>
+
+            <button
+              onClick={generateSaveCode}
+              title="Mã lưu"
+            >
+              🔐
+            </button>
+
+            <button
+              onClick={() =>
+                setOverlay("settings")
+              }
+              title="Cài đặt"
+            >
+              ⚙️
+            </button>
+          </div>
+        </header>
+
+        <main className="game-shell">
+          <section className="hud">
+            <div className="day-card">
+              <span>NGÀY</span>
+              <strong>
+                {game.day}/{game.totalDays}
+              </strong>
+            </div>
+
+            <div className="time-card">
+              <span>THỜI GIAN</span>
+              <strong>
+                {TIMES[game.timeIndex]}
+              </strong>
+            </div>
+
+            <div className="money-card">
+              <span>TIỀN</span>
+              <strong>
+                💰{" "}
+                {formatMoney(
+                  game.stats.money
+                )}
+              </strong>
+            </div>
+
+            <div className="rank-card">
+              <span>THI ĐUA</span>
+              <strong>
+                #{game.currentRank}
+                {" "}
+                •{" "}
+                {game.competitionScore}
+              </strong>
+            </div>
+          </section>
+
+          <section className="stats">
+            <Stat
+              icon="❤️"
+              name="HP"
+              value={game.stats.hp}
+            />
+
+            <Stat
+              icon="⚡"
+              name="Năng lượng"
+              value={game.stats.energy}
+            />
+
+            <Stat
+              icon="😊"
+              name="Tâm trạng"
+              value={game.stats.mood}
+            />
+
+            <Stat
+              icon="📚"
+              name="Học tập"
+              value={game.stats.study}
+            />
+
+            <Stat
+              icon="💖"
+              name="Tình cảm"
+              value={game.stats.love}
+            />
+
+            <Stat
+              icon="🧠"
+              name="Kỹ năng"
+              value={game.stats.skill}
+            />
+          </section>
+
+          <section className="location-tabs">
+            {Object.entries(
+              LOCATION_META
+            ).map(([id, info]) => (
               <button
-                className="mini-btn green"
-                onClick={saveGame}
+                key={id}
+                className={
+                  game.location === id
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  goLocation(id)
+                }
               >
-                💾 LƯU
+                <span>
+                  {info.icon}
+                </span>
+
+                <small>
+                  {info.name}
+                </small>
+              </button>
+            ))}
+          </section>
+
+          <section className="main-panel">
+            {renderLocation()}
+          </section>
+
+          <section className="npc-strip">
+            {Object.values(NPCS).map(npc => (
+              <button
+                className="npc-mini"
+                key={npc.id}
+                onClick={() =>
+                  interactNPC(npc.id)
+                }
+              >
+                <span className="npc-avatar">
+                  {npc.avatar}
+                </span>
+
+                <span>
+                  <b>{npc.name}</b>
+                  <small>
+                    ❤️{" "}
+                    {
+                      game.npcRelationships[
+                        npc.id
+                      ]
+                    }
+                  </small>
+                </span>
+              </button>
+            ))}
+          </section>
+
+          <section className="bottom-actions">
+            <button
+              onClick={() =>
+                setDrawer("profile")
+              }
+            >
+              👤
+              <span>Hồ sơ</span>
+            </button>
+
+            <button
+              onClick={() =>
+                setOverlay("competition")
+              }
+            >
+              🏆
+              <span>Thi đua</span>
+            </button>
+
+            <button
+              onClick={() =>
+                setOverlay("titles")
+              }
+            >
+              🎖️
+              <span>Danh hiệu</span>
+            </button>
+
+            <button
+              onClick={() =>
+                setDrawer("assets")
+              }
+            >
+              🏠
+              <span>Tài sản</span>
+            </button>
+
+            <button
+              onClick={() =>
+                setDrawer("bag")
+              }
+            >
+              🎒
+              <span>Túi đồ</span>
+            </button>
+
+            <button
+              onClick={() =>
+                setDrawer("diary")
+              }
+            >
+              📖
+              <span>Nhật ký</span>
+            </button>
+          </section>
+
+          <section className="controller">
+            <div className="dpad">
+              <button
+                onClick={navLeft}
+              >
+                ◀
               </button>
 
               <button
-                className="mini-btn blue"
-                onClick={loadGame}
+                onClick={navRight}
               >
-                📂 TẢI
+                ▶
+              </button>
+            </div>
+
+            <div className="controller-info">
+              <span>
+                {LOCATION_META[
+                  game.location
+                ]?.icon}
+              </span>
+
+              <b>
+                {LOCATION_META[
+                  game.location
+                ]?.name}
+              </b>
+            </div>
+
+            <div className="ab-buttons">
+              <button
+                className="btn-b"
+                onClick={handleB}
+              >
+                B
               </button>
 
               <button
-                className="mini-btn"
-                onClick={openSaveCode}
+                className="btn-a"
+                onClick={handleA}
               >
-                🔑 MÃ
+                A
+              </button>
+            </div>
+          </section>
+
+          <section className="advance-row">
+            <button
+              className="next-time"
+              onClick={advanceTime}
+            >
+              ⏩ Kết thúc hoạt động
+              <span>
+                Sang{" "}
+                {game.timeIndex <
+                TIMES.length - 1
+                  ? TIMES[
+                      game.timeIndex + 1
+                    ]
+                  : "ngày mới"}
+              </span>
+            </button>
+          </section>
+        </main>
+
+        {toast && (
+          <div className="toast">
+            {toast}
+          </div>
+        )}
+
+        {drawer === "profile" && (
+          <Drawer
+            title="👤 Hồ sơ nhân vật"
+            onClose={() =>
+              setDrawer(null)
+            }
+          >
+            <div className="profile-avatar">
+              🧑‍🎓
+            </div>
+
+            <h3>
+              Học sinh Thanh Xuân
+            </h3>
+
+            <div className="profile-grid">
+              <MiniStat
+                name="Học tập"
+                value={game.stats.study}
+              />
+              <MiniStat
+                name="Kỹ năng"
+                value={game.stats.skill}
+              />
+              <MiniStat
+                name="Bạn bè"
+                value={game.stats.friends}
+              />
+              <MiniStat
+                name="Tình cảm"
+                value={game.stats.love}
+              />
+              <MiniStat
+                name="Danh tiếng"
+                value={game.stats.reputation}
+              />
+              <MiniStat
+                name="Thi đua"
+                value={game.competitionScore}
+              />
+            </div>
+
+            <div className="profile-section">
+              <b>🏅 Thành tích tốt nhất</b>
+              <p>
+                Hạng cao nhất: #
+                {game.bestRank}
+              </p>
+            </div>
+
+            <div className="profile-section">
+              <b>🔥 Chuỗi thi đua</b>
+              <p>
+                {game.competitionStreak} ngày
+              </p>
+            </div>
+          </Drawer>
+        )}
+
+        {drawer === "assets" && (
+          <Drawer
+            title="🏠 Tài sản"
+            onClose={() =>
+              setDrawer(null)
+            }
+          >
+            {game.assets.length === 0 ? (
+              <Empty text="Bạn chưa sở hữu tài sản nào." />
+            ) : (
+              <div className="drawer-list">
+                {game.assets.map(id => {
+                  const asset =
+                    PROPERTIES.find(
+                      x => x.id === id
+                    );
+
+                  if (!asset) return null;
+
+                  return (
+                    <div
+                      className="drawer-item"
+                      key={id}
+                    >
+                      <span>
+                        {asset.icon}
+                      </span>
+
+                      <div>
+                        <b>
+                          {asset.name}
+                        </b>
+                        <small>
+                          {asset.effect}
+                        </small>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Drawer>
+        )}
+
+        {drawer === "bag" && (
+          <Drawer
+            title="🎒 Túi đồ"
+            onClose={() =>
+              setDrawer(null)
+            }
+          >
+            <div className="drawer-list">
+              {game.bag.map(item => (
+                <div
+                  className="drawer-item"
+                  key={item.id}
+                >
+                  <span>
+                    {item.icon}
+                  </span>
+
+                  <div>
+                    <b>
+                      {item.name}
+                      {" "}
+                      ×{item.count}
+                    </b>
+
+                    <small>
+                      {item.desc}
+                    </small>
+                  </div>
+
+                  <button
+                    disabled={
+                      item.count <= 0
+                    }
+                    onClick={() =>
+                      useBagItem(item.id)
+                    }
+                  >
+                    Dùng
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Drawer>
+        )}
+
+        {drawer === "diary" && (
+          <Drawer
+            title="📖 Nhật ký thanh xuân"
+            onClose={() =>
+              setDrawer(null)
+            }
+          >
+            {game.diaryEntries.length === 0 ? (
+              <Empty text="Hành trình của bạn chưa có trang nhật ký nào." />
+            ) : (
+              <div className="diary-list">
+                {[...game.diaryEntries]
+                  .reverse()
+                  .map((entry, index) => (
+                    <div
+                      className="diary-entry"
+                      key={`${entry.day}-${index}`}
+                    >
+                      <b>
+                        Ngày {entry.day}
+                      </b>
+
+                      <p>
+                        {entry.text}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </Drawer>
+        )}
+
+        {overlay === "npc" && (
+          <Modal
+            title="👥 Bạn bè"
+            onClose={() =>
+              setOverlay(null)
+            }
+          >
+            <div className="npc-grid">
+              {Object.values(NPCS).map(npc => (
+                <div
+                  className="npc-card"
+                  key={npc.id}
+                >
+                  <div className="big-avatar">
+                    {npc.avatar}
+                  </div>
+
+                  <h3>{npc.name}</h3>
+
+                  <p>
+                    {npc.description}
+                  </p>
+
+                  <div>
+                    ❤️ Quan hệ:{" "}
+                    {
+                      game.npcRelationships[
+                        npc.id
+                      ]
+                    }
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      interactNPC(npc.id)
+                    }
+                  >
+                    💬 Nói chuyện
+                  </button>
+
+                  {npc.id ===
+                    "trieu_man" && (
+                    <button
+                      className="secondary-btn"
+                      onClick={() =>
+                        setOverlay("crush")
+                      }
+                    >
+                      💖 Tâm sự
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Modal>
+        )}
+
+        {overlay === "crush" && (
+          <Modal
+            title="💖 Cuộc trò chuyện"
+            onClose={() =>
+              setOverlay(null)
+            }
+          >
+            <div className="dialogue">
+              <div className="dialogue-avatar">
+                👩
+              </div>
+
+              <div className="speech">
+                <b>
+                  Triệu Mẫn
+                </b>
+
+                <p>
+                  "Nếu sau này chúng ta tốt
+                  nghiệp, cậu muốn nhớ nhất
+                  điều gì về những năm tháng
+                  này?"
+                </p>
+              </div>
+            </div>
+
+            <div className="dialogue-options">
+              <button
+                onClick={() => {
+                  modifyStats({
+                    love: 8,
+                    mood: 5
+                  });
+
+                  setOverlay(null);
+
+                  showToast(
+                    "💖 Bạn chọn lưu giữ những kỷ niệm đẹp."
+                  );
+                }}
+              >
+                🌸 Những kỷ niệm
               </button>
 
               <button
-                className="mini-btn"
-                onClick={exportFile}
+                onClick={() => {
+                  modifyStats({
+                    love: 5,
+                    skill: 2
+                  });
+
+                  setOverlay(null);
+
+                  showToast(
+                    "✨ Bạn chọn cùng nhau trưởng thành."
+                  );
+                }}
               >
-                📤 XUẤT
+                🚀 Cùng nhau trưởng thành
               </button>
 
               <button
-                className="mini-btn"
+                onClick={() => {
+                  modifyStats({
+                    love: -2,
+                    mood: 3
+                  });
+
+                  setOverlay(null);
+
+                  showToast(
+                    "😳 Bạn ngại ngùng chuyển chủ đề."
+                  );
+                }}
+              >
+                😳 Chuyển chủ đề
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {overlay === "competition" && (
+          <Modal
+            title="🏆 Bảng thi đua"
+            onClose={() =>
+              setOverlay(null)
+            }
+            wide
+          >
+            <div className="competition-summary">
+              <div className="competition-card">
+                <span>📊 Điểm của bạn</span>
+                <strong>
+                  {game.competitionScore}
+                </strong>
+              </div>
+
+              <div className="competition-card">
+                <span>🏅 Hạng hiện tại</span>
+                <strong>
+                  #{game.currentRank}
+                </strong>
+              </div>
+
+              <div className="competition-card">
+                <span>🔥 Chuỗi</span>
+                <strong>
+                  {game.competitionStreak}
+                </strong>
+              </div>
+            </div>
+
+            <div className="ranking-list">
+              {ranking.map(row => (
+                <div
+                  className={
+                    `ranking-row ${
+                      row.id === "player"
+                        ? "ranking-player"
+                        : ""
+                    }`
+                  }
+                  key={row.id}
+                >
+                  <div className="ranking-position">
+                    {row.rank === 1
+                      ? "🥇"
+                      : row.rank === 2
+                      ? "🥈"
+                      : row.rank === 3
+                      ? "🥉"
+                      : `#${row.rank}`}
+                  </div>
+
+                  <div className="ranking-avatar">
+                    {row.avatar}
+                  </div>
+
+                  <div className="ranking-name">
+                    <strong>
+                      {row.name}
+                    </strong>
+
+                    <span>
+                      {row.id === "player"
+                        ? "Nhân vật chính"
+                        : "Đối thủ thi đua"}
+                    </span>
+                  </div>
+
+                  <div className="ranking-score">
+                    {row.score}
+                    <small>
+                      {" "}điểm
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="competition-rule">
+              <b>
+                📅 Cơ chế thi đua
+              </b>
+
+              <p>
+                Cuối mỗi ngày, điểm thi đua
+                của bạn được tính từ học tập,
+                kỹ năng, bạn bè, tình cảm,
+                danh tiếng, chứng chỉ và tài sản.
+              </p>
+
+              <p>
+                Lan, Triệu Mẫn và Tuấn cũng
+                tự động nhận điểm mỗi ngày.
+                Vì vậy thứ hạng sẽ thay đổi
+                liên tục trong 45 ngày.
+              </p>
+            </div>
+
+            <div className="history-box">
+              <b>
+                📈 Lịch sử gần đây
+              </b>
+
+              {game.competitionHistory
+                .slice(-5)
+                .reverse()
+                .map((entry, index) => (
+                  <div
+                    className="history-row"
+                    key={`${entry.day}-${index}`}
+                  >
+                    <span>
+                      Ngày {entry.day}
+                    </span>
+
+                    <span>
+                      Bạn +{entry.playerGain}
+                    </span>
+
+                    <span>
+                      Hạng #{entry.rank}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </Modal>
+        )}
+
+        {overlay === "titles" && (
+          <Modal
+            title="🎖️ Danh hiệu"
+            onClose={() =>
+              setOverlay(null)
+            }
+            wide
+          >
+            <div className="title-counter">
+              Đã mở khóa{" "}
+              <b>
+                {game.unlockedTitles.length}
+              </b>
+              {" / "}
+              {TITLES.length}
+              {" "}danh hiệu
+            </div>
+
+            <div className="title-grid">
+              {TITLES.map(title => {
+                const unlocked =
+                  game.unlockedTitles.includes(
+                    title.id
+                  );
+
+                return (
+                  <div
+                    className={
+                      `title-item ${
+                        unlocked
+                          ? "title-unlocked"
+                          : "title-locked"
+                      }`
+                    }
+                    key={title.id}
+                  >
+                    <div className="title-icon">
+                      {unlocked
+                        ? title.icon
+                        : "🔒"}
+                    </div>
+
+                    <div>
+                      <strong>
+                        {title.name}
+                      </strong>
+
+                      <p>
+                        {title.desc}
+                      </p>
+
+                      <span
+                        className={
+                          unlocked
+                            ? "title-status"
+                            : "title-status locked"
+                        }
+                      >
+                        {unlocked
+                          ? "✓ Đã đạt"
+                          : "Chưa đạt"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Modal>
+        )}
+
+        {overlay === "quiz" &&
+          quiz && (
+            <Modal
+              title={`📝 Quiz ${
+                quizIndex + 1
+              }/${quiz.length}`}
+              onClose={() => {
+                setQuiz(null);
+                setOverlay(null);
+              }}
+              wide
+            >
+              <div className="quiz-subject">
+                {quiz[quizIndex].subject}
+              </div>
+
+              <h3 className="quiz-question">
+                {quiz[quizIndex].q}
+              </h3>
+
+              <div className="quiz-options">
+                {quiz[
+                  quizIndex
+                ].options.map(
+                  (option, index) => (
+                    <button
+                      key={option}
+                      onClick={() =>
+                        answerQuiz(
+                          index
+                        )
+                      }
+                    >
+                      <span>
+                        {String.fromCharCode(
+                          65 + index
+                        )}
+                      </span>
+                      {option}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="quiz-progress">
+                <div
+                  style={{
+                    width: `${
+                      ((quizIndex + 1) /
+                        quiz.length) *
+                      100
+                    }%`
+                  }}
+                />
+              </div>
+            </Modal>
+          )}
+
+        {overlay === "certExam" &&
+          certExam && (
+            <Modal
+              title={`${certExam.icon} ${
+                certExam.name
+              }`}
+              onClose={() => {
+                setCertExam(null);
+                setOverlay(null);
+              }}
+              wide
+            >
+              <div className="quiz-subject">
+                Câu {certIndex + 1}/
+                {certExam.questions.length}
+              </div>
+
+              <h3 className="quiz-question">
+                {
+                  certExam.questions[
+                    certIndex
+                  ].q
+                }
+              </h3>
+
+              <div className="quiz-options">
+                {certExam.questions[
+                  certIndex
+                ].options.map(
+                  (option, index) => (
+                    <button
+                      key={option}
+                      onClick={() =>
+                        answerCertificate(
+                          index
+                        )
+                      }
+                    >
+                      <span>
+                        {String.fromCharCode(
+                          65 + index
+                        )}
+                      </span>
+
+                      {option}
+                    </button>
+                  )
+                )}
+              </div>
+            </Modal>
+          )}
+
+        {overlay === "saveCode" && (
+          <Modal
+            title="🔐 Mã lưu game"
+            onClose={() =>
+              setOverlay(null)
+            }
+            wide
+          >
+            <p>
+              Mã dưới đây chứa toàn bộ tiến
+              trình game hiện tại. Bạn có thể
+              copy để lưu lại hoặc dán trên
+              thiết bị khác.
+            </p>
+
+            <textarea
+              className="save-textarea"
+              value={saveCode}
+              onChange={e =>
+                setSaveCode(
+                  e.target.value
+                )
+              }
+              placeholder="Mã lưu..."
+            />
+
+            <div className="modal-actions">
+              <button
+                className="primary-btn"
+                onClick={copySaveCode}
+              >
+                📋 Copy mã
+              </button>
+            </div>
+
+            <hr />
+
+            <h3>
+              📥 Nhập mã lưu
+            </h3>
+
+            <textarea
+              className="save-textarea"
+              value={saveCodeInput}
+              onChange={e =>
+                setSaveCodeInput(
+                  e.target.value
+                )
+              }
+              placeholder="Dán mã lưu vào đây..."
+            />
+
+            <button
+              className="primary-btn"
+              onClick={importSaveCode}
+            >
+              🔄 Tải từ mã
+            </button>
+
+            <div className="file-actions">
+              <button
+                onClick={exportSave}
+              >
+                📦 Xuất file JSON
+              </button>
+
+              <button
                 onClick={() =>
                   fileInputRef.current?.click()
                 }
               >
-                📥 NHẬP
+                📥 Nhập file JSON
               </button>
 
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".json,application/json"
-                style={{ display: "none" }}
-                onChange={importFile}
+                hidden
+                onChange={
+                  importSaveFile
+                }
               />
+            </div>
+          </Modal>
+        )}
+
+        {overlay === "settings" && (
+          <Modal
+            title="⚙️ Cài đặt"
+            onClose={() =>
+              setOverlay(null)
+            }
+          >
+            <div className="settings-list">
+              <button
+                onClick={() =>
+                  setAudioEnabled(
+                    value => !value
+                  )
+                }
+              >
+                {audioEnabled
+                  ? "🔊 Tắt âm thanh"
+                  : "🔇 Bật âm thanh"}
+              </button>
 
               <button
-                className="mini-btn"
-                onClick={toggleAudio}
+                onClick={saveNow}
               >
-                {audioEnabled ? "🔊" : "🔇"}
+                💾 Lưu game
+              </button>
+
+              <button
+                onClick={
+                  generateSaveCode
+                }
+              >
+                🔐 Tạo mã lưu
+              </button>
+
+              <button
+                onClick={
+                  restartGame
+                }
+              >
+                🔄 Chơi lại từ đầu
               </button>
             </div>
-          </div>
+          </Modal>
+        )}
 
-          {/* SCREEN */}
-          <div className="screen">
-            {/* HUD */}
-            <div className="hud">
-              <div className="day-box">
-                <div className="weather">☀️</div>
+        {game.isGameOver && (
+          <div className="ending-overlay">
+            <div className="ending-card">
+              <div className="ending-icon">
+                🎓
+              </div>
 
+              <div className="ending-kicker">
+                HÀNH TRÌNH 45 NGÀY
+              </div>
+
+              <h1>
+                Thanh Xuân Rực Rỡ
+              </h1>
+
+              <p>
+                Bạn đã hoàn thành hành trình
+                cấp 3 của mình.
+              </p>
+
+              <div className="ending-stats">
                 <div>
-                  <div className="day-title">
-                    {DAYS_OF_WEEK[
-                      (state.day - 1) % 7
-                    ]}
-
-                    <span>•</span>
-
-                    <span className="time">
-                      {currentPeriod.text}
-                    </span>
-                  </div>
-
-                  <div className="period">
-                    {currentPeriod.name}
-                  </div>
-                </div>
-
-                <div className="day-count">
-                  NGÀY {state.day}/{state.totalDays}
-                </div>
-              </div>
-
-              <div className="stats">
-                <Stat icon="❤️" value={state.stats.hp} />
-                <Stat
-                  icon="⚡"
-                  value={state.stats.energy}
-                />
-                <Stat
-                  icon="😊"
-                  value={state.stats.mood}
-                />
-                <Stat
-                  icon="📚"
-                  value={state.stats.study}
-                />
-                <Stat
-                  icon="💕"
-                  value={`${state.stats.love}%`}
-                />
-                <Stat
-                  icon="🧠"
-                  value={state.stats.skill}
-                />
-                <Stat
-                  icon="💰"
-                  value={formatMoney(
-                    state.stats.money
-                  )}
-                />
-              </div>
-            </div>
-
-            {/* STAGE */}
-            <div className="stage">
-              <div className="stage-header">
-                <div className="location-title">
-                  <span>{locationInfo.icon}</span>
+                  <b>
+                    #{game.currentRank}
+                  </b>
                   <span>
-                    {view === "class" &&
-                      "LỚP 12A3 - KHỐI CHUYÊN"}
-
-                    {view === "canteen" &&
-                      "CĂN TIN TRƯỜNG - CÔ NĂM"}
-
-                    {view === "job" &&
-                      "TRUNG TÂM VIỆC LÀM"}
-
-                    {view === "cert" &&
-                      "TRUNG TÂM KHẢO THÍ"}
-
-                    {view === "prop" &&
-                      "SÀN NHÀ CỬA & SIÊU XE"}
-
-                    {view === "home" &&
-                      "PHÒNG RIÊNG Ở NHÀ"}
+                    Hạng thi đua
                   </span>
                 </div>
 
-                {toast && (
-                  <div
-                    className={`toast-inline ${toast.type}`}
-                  >
-                    {toast.message}
-                  </div>
-                )}
+                <div>
+                  <b>
+                    {game.competitionScore}
+                  </b>
+                  <span>
+                    Điểm thi đua
+                  </span>
+                </div>
+
+                <div>
+                  <b>
+                    {game.stats.study}
+                  </b>
+                  <span>
+                    Học tập
+                  </span>
+                </div>
+
+                <div>
+                  <b>
+                    {game.stats.skill}
+                  </b>
+                  <span>
+                    Kỹ năng
+                  </span>
+                </div>
+
+                <div>
+                  <b>
+                    {game.stats.love}
+                  </b>
+                  <span>
+                    Tình cảm
+                  </span>
+                </div>
+
+                <div>
+                  <b>
+                    {game.unlockedTitles.length}
+                  </b>
+                  <span>
+                    Danh hiệu
+                  </span>
+                </div>
               </div>
 
-              <div className="stage-content">
-                {/* CLASS */}
-                {view === "class" && !quiz && (
-                  <ClassScene
-                    onNPC={interactNPC}
-                    onStudy={startClassroomLesson}
-                  />
-                )}
-
-                {/* HOME */}
-                {view === "home" && (
-                  <HomeScene
-                    state={state}
-                    onStudy={startClassroomLesson}
-                  />
-                )}
-
-                {/* CANTEEN */}
-                {view === "canteen" && (
-                  <CanteenView
-                    items={CANTEEN}
-                    money={state.stats.money}
-                    onBuy={buyFood}
-                  />
-                )}
-
-                {/* JOB */}
-                {view === "job" && (
-                  <JobView
-                    jobs={JOBS}
-                    state={state}
-                    onJob={doJob}
-                  />
-                )}
-
-                {/* CERT */}
-                {view === "cert" && !certExam && (
-                  <CertificateView
-                    certificates={CERTIFICATES}
-                    state={state}
-                    onStart={startCertificate}
-                  />
-                )}
-
-                {/* PROPERTY */}
-                {view === "prop" && (
-                  <PropertyView
-                    properties={PROPERTIES}
-                    state={state}
-                    onBuy={buyProperty}
-                  />
-                )}
-
-                {/* QUIZ */}
-                {quiz && (
-                  <QuizCard
-                    quiz={quiz}
-                    teacher={TEACHERS[quiz.sub]}
-                    onAnswer={answerQuiz}
-                    onSkip={skipClass}
-                  />
-                )}
-
-                {/* CERT EXAM */}
-                {certExam && (
-                  <CertificateExam
-                    exam={certExam}
-                    cert={CERTIFICATES.find(
-                      (x) => x.id === certExam.certId
-                    )}
-                    onAnswer={answerCertificate}
-                  />
-                )}
+              <div className="ending-message">
+                {game.currentRank === 1
+                  ? "🏆 Bạn đã trở thành Quán Quân Thi Đua!"
+                  : game.stats.study >= 80
+                  ? "📚 Một thanh xuân đầy nỗ lực và đáng nhớ!"
+                  : game.stats.love >= 80
+                  ? "💖 Điều đẹp nhất là những người bạn đã gặp."
+                  : "🌱 Quan trọng nhất là bạn đã trưởng thành sau hành trình này."}
               </div>
 
-              {/* LOCATION NAV */}
-              <div className="location-nav">
-                {LOCATIONS.map((loc) => (
-                  <button
-                    key={loc.id}
-                    className={
-                      view === loc.id
-                        ? "location-btn active"
-                        : "location-btn"
-                    }
-                    onClick={() =>
-                      changeLocation(loc.id)
-                    }
-                    disabled={state.isGameOver}
-                  >
-                    <span>{loc.icon}</span>
-                    <span>{loc.name}</span>
-                  </button>
-                ))}
+              <div className="ending-actions">
+                <button
+                  onClick={() =>
+                    setOverlay("competition")
+                  }
+                >
+                  🏆 Xem bảng thi đua
+                </button>
+
+                <button
+                  onClick={() =>
+                    setOverlay("titles")
+                  }
+                >
+                  🎖️ Xem danh hiệu
+                </button>
+
+                <button
+                  onClick={generateSaveCode}
+                >
+                  🔐 Lưu thành mã
+                </button>
+
+                <button
+                  className="danger-btn"
+                  onClick={
+                    restartGame
+                  }
+                >
+                  🔄 Chơi lại
+                </button>
               </div>
-            </div>
-
-            {/* BOTTOM ACTION BAR */}
-            <div className="action-bar">
-              <button
-                onClick={() =>
-                  toggleDrawer("study")
-                }
-              >
-                📖 <span>Học Tập</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  toggleDrawer("profile")
-                }
-              >
-                🎖️ <span>Bằng Cấp</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  toggleDrawer("assets")
-                }
-              >
-                🏡 <span>Tài Sản</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  toggleDrawer("bag")
-                }
-              >
-                🎒 <span>Túi Đồ</span>
-              </button>
-
-              <button
-                className="diary-btn"
-                onClick={openDiary}
-              >
-                📓 <span>Nhật Ký</span>
-              </button>
-            </div>
-
-            {/* DRAWER */}
-            {drawer && (
-              <Drawer
-                type={drawer}
-                state={state}
-                onClose={() => setDrawer(null)}
-                onStudy={startClassroomLesson}
-                onCert={() => {
-                  setDrawer(null);
-                  changeLocation("cert");
-                }}
-                onBuyBag={useBagItem}
-              />
-            )}
-          </div>
-
-          {/* CONTROLLER */}
-          <div className="controller">
-            <div className="dpad">
-              <button
-                onClick={() => navigateLocation(-1)}
-              >
-                ◀
-              </button>
-
-              <button
-                onClick={() => navigateLocation(1)}
-              >
-                ▶
-              </button>
-            </div>
-
-            <div className="controller-label">
-              THANH XUÂN RỰC RỠ • CAREER & ASSETS
-            </div>
-
-            <div className="ab-buttons">
-              <button
-                className="b-button"
-                onClick={quickSleep}
-              >
-                B
-              </button>
-
-              <button
-                className="a-button"
-                onClick={openDiary}
-              >
-                A
-              </button>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* DIALOGUE */}
-      {dialogue && (
-        <Modal>
-          <div className="dialogue-card">
-            <div className="modal-title pink">
-              💕 TRIỆU MẪN
-            </div>
-
-            <div className="dialogue-text">
-              {dialogue.hasCar
-                ? "“Wow... Bạn tự đi làm tích góp mua được ô tô luôn hả? Chiều nay chở tớ đi ngắm hoàng hôn được không? 💕”"
-                : "“Này cậu! Dạo này thấy cậu chăm chỉ học hành ghê nha. Cố lên nhé, tớ luôn ủng hộ cậu!”"}
-            </div>
-
-            <button
-              className="choice pink-choice"
-              onClick={() =>
-                chooseDialogue(dialogue.hasCar)
-              }
-            >
-              {dialogue.hasCar
-                ? "🚗 Lên xe nào Mẫn ơi!"
-                : "💕 Cảm ơn Mẫn nhé, tớ sẽ cố gắng!"}
-            </button>
-
-            <button
-              className="close-button"
-              onClick={() => setDialogue(null)}
-            >
-              Đóng
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* DIARY */}
-      {(manualDiary || pendingDiary) && (
-        <Modal>
-          <div className="diary-card">
-            <div className="diary-heading">
-              <span>📓</span>
-              <div>
-                <h2>
-                  NHẬT KÝ — NGÀY{" "}
-                  {pendingDiary?.day ||
-                    latestDiary?.day ||
-                    state.day}
-                </h2>
-                <small>
-                  Những cột mốc trưởng thành
-                </small>
-              </div>
-            </div>
-
-            <div className="diary-content">
-              {pendingDiary?.text ||
-                latestDiary?.text ||
-                "Chưa có trang nhật ký nào."}
-            </div>
-
-            <div className="diary-actions">
-              <button
-                className="primary-button"
-                onClick={continueDiary}
-              >
-                {showEnding
-                  ? "Xem lễ tốt nghiệp 🎓"
-                  : pendingDiary
-                  ? "Thức dậy ngày mới ☀️"
-                  : "Đóng nhật ký"}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ENDING */}
-      {showEnding && (
-        <Modal>
-          <div className="ending-card">
-            <div className="graduation">🎓</div>
-
-            <div className="pixel-small">
-              LỄ TỐT NGHIỆP & TỔNG KẾT
-            </div>
-
-            <h1>{ending.title}</h1>
-
-            <h3>{ending.sub}</h3>
-
-            <p>{ending.desc}</p>
-
-            <div className="ending-grid">
-              <div>
-                📚 Học tập
-                <b>{state.stats.study}</b>
-              </div>
-
-              <div>
-                💕 Tình cảm
-                <b>{state.stats.love}%</b>
-              </div>
-
-              <div>
-                📜 Chứng chỉ
-                <b>{state.certificates.length}</b>
-              </div>
-
-              <div>
-                🏡 Tài sản
-                <b>{state.assets.length}</b>
-              </div>
-
-              <div>
-                💰 Tiền
-                <b>{formatMoney(state.stats.money)}</b>
-              </div>
-
-              <div>
-                🧠 Kỹ năng
-                <b>{state.stats.skill}</b>
-              </div>
-            </div>
-
-            <button
-              className="restart-button"
-              onClick={restartGame}
-            >
-              CHƠI LẠI VÁN MỚI 🌸
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* SAVE CODE MODAL */}
-      {saveModal && (
-        <Modal>
-          <div className="save-card">
-            <h2>🔑 MÃ LƯU GAME</h2>
-
-            <p>
-              {saveModal === "export"
-                ? "Copy mã này để lưu game. Bạn có thể gửi mã cho chính mình hoặc nhập lại trên máy khác."
-                : "Dán mã lưu game vào ô bên dưới."}
-            </p>
-
-            <textarea
-              value={saveCode}
-              onChange={(e) =>
-                setSaveCode(e.target.value)
-              }
-              placeholder="Mã lưu game..."
-              spellCheck={false}
-            />
-
-            <div className="save-actions">
-              {saveModal === "export" ? (
-                <button
-                  className="primary-button"
-                  onClick={copySaveCode}
-                >
-                  📋 COPY MÃ
-                </button>
-              ) : (
-                <button
-                  className="primary-button"
-                  onClick={importSaveCode}
-                >
-                  📂 KHÔI PHỤC
-                </button>
-              )}
-
-              <button
-                className="close-button"
-                onClick={() => setSaveModal(null)}
-              >
-                Đóng
-              </button>
-            </div>
-
-            <button
-              className="link-button"
-              onClick={() =>
-                setSaveModal(
-                  saveModal === "export"
-                    ? "import"
-                    : "export"
-                )
-              }
-            >
-              {saveModal === "export"
-                ? "→ Nhập mã lưu game"
-                : "→ Tạo mã từ game hiện tại"}
-            </button>
-          </div>
-        </Modal>
-      )}
     </>
   );
 }
 
-/* =========================================================
-   COMPONENTS
-   ========================================================= */
-
-function Stat({ icon, value }) {
+function Stat({ icon, name, value }) {
   return (
     <div className="stat">
-      <span>{icon}</span>
+      <div className="stat-top">
+        <span>
+          {icon} {name}
+        </span>
+
+        <b>{value}</b>
+      </div>
+
+      <div className="bar">
+        <div
+          style={{
+            width: `${Math.min(
+              100,
+              Math.max(0, value)
+            )}%`
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ name, value }) {
+  return (
+    <div className="mini-stat">
+      <span>{name}</span>
       <b>{value}</b>
     </div>
   );
 }
 
-function ClassScene({ onNPC, onStudy }) {
-  return (
-    <div className="scene">
-      <div className="npc-row">
-        <button
-          className="npc"
-          onClick={() => onNPC("lan")}
-        >
-          <span>👧</span>
-          <small>Lan</small>
-          <em>Bạn thân</em>
-        </button>
-
-        <button
-          className="npc crush"
-          onClick={() => onNPC("crush")}
-        >
-          <span>✨👧</span>
-          <small>Triệu Mẫn</small>
-          <em>💕 Crush</em>
-        </button>
-
-        <button
-          className="npc"
-          onClick={() => onNPC("tuan")}
-        >
-          <span>🏀</span>
-          <small>Tuấn</small>
-          <em>Bóng rổ</em>
-        </button>
-      </div>
-
-      <div className="class-label">
-        LỚP 12A3 — KHỐI CHUYÊN
-      </div>
-
-      <p className="narrative">
-        “Tự mình học tập, làm thêm, thi chứng chỉ
-        và gom góp để xây dựng tương lai!”
-      </p>
-
-      <button
-        className="big-study-button"
-        onClick={onStudy}
-      >
-        📚 VÀO TIẾT HỌC
-      </button>
-    </div>
-  );
-}
-
-function HomeScene({ state, onStudy }) {
-  const condo = state.assets.includes("asset_condo");
-  const villa = state.assets.includes("asset_villa");
-
-  return (
-    <div className="home-scene">
-      <div className="home-icon">
-        {villa ? "🏰" : condo ? "🏙️" : "🏠"}
-      </div>
-
-      <h2>
-        {villa
-          ? "BIỆT THỰ THẢO ĐIỀN"
-          : condo
-          ? "CĂN HỘ STUDIO"
-          : "PHÒNG RIÊNG"}
-      </h2>
-
-      <p>
-        {villa
-          ? "Không gian sống của một đại gia tương lai."
-          : condo
-          ? "Không gian yên tĩnh để học tập và nghỉ ngơi."
-          : "Góc nhỏ để hồi phục năng lượng sau một ngày dài."}
-      </p>
-
-      <button
-        className="big-study-button"
-        onClick={onStudy}
-      >
-        📖 NGỒI HỌC
-      </button>
-    </div>
-  );
-}
-
-function CanteenView({ items, money, onBuy }) {
-  return (
-    <div className="list-view">
-      <div className="view-heading">
-        🍜 CĂN TIN CÔ NĂM
-        <span>Ví: {formatMoney(money)}</span>
-      </div>
-
-      {items.map((item) => (
-        <div className="shop-item" key={item.id}>
-          <div className="shop-icon">
-            {item.icon}
-          </div>
-
-          <div className="shop-info">
-            <b>{item.name}</b>
-
-            <small>
-              +{item.energy}⚡ | +{item.mood}😊
-              {item.love > 0 &&
-                ` | +${item.love}💕`}
-            </small>
-
-            <strong>
-              {formatMoney(item.price)}
-            </strong>
-          </div>
-
-          <button
-            className="buy green-buy"
-            onClick={() => onBuy(item)}
-          >
-            MUA
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function JobView({ jobs, state, onJob }) {
-  return (
-    <div className="list-view">
-      <div className="view-heading">
-        💼 VIỆC LÀM
-        <span>
-          Năng lượng: {state.stats.energy}
-        </span>
-      </div>
-
-      {jobs.map((job) => {
-        const available = job.condition(state);
-
-        return (
-          <div
-            className={`shop-item ${
-              !available ? "disabled" : ""
-            }`}
-            key={job.id}
-          >
-            <div className="shop-icon">
-              {job.icon}
-            </div>
-
-            <div className="shop-info">
-              <b>{job.name}</b>
-
-              <small>{job.requirement}</small>
-
-              <strong>
-                +{formatMoney(job.salary)} • -
-                {job.energy}⚡
-              </strong>
-            </div>
-
-            <button
-              className="buy purple-buy"
-              disabled={!available}
-              onClick={() => onJob(job)}
-            >
-              LÀM
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function CertificateView({
-  certificates,
-  state,
-  onStart,
-}) {
-  return (
-    <div className="list-view">
-      <div className="view-heading">
-        📜 TRUNG TÂM CHỨNG CHỈ
-        <span>
-          Kỹ năng: {state.stats.skill}
-        </span>
-      </div>
-
-      {certificates.map((cert) => {
-        const owned =
-          state.certificates.includes(cert.id);
-
-        return (
-          <div
-            className={`shop-item ${
-              owned ? "owned" : ""
-            }`}
-            key={cert.id}
-          >
-            <div className="shop-icon">
-              {cert.icon}
-            </div>
-
-            <div className="shop-info">
-              <b>{cert.name}</b>
-
-              <small>{cert.desc}</small>
-
-              <strong>
-                Lệ phí: {formatMoney(cert.fee)} |
-                Kỹ năng ≥ {cert.reqSkill}
-              </strong>
-            </div>
-
-            {owned ? (
-              <span className="owned-label">
-                ĐÃ CÓ ✓
-              </span>
-            ) : (
-              <button
-                className="buy cyan-buy"
-                onClick={() => onStart(cert)}
-              >
-                THI
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PropertyView({
-  properties,
-  state,
-  onBuy,
-}) {
-  return (
-    <div className="list-view">
-      <div className="view-heading">
-        🏙️ NHÀ & XE
-        <span>
-          Ví: {formatMoney(state.stats.money)}
-        </span>
-      </div>
-
-      {properties.map((item) => {
-        const owned = state.assets.includes(
-          item.id
-        );
-
-        const locked =
-          item.license &&
-          !state.certificates.includes(
-            item.license
-          );
-
-        return (
-          <div
-            className={`shop-item ${
-              owned ? "owned" : ""
-            }`}
-            key={item.id}
-          >
-            <div className="shop-icon">
-              {item.icon}
-            </div>
-
-            <div className="shop-info">
-              <b>{item.name}</b>
-
-              <small>{item.desc}</small>
-
-              <strong>
-                {formatMoney(item.price)}
-              </strong>
-
-              <small className="yellow-text">
-                {item.buff}
-              </small>
-
-              {locked && (
-                <small className="red-text">
-                  🔒 Cần bằng lái
-                </small>
-              )}
-            </div>
-
-            {owned ? (
-              <span className="owned-label">
-                ĐANG SỞ HỮU
-              </span>
-            ) : (
-              <button
-                className="buy gold-buy"
-                disabled={locked}
-                onClick={() => onBuy(item)}
-              >
-                MUA
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function QuizCard({
-  quiz,
-  teacher,
-  onAnswer,
-  onSkip,
-}) {
-  return (
-    <div className="quiz-card">
-      <div className="quiz-header">
-        <span>{teacher.subject}</span>
-        <b>{teacher.name}</b>
-      </div>
-
-      <div className="teacher-row">
-        <div className="teacher-avatar">
-          {teacher.avatar}
-        </div>
-
-        <p>{quiz.q}</p>
-      </div>
-
-      <div className="quiz-options">
-        {quiz.opts.map((option, index) => (
-          <button
-            key={option}
-            onClick={() => onAnswer(index)}
-          >
-            {String.fromCharCode(65 + index)}.{" "}
-            {option}
-          </button>
-        ))}
-      </div>
-
-      <div className="quiz-bottom">
-        <span>⚡ Tốn 15 năng lượng</span>
-
-        <button onClick={onSkip}>
-          😴 Gục đầu ngủ
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CertificateExam({
-  exam,
-  cert,
-  onAnswer,
-}) {
-  const question = cert.questions[exam.index];
-
-  return (
-    <div className="quiz-card cert-exam">
-      <div className="quiz-header cyan">
-        <span>
-          {cert.icon} {cert.name}
-        </span>
-
-        <b>
-          Câu {exam.index + 1}/
-          {cert.questions.length}
-        </b>
-      </div>
-
-      <div className="exam-question">
-        {question.q}
-      </div>
-
-      <div className="quiz-options one-column">
-        {question.opts.map((option, index) => (
-          <button
-            key={option}
-            onClick={() => onAnswer(index)}
-          >
-            {String.fromCharCode(65 + index)}.{" "}
-            {option}
-          </button>
-        ))}
-      </div>
-
-      <div className="exam-score">
-        Điểm hiện tại: {exam.score}
-      </div>
-    </div>
-  );
-}
-
 function Drawer({
-  type,
-  state,
+  title,
   onClose,
-  onStudy,
-  onCert,
-  onBuyBag,
+  children
 }) {
-  let title = "";
-  let content = null;
+  return (
+    <div className="overlay">
+      <div className="drawer-panel">
+        <div className="drawer-header">
+          <h2>{title}</h2>
 
-  if (type === "study") {
-    title = "📖 HỌC TẬP";
-
-    content = (
-      <>
-        <button
-          className="drawer-action"
-          onClick={onStudy}
-        >
-          ✍️ Trả lời câu hỏi giáo viên
-        </button>
-
-        <button
-          className="drawer-action cyan"
-          onClick={onCert}
-        >
-          📜 Thi chứng chỉ
-        </button>
-      </>
-    );
-  }
-
-  if (type === "profile") {
-    title = "🎖️ CHỨNG CHỈ";
-
-    content =
-      state.certificates.length === 0 ? (
-        <p className="empty">
-          Chưa có chứng chỉ nào.
-        </p>
-      ) : (
-        state.certificates.map((id) => {
-          const cert = CERTIFICATES.find(
-            (x) => x.id === id
-          );
-
-          return (
-            <div className="drawer-card" key={id}>
-              {cert?.icon} {cert?.name}
-            </div>
-          );
-        })
-      );
-  }
-
-  if (type === "assets") {
-    title = "🏡 TÀI SẢN";
-
-    content =
-      state.assets.length === 0 ? (
-        <p className="empty">
-          Bạn chưa sở hữu tài sản nào.
-        </p>
-      ) : (
-        state.assets.map((id) => {
-          const item = PROPERTIES.find(
-            (x) => x.id === id
-          );
-
-          return (
-            <div className="drawer-card" key={id}>
-              <b>
-                {item?.icon} {item?.name}
-              </b>
-
-              <small>{item?.buff}</small>
-            </div>
-          );
-        })
-      );
-  }
-
-  if (type === "bag") {
-    title = "🎒 TÚI ĐỒ";
-
-    content = state.bag.map((item) => (
-      <div className="drawer-card bag-row" key={item.id}>
-        <div>
-          <b>
-            {item.icon} {item.name}
-          </b>
-
-          <small>{item.desc}</small>
+          <button
+            className="close-btn"
+            onClick={onClose}
+          >
+            ✕
+          </button>
         </div>
 
-        <button
-          className="use-button"
-          disabled={item.count <= 0}
-          onClick={() => onBuyBag(item)}
-        >
-          DÙNG x{item.count}
-        </button>
-      </div>
-    ));
-  }
-
-  return (
-    <div className="drawer">
-      <div className="drawer-header">
-        <b>{title}</b>
-
-        <button onClick={onClose}>✕</button>
-      </div>
-
-      <div className="drawer-content">
-        {content}
+        {children}
       </div>
     </div>
   );
 }
 
-function Modal({ children }) {
+function Modal({
+  title,
+  onClose,
+  children,
+  wide = false
+}) {
   return (
-    <div className="modal-backdrop">
-      {children}
+    <div className="overlay">
+      <div
+        className={
+          `modal ${
+            wide ? "modal-wide" : ""
+          }`
+        }
+      >
+        <div className="modal-header">
+          <h2>{title}</h2>
+
+          <button
+            className="close-btn"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="modal-body">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
 
-/* =========================================================
-   CSS
-   ========================================================= */
+function Empty({ text }) {
+  return (
+    <div className="empty">
+      <div>📭</div>
+      <p>{text}</p>
+    </div>
+  );
+}
 
 const CSS = `
 * {
@@ -2791,21 +3682,31 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  width: 100%;
 }
 
 body {
-  background:
-    radial-gradient(circle at top, #18243b 0%, #020617 55%);
-  color: #e2e8f0;
   font-family:
-    "Be Vietnam Pro",
-    Arial,
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
+  background:
+    radial-gradient(
+      circle at top,
+      #eef3ff 0%,
+      #dfe6f5 45%,
+      #cfd7e7 100%
+    );
+  color: #202333;
 }
 
 button,
-textarea {
-  font-family: inherit;
+textarea,
+input {
+  font: inherit;
 }
 
 button {
@@ -2814,1193 +3715,1300 @@ button {
 
 button:disabled {
   cursor: not-allowed;
+  opacity: .5;
 }
 
-.game-page {
+.app {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-}
-
-.console {
-  width: 100%;
-  max-width: 1050px;
-  background: #0f172a;
-  border: 5px solid #334155;
-  border-radius: 30px;
-  padding: 12px;
-  box-shadow:
-    0 0 0 4px #1e293b,
-    0 0 0 8px #334155,
-    0 25px 60px rgba(0,0,0,.8);
+  padding-bottom: 30px;
 }
 
 .topbar {
+  min-height: 76px;
+  background: rgba(20, 25, 45, .96);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 5px 8px 10px;
-  border-bottom: 2px solid #1e293b;
+  padding: 14px max(18px, calc((100vw - 1180px) / 2));
+  box-shadow: 0 5px 25px rgba(0,0,0,.18);
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #fbbf24;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 1px;
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -.5px;
 }
 
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 10px #10b981;
+.subtitle {
+  margin-top: 3px;
+  font-size: 11px;
+  opacity: .55;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
 }
 
 .top-actions {
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  gap: 7px;
 }
 
-.mini-btn {
-  border: 1px solid #475569;
-  background: #1e293b;
-  color: #cbd5e1;
-  border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.mini-btn:hover {
-  background: #334155;
+.top-actions button {
+  border: 0;
+  background: rgba(255,255,255,.1);
   color: white;
+  border-radius: 11px;
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
 }
 
-.mini-btn.green {
-  background: #047857;
-  color: white;
+.top-actions button:hover {
+  background: rgba(255,255,255,.2);
 }
 
-.mini-btn.blue {
-  background: #0369a1;
-  color: white;
-}
-
-.screen {
-  position: relative;
-  margin-top: 12px;
-  min-height: 700px;
-  padding: 12px;
-  border: 5px solid #020617;
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at center, #1e293b 0%, #020617 100%);
-  box-shadow: inset 0 0 35px rgba(0,0,0,.9);
+.game-shell {
+  width: min(1180px, calc(100% - 24px));
+  margin: 18px auto;
 }
 
 .hud {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns:
+    1fr 1fr 1.4fr 1.4fr;
   gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px;
-  border: 2px solid #334155;
-  border-radius: 13px;
-  background: rgba(2,6,23,.9);
-  box-shadow: 3px 3px 0 #020617;
+  margin-bottom: 12px;
 }
 
-.day-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.day-card,
+.time-card,
+.money-card,
+.rank-card {
+  background: rgba(255,255,255,.9);
+  border-radius: 16px;
+  padding: 12px 15px;
+  box-shadow:
+    0 5px 18px rgba(30,40,80,.08);
 }
 
-.weather {
-  font-size: 25px;
-}
-
-.day-title {
-  color: #fcd34d;
-  font-weight: 900;
-  font-size: 12px;
-}
-
-.day-title .time {
-  color: #34d399;
-  font-family: monospace;
-}
-
-.day-title span {
-  margin: 0 4px;
-}
-
-.period {
-  color: #94a3b8;
+.hud span {
+  display: block;
   font-size: 10px;
-  margin-top: 2px;
-}
-
-.day-count {
-  margin-left: 5px;
-  padding: 4px 7px;
-  border-radius: 6px;
-  background: #1e293b;
-  color: #94a3b8;
-  font-family: monospace;
-  font-size: 9px;
-}
-
-.stats {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.stat {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 7px;
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 7px;
-  font-family: monospace;
-  font-size: 10px;
-}
-
-.stat b {
-  color: #f8fafc;
-}
-
-.stage {
-  position: relative;
-  min-height: 485px;
-  margin-top: 12px;
-  padding: 12px;
-  border: 2px solid #334155;
-  border-radius: 14px;
-  background:
-    linear-gradient(
-      to bottom,
-      rgba(7,89,133,.35),
-      rgba(15,23,42,.9) 55%,
-      #020617
-    );
-  overflow: hidden;
-}
-
-.stage-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.location-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  background: rgba(2,6,23,.85);
-  border: 1px solid #475569;
-  border-radius: 8px;
-  color: #fcd34d;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.toast-inline {
-  padding: 6px 9px;
-  background: rgba(0,0,0,.85);
-  border: 1px solid #475569;
-  border-radius: 7px;
-  font-family: monospace;
-  font-size: 10px;
-  max-width: 55%;
-}
-
-.toast-inline.success {
-  color: #34d399;
-}
-
-.toast-inline.error {
-  color: #fb7185;
-}
-
-.toast-inline.warning {
-  color: #fbbf24;
-}
-
-.toast-inline.info {
-  color: #38bdf8;
-}
-
-.stage-content {
-  min-height: 370px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 0;
-}
-
-.scene {
-  width: 100%;
-  text-align: center;
-}
-
-.npc-row {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: clamp(18px, 7vw, 70px);
-  margin-bottom: 25px;
-}
-
-.npc {
-  border: 0;
-  background: transparent;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: transform .15s;
-}
-
-.npc:hover {
-  transform: translateY(-6px);
-}
-
-.npc > span {
-  font-size: clamp(38px, 7vw, 65px);
-  filter: drop-shadow(0 8px 4px rgba(0,0,0,.5));
-}
-
-.npc small {
-  margin-top: 3px;
-  padding: 4px 8px;
-  background: rgba(2,6,23,.9);
-  border: 1px solid #475569;
-  border-radius: 6px;
-  color: #e2e8f0;
-  font-weight: 900;
-  font-size: 10px;
-}
-
-.npc em {
-  color: #94a3b8;
-  font-size: 8px;
-  font-style: normal;
-}
-
-.npc.crush small {
-  color: #f9a8d4;
-  border-color: #be185d;
-}
-
-.class-label {
-  display: inline-block;
-  padding: 8px 20px;
-  border: 2px solid #fcd34d;
-  border-radius: 9px;
-  background: linear-gradient(
-    90deg,
-    #d97706,
-    #facc15
-  );
-  color: #172033;
-  font-size: 12px;
-  font-weight: 1000;
+  font-weight: 800;
   letter-spacing: 1px;
-}
-
-.narrative {
-  max-width: 560px;
-  margin: 12px auto;
-  color: #cbd5e1;
-  font-size: 11px;
-  line-height: 1.7;
-  font-style: italic;
-}
-
-.big-study-button {
-  border: 2px solid #fbbf24;
-  background: #f59e0b;
-  color: #111827;
-  border-radius: 10px;
-  padding: 10px 18px;
-  font-size: 11px;
-  font-weight: 1000;
-  box-shadow: 3px 3px 0 #020617;
-}
-
-.big-study-button:hover {
-  background: #fcd34d;
-}
-
-.home-scene {
-  text-align: center;
-  max-width: 520px;
-}
-
-.home-icon {
-  font-size: 75px;
-  filter: drop-shadow(0 10px 5px rgba(0,0,0,.5));
-}
-
-.home-scene h2 {
-  color: #fcd34d;
-  font-size: 18px;
-  margin: 10px 0 5px;
-}
-
-.home-scene p {
-  color: #94a3b8;
-  font-size: 11px;
-  line-height: 1.7;
-}
-
-.list-view {
-  width: 100%;
-  max-width: 720px;
-  max-height: 365px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.view-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #334155;
-  color: #67e8f9;
-  font-size: 12px;
-  font-weight: 1000;
-}
-
-.view-heading span {
-  color: #94a3b8;
-  font-family: monospace;
-  font-size: 9px;
-}
-
-.shop-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 7px;
-  padding: 9px;
-  border: 1px solid #334155;
-  border-radius: 11px;
-  background: rgba(2,6,23,.85);
-}
-
-.shop-item:hover {
-  border-color: #64748b;
-}
-
-.shop-item.disabled {
   opacity: .55;
 }
 
-.shop-item.owned {
-  border-color: #059669;
-  background: rgba(6,78,59,.18);
-}
-
-.shop-icon {
-  width: 42px;
-  text-align: center;
-  font-size: 29px;
-  flex-shrink: 0;
-}
-
-.shop-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.shop-info b {
+.hud strong {
   display: block;
-  color: #f1f5f9;
-  font-size: 11px;
+  margin-top: 3px;
+  font-size: 18px;
 }
 
-.shop-info small {
-  display: block;
-  color: #94a3b8;
-  font-size: 9px;
-  line-height: 1.5;
-  margin-top: 2px;
+.rank-card strong {
+  color: #7353d6;
 }
 
-.shop-info strong {
-  display: block;
-  color: #34d399;
-  font-family: monospace;
-  font-size: 10px;
-  margin-top: 2px;
-}
-
-.yellow-text {
-  color: #fbbf24 !important;
-}
-
-.red-text {
-  color: #fb7185 !important;
-}
-
-.buy {
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 7px;
-  padding: 7px 10px;
-  color: white;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.buy:disabled {
-  opacity: .35;
-}
-
-.green-buy {
-  background: #059669;
-}
-
-.purple-buy {
-  background: #4f46e5;
-}
-
-.cyan-buy {
-  background: #0891b2;
-}
-
-.gold-buy {
-  background: #d97706;
-  color: #111827;
-}
-
-.owned-label {
-  color: #34d399;
-  font-family: monospace;
-  font-size: 9px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.quiz-card {
-  width: 100%;
-  max-width: 650px;
-  padding: 15px;
-  border: 2px solid #fbbf24;
-  border-radius: 15px;
-  background: #0f172a;
-  box-shadow: 0 15px 40px rgba(0,0,0,.55);
-}
-
-.quiz-card.cert-exam {
-  border-color: #22d3ee;
-}
-
-.quiz-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 9px;
-  border-bottom: 1px solid #1e293b;
-  color: #fbbf24;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.quiz-header.cyan {
-  color: #67e8f9;
-}
-
-.teacher-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  margin: 13px 0;
-}
-
-.teacher-avatar {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  background: #1e293b;
-  font-size: 25px;
-}
-
-.teacher-row p,
-.exam-question {
-  margin: 0;
-  color: #e2e8f0;
-  font-size: 12px;
-  line-height: 1.7;
-  font-weight: 700;
-}
-
-.quiz-options {
+.stats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 7px;
+  grid-template-columns:
+    repeat(6, 1fr);
+  gap: 9px;
+  margin-bottom: 12px;
 }
 
-.quiz-options.one-column {
-  grid-template-columns: 1fr;
+.stat {
+  background: white;
+  border-radius: 14px;
+  padding: 9px 11px;
+  box-shadow:
+    0 5px 18px rgba(30,40,80,.07);
 }
 
-.quiz-options button {
-  padding: 10px;
-  border: 1px solid #475569;
-  border-radius: 9px;
-  background: #1e293b;
-  color: #e2e8f0;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.quiz-options button:hover {
-  border-color: #fbbf24;
-  background: #334155;
-}
-
-.cert-exam .quiz-options button:hover {
-  border-color: #22d3ee;
-}
-
-.quiz-bottom {
+.stat-top {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-  margin-top: 9px;
-  padding-top: 8px;
-  border-top: 1px solid #1e293b;
-  color: #94a3b8;
-  font-size: 9px;
-}
-
-.quiz-bottom button {
-  border: 0;
-  background: transparent;
-  color: #fb7185;
-  font-size: 9px;
-}
-
-.exam-question {
-  margin: 14px 0;
-}
-
-.exam-score {
-  margin-top: 10px;
-  color: #67e8f9;
-  font-family: monospace;
-  font-size: 10px;
-}
-
-.location-nav {
-  display: flex;
   gap: 5px;
-  padding-top: 9px;
-  border-top: 1px solid #1e293b;
-  flex-wrap: wrap;
-}
-
-.location-btn {
-  flex: 1 1 90px;
-  min-width: 75px;
-  padding: 8px 5px;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: #1e293b;
-  color: #cbd5e1;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.location-btn:hover {
-  background: #334155;
-  color: white;
-}
-
-.location-btn.active {
-  border-color: #fbbf24;
-  background: rgba(245,158,11,.15);
-  color: #fcd34d;
-}
-
-.action-bar {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 8px;
-  border: 2px solid #334155;
-  border-radius: 12px;
-  background: #020617;
-}
-
-.action-bar button {
-  flex: 1;
-  padding: 9px 5px;
-  border: 1px solid #475569;
-  border-radius: 8px;
-  background: #1e293b;
-  color: #e2e8f0;
-  font-size: 10px;
-  font-weight: 900;
-  box-shadow: 2px 2px 0 #020617;
-}
-
-.action-bar button:hover {
-  background: #334155;
-}
-
-.action-bar .diary-btn {
-  background: #f59e0b;
-  color: #111827;
-}
-
-.drawer {
-  position: absolute;
-  z-index: 50;
-  left: 15px;
-  right: 15px;
-  bottom: 85px;
-  max-height: 300px;
-  overflow-y: auto;
-  border: 2px solid #475569;
-  border-radius: 15px;
-  background: #0f172a;
-  box-shadow: 0 20px 50px rgba(0,0,0,.75);
-  padding: 12px;
-}
-
-.drawer-header {
-  display: flex;
-  justify-content: space-between;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #1e293b;
-  color: #fcd34d;
   font-size: 11px;
 }
 
-.drawer-header button {
-  border: 0;
-  background: transparent;
-  color: #94a3b8;
+.stat-top b {
+  font-size: 12px;
 }
 
-.drawer-content {
+.bar {
+  height: 6px;
+  background: #edf0f5;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 7px;
+}
+
+.bar div {
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      #7f75e9,
+      #4fb4ff
+    );
+}
+
+.location-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 9px;
 }
 
-.drawer-action {
+.location-tabs button {
+  flex: 1;
+  min-width: 100px;
+  border: 0;
+  background: rgba(255,255,255,.65);
+  border-radius: 14px;
   padding: 10px;
-  border: 1px solid #334155;
-  border-radius: 9px;
-  background: #1e293b;
-  color: #e2e8f0;
-  text-align: left;
-  font-size: 10px;
+  color: #30354a;
+}
+
+.location-tabs button.active {
+  background: #292e4c;
+  color: white;
+  box-shadow:
+    0 5px 15px rgba(30,30,70,.22);
+}
+
+.location-tabs span {
+  display: block;
+  font-size: 20px;
+}
+
+.location-tabs small {
+  display: block;
+  margin-top: 3px;
   font-weight: 800;
 }
 
-.drawer-action:hover {
-  background: #334155;
+.main-panel {
+  min-height: 440px;
+  background: white;
+  border-radius: 25px;
+  overflow: hidden;
+  box-shadow:
+    0 10px 35px rgba(30,40,80,.1);
 }
 
-.drawer-action.cyan {
-  color: #67e8f9;
+.location-panel {
+  min-height: 440px;
 }
 
-.drawer-card {
-  padding: 9px;
-  border: 1px solid #334155;
-  border-radius: 9px;
-  background: #1e293b;
-  color: #e2e8f0;
-  font-size: 10px;
+.pixel-scene {
+  min-height: 175px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  font-size: 80px;
 }
 
-.drawer-card small {
+.class-scene {
+  background:
+    linear-gradient(
+      #a8ddff 0 60%,
+      #d8e5f0 60% 100%
+    );
+}
+
+.canteen-scene {
+  background:
+    linear-gradient(
+      #ffd7a1 0 60%,
+      #f3bd7a 60% 100%
+    );
+}
+
+.home-scene {
+  background:
+    linear-gradient(
+      #b8e9ff 0 58%,
+      #a9d69b 58% 100%
+    );
+}
+
+.scene-cloud {
+  position: absolute;
+  left: 12%;
+  top: 20px;
+  font-size: 40px;
+}
+
+.scene-school {
+  font-size: 80px;
+}
+
+.scene-student {
+  position: absolute;
+  bottom: 8px;
+  font-size: 65px;
+}
+
+.scene-food {
+  font-size: 45px;
+}
+
+.scene-bed {
+  position: absolute;
+  right: 18%;
+  bottom: 5px;
+  font-size: 55px;
+}
+
+.location-content {
+  padding: 22px;
+}
+
+.location-content h2 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.location-content > p {
+  color: #6d7284;
+  line-height: 1.6;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.primary-btn,
+.secondary-btn,
+.action-grid button,
+.location-content button {
+  border: 0;
+  border-radius: 13px;
+  padding: 12px 15px;
+  font-weight: 800;
+}
+
+.primary-btn {
+  color: white;
+  background:
+    linear-gradient(
+      135deg,
+      #7167df,
+      #4f9ee9
+    );
+  box-shadow:
+    0 7px 18px rgba(91,90,210,.2);
+}
+
+.secondary-btn {
+  background: #eef0f7;
+  color: #34384c;
+}
+
+.large {
+  padding: 15px 22px;
+  font-size: 16px;
+}
+
+.shop-grid,
+.cert-grid,
+.property-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.shop-card,
+.cert-card,
+.property-card {
+  border: 1px solid #e8eaf0;
+  border-radius: 18px;
+  padding: 15px;
+  text-align: center;
+  background: #fbfcff;
+}
+
+.shop-icon,
+.cert-icon,
+.property-icon {
+  font-size: 42px;
+  margin-bottom: 7px;
+}
+
+.shop-card strong,
+.cert-card strong,
+.property-card strong {
   display: block;
-  color: #94a3b8;
-  margin-top: 4px;
-  font-size: 9px;
 }
 
-.bag-row {
+.shop-card small,
+.cert-card p,
+.property-card p {
+  display: block;
+  color: #73788a;
+  font-size: 12px;
+}
+
+.shop-card button,
+.cert-card button,
+.property-card button {
+  width: 100%;
+  margin-top: 8px;
+  background: #272c47;
+  color: white;
+}
+
+.cert-card.owned,
+.property-card.owned {
+  background: #effcf4;
+  border-color: #8bd5a5;
+}
+
+.job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.job-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 14px;
+  border: 1px solid #e8eaf0;
+  border-radius: 17px;
+  padding: 13px;
 }
 
-.use-button {
-  border: 0;
-  border-radius: 6px;
-  background: #7c3aed;
+.job-icon {
+  font-size: 35px;
+}
+
+.job-main {
+  flex: 1;
+}
+
+.job-main strong {
+  font-size: 16px;
+}
+
+.job-main p {
+  margin: 4px 0;
+  color: #727789;
+  font-size: 12px;
+}
+
+.job-main span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.job-main small {
+  display: block;
+  color: #a05d3d;
+  margin-top: 4px;
+}
+
+.job-card > button {
+  background: #292e4c;
   color: white;
-  padding: 6px 8px;
-  font-size: 9px;
-  font-weight: 900;
+  min-width: 70px;
 }
 
-.use-button:disabled {
-  opacity: .3;
+.npc-strip {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.empty {
-  color: #64748b;
+.npc-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: white;
+  border-radius: 16px;
+  padding: 10px 14px;
+  text-align: left;
+  box-shadow:
+    0 5px 18px rgba(30,40,80,.07);
+}
+
+.npc-avatar {
+  font-size: 34px;
+}
+
+.npc-mini b,
+.npc-mini small {
+  display: block;
+}
+
+.npc-mini small {
+  color: #73788a;
+  margin-top: 3px;
+}
+
+.bottom-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bottom-actions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 5px;
+  background: white;
+  box-shadow:
+    0 5px 18px rgba(30,40,80,.07);
+  font-size: 19px;
+}
+
+.bottom-actions span {
+  display: block;
   font-size: 10px;
+  margin-top: 4px;
+  font-weight: 800;
 }
 
 .controller {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 8px 0;
+  margin-top: 15px;
+  padding: 15px 18px;
+  background: #252a45;
+  color: white;
+  border-radius: 20px;
 }
 
 .dpad {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+}
+
+.dpad button,
+.ab-buttons button {
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  font-weight: 950;
+  font-size: 16px;
 }
 
 .dpad button {
-  width: 30px;
-  height: 30px;
-  border: 2px solid #475569;
-  border-radius: 6px;
-  background: #1e293b;
-  color: #fbbf24;
-  font-weight: 900;
+  background: #3d4364;
+  color: white;
 }
 
-.controller-label {
-  color: #64748b;
-  text-align: center;
-  font-family: monospace;
-  font-size: 8px;
-  letter-spacing: 1px;
+.controller-info {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.controller-info span {
+  font-size: 24px;
 }
 
 .ab-buttons {
   display: flex;
-  gap: 7px;
+  gap: 8px;
 }
 
-.ab-buttons button {
-  width: 32px;
-  height: 32px;
-  border: 2px solid;
-  border-radius: 50%;
+.btn-a {
+  background: #ff7192;
   color: white;
+}
+
+.btn-b {
+  background: #5e9eea;
+  color: white;
+}
+
+.advance-row {
+  margin-top: 10px;
+}
+
+.next-time {
+  width: 100%;
+  border: 0;
+  background: #171b31;
+  color: white;
+  border-radius: 15px;
+  padding: 13px;
+  font-weight: 850;
+}
+
+.next-time span {
+  margin-left: 8px;
+  opacity: .6;
+  font-weight: 500;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(13,17,33,.62);
+  backdrop-filter: blur(5px);
+}
+
+.modal,
+.drawer-panel {
+  width: min(620px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 25px;
+  box-shadow:
+    0 25px 90px rgba(0,0,0,.35);
+}
+
+.modal-wide {
+  width: min(850px, 95vw);
+}
+
+.modal-header,
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.modal-header h2,
+.drawer-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.modal-body {
+  padding: 22px;
+}
+
+.close-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 11px;
+  background: #f0f2f6;
+  font-size: 17px;
+}
+
+.drawer-panel {
+  width: min(560px, 95vw);
+}
+
+.drawer-panel > *:not(.drawer-header) {
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.profile-avatar {
+  font-size: 80px;
+  text-align: center;
+  margin-top: 22px;
+}
+
+.drawer-panel h3 {
+  text-align: center;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, 1fr);
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.mini-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: #f5f6fa;
+  border-radius: 12px;
+}
+
+.profile-section {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f5f6fa;
+}
+
+.profile-section p {
+  margin: 6px 0 0;
+  color: #717687;
+}
+
+.drawer-list {
+  padding-top: 10px;
+  padding-bottom: 20px;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.drawer-item > span {
+  font-size: 31px;
+}
+
+.drawer-item > div {
+  flex: 1;
+}
+
+.drawer-item b,
+.drawer-item small {
+  display: block;
+}
+
+.drawer-item small {
+  margin-top: 3px;
+  color: #74798b;
+}
+
+.drawer-item button {
+  border: 0;
+  background: #292e4c;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+
+.diary-entry {
+  padding: 14px;
+  margin-bottom: 10px;
+  border-radius: 15px;
+  background: #fff9e8;
+}
+
+.diary-entry p {
+  margin: 6px 0 0;
+  line-height: 1.55;
+}
+
+.npc-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 12px;
+}
+
+.npc-card {
+  border: 1px solid #e8eaf0;
+  border-radius: 18px;
+  padding: 15px;
+  text-align: center;
+}
+
+.big-avatar {
+  font-size: 60px;
+}
+
+.npc-card p {
+  color: #717687;
+  font-size: 12px;
+  min-height: 45px;
+}
+
+.npc-card button {
+  width: 100%;
+  margin-top: 7px;
+  border: 0;
+  background: #292e4c;
+  color: white;
+  border-radius: 11px;
+  padding: 10px;
+  font-weight: 800;
+}
+
+.dialogue {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+.dialogue-avatar {
+  font-size: 65px;
+}
+
+.speech {
+  background: #f4f5fa;
+  padding: 14px;
+  border-radius: 17px;
+  flex: 1;
+}
+
+.speech p {
+  line-height: 1.6;
+}
+
+.dialogue-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.dialogue-options button {
+  border: 0;
+  background: #f0f1f6;
+  border-radius: 13px;
+  padding: 12px;
+  text-align: left;
+  font-weight: 750;
+}
+
+.competition-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.competition-card {
+  padding: 15px;
+  border-radius: 16px;
+  text-align: center;
+  background: #f5f6fa;
+}
+
+.competition-card span {
+  display: block;
+  font-size: 11px;
+  color: #777c8d;
+}
+
+.competition-card strong {
+  display: block;
+  font-size: 25px;
+  margin-top: 4px;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns:
+    48px 45px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+  background: #f5f6fa;
+  border-radius: 15px;
+}
+
+.ranking-player {
+  background: #fff6d5;
+  box-shadow:
+    inset 0 0 0 2px #efca56;
+}
+
+.ranking-position {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.ranking-avatar {
+  font-size: 31px;
+  text-align: center;
+}
+
+.ranking-name strong,
+.ranking-name span {
+  display: block;
+}
+
+.ranking-name span {
+  color: #777c8d;
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.ranking-score {
+  font-size: 19px;
+  font-weight: 950;
+}
+
+.ranking-score small {
+  font-size: 10px;
+  opacity: .5;
+}
+
+.competition-rule,
+.history-box {
+  margin-top: 15px;
+  padding: 14px;
+  border-radius: 15px;
+  background: #f6f7fa;
+  line-height: 1.55;
+}
+
+.competition-rule p {
+  margin: 7px 0 0;
+  color: #73788a;
+  font-size: 13px;
+}
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid #e5e7ed;
+  font-size: 12px;
+}
+
+.history-row:last-child {
+  border-bottom: 0;
+}
+
+.title-counter {
+  padding: 12px;
+  background: #fff7d9;
+  border-radius: 13px;
+  margin-bottom: 12px;
+}
+
+.title-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, 1fr);
+  gap: 11px;
+}
+
+.title-item {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 17px;
+  min-height: 100px;
+}
+
+.title-unlocked {
+  background: #fff7d8;
+  border: 1px solid #efd36d;
+}
+
+.title-locked {
+  background: #f2f3f6;
+  opacity: .55;
+}
+
+.title-icon {
+  min-width: 45px;
+  font-size: 34px;
+  text-align: center;
+}
+
+.title-item strong {
+  display: block;
+}
+
+.title-item p {
+  margin: 5px 0;
+  font-size: 11px;
+  color: #74798b;
+  line-height: 1.4;
+}
+
+.title-status {
+  color: #26834d;
   font-size: 10px;
   font-weight: 900;
 }
 
-.a-button {
-  background: #047857;
-  border-color: #059669;
+.title-status.locked {
+  color: #858a98;
 }
 
-.b-button {
-  background: #be123c;
-  border-color: #e11d48;
-}
-
-.modal-backdrop {
-  position: fixed;
-  z-index: 1000;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
-  background: rgba(0,0,0,.78);
-  backdrop-filter: blur(3px);
-}
-
-.dialogue-card,
-.save-card,
-.diary-card,
-.ending-card {
-  width: 100%;
-  max-width: 530px;
-  padding: 18px;
-  border-radius: 17px;
-  background: #0f172a;
-  border: 2px solid #475569;
-  box-shadow: 0 25px 70px rgba(0,0,0,.8);
-}
-
-.dialogue-card {
-  border-color: #f472b6;
-}
-
-.modal-title {
-  padding-bottom: 10px;
-  border-bottom: 1px solid #334155;
-  font-size: 13px;
-  font-weight: 1000;
-}
-
-.modal-title.pink {
-  color: #f9a8d4;
-}
-
-.dialogue-text {
-  margin: 13px 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: #020617;
-  color: #e2e8f0;
+.quiz-subject {
+  display: inline-block;
+  background: #eeeafd;
+  color: #6855c7;
+  border-radius: 99px;
+  padding: 6px 10px;
   font-size: 11px;
-  line-height: 1.8;
-  font-style: italic;
+  font-weight: 850;
 }
 
-.choice {
-  width: 100%;
-  border: 1px solid;
-  border-radius: 10px;
-  padding: 11px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 800;
+.quiz-question {
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 15px 0;
 }
 
-.pink-choice {
-  border-color: #be185d;
-  background: rgba(157,23,77,.2);
-  color: #fbcfe8;
+.quiz-options {
+  display: grid;
+  gap: 9px;
 }
 
-.close-button {
-  width: 100%;
-  margin-top: 7px;
-  padding: 9px;
-  border: 1px solid #475569;
-  border-radius: 8px;
-  background: #1e293b;
-  color: #cbd5e1;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.diary-card {
-  border: 4px solid rgba(120,53,15,.6);
-  background: #fffbeb;
-  color: #451a03;
-}
-
-.diary-heading {
+.quiz-options button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #fcd34d;
-}
-
-.diary-heading > span {
-  font-size: 28px;
-}
-
-.diary-heading h2 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.diary-heading small {
-  color: #92400e;
-  font-size: 9px;
-}
-
-.diary-content {
-  min-height: 130px;
-  max-height: 270px;
-  overflow-y: auto;
-  margin: 12px 0;
+  border: 1px solid #e4e6ed;
+  background: #fafbfe;
   padding: 13px;
-  border: 1px solid #fde68a;
-  border-radius: 10px;
-  background: #fef3c7;
-  color: #451a03;
-  font-family: Georgia, serif;
-  font-size: 12px;
-  line-height: 1.8;
-  font-style: italic;
-}
-
-.diary-actions {
-  padding-top: 9px;
-  border-top: 1px solid #fde68a;
-}
-
-.primary-button {
-  width: 100%;
-  padding: 10px;
-  border: 0;
-  border-radius: 9px;
-  background: #92400e;
-  color: #fef3c7;
-  font-size: 10px;
-  font-weight: 1000;
-}
-
-.ending-card {
-  max-width: 600px;
-  border: 4px solid #facc15;
-  text-align: center;
-}
-
-.graduation {
-  font-size: 55px;
-  margin-bottom: 5px;
-}
-
-.pixel-small {
-  color: #fbbf24;
-  font-family: monospace;
-  font-size: 9px;
-  letter-spacing: 1px;
-}
-
-.ending-card h1 {
-  margin: 12px 0 5px;
-  color: #fff;
-  font-size: 19px;
-}
-
-.ending-card h3 {
-  margin: 0 0 12px;
-  color: #fde047;
-  font-size: 11px;
-}
-
-.ending-card p {
-  margin: 0 0 13px;
-  padding: 12px;
-  border-radius: 9px;
-  background: #020617;
-  color: #cbd5e1;
-  font-size: 10px;
-  line-height: 1.7;
+  border-radius: 13px;
   text-align: left;
 }
 
-.ending-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding: 8px;
-  border-radius: 10px;
-  background: #1e293b;
+.quiz-options button:hover {
+  background: #f0f1fa;
+  border-color: #9c93e9;
 }
 
-.ending-grid div {
-  padding: 7px;
-  color: #94a3b8;
-  font-family: monospace;
-  font-size: 8px;
-}
-
-.ending-grid b {
-  display: block;
-  margin-top: 4px;
-  color: #f8fafc;
-  font-size: 11px;
-}
-
-.restart-button {
-  width: 100%;
-  margin-top: 12px;
-  padding: 11px;
-  border: 0;
-  border-radius: 10px;
-  background: linear-gradient(
-    90deg,
-    #f59e0b,
-    #facc15
-  );
-  color: #111827;
-  font-size: 11px;
-  font-weight: 1000;
-}
-
-.save-card h2 {
-  margin-top: 0;
-  color: #fbbf24;
-  font-size: 15px;
-}
-
-.save-card p {
-  color: #94a3b8;
-  font-size: 10px;
-  line-height: 1.6;
-}
-
-.save-card textarea {
-  width: 100%;
-  min-height: 150px;
-  resize: vertical;
-  padding: 10px;
-  border: 1px solid #475569;
-  border-radius: 9px;
-  outline: none;
-  background: #020617;
-  color: #67e8f9;
-  font-family: monospace;
-  font-size: 9px;
-}
-
-.save-card textarea:focus {
-  border-color: #22d3ee;
-}
-
-.save-actions {
+.quiz-options button span {
+  width: 28px;
+  height: 28px;
   display: flex;
-  gap: 7px;
-  margin-top: 8px;
+  align-items: center;
+  justify-content: center;
+  background: #e8e9f3;
+  border-radius: 8px;
+  font-weight: 900;
 }
 
-.save-actions .primary-button,
-.save-actions .close-button {
-  margin: 0;
+.quiz-progress {
+  height: 6px;
+  margin-top: 18px;
+  border-radius: 99px;
+  background: #eceef3;
+  overflow: hidden;
 }
 
-.link-button {
+.quiz-progress div {
+  height: 100%;
+  background: #7167df;
+}
+
+.save-textarea {
   width: 100%;
-  margin-top: 8px;
-  border: 0;
-  background: transparent;
-  color: #38bdf8;
-  font-size: 9px;
+  min-height: 140px;
+  resize: vertical;
+  border: 1px solid #dfe2e9;
+  border-radius: 13px;
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 8px 0 12px;
+  outline: none;
 }
 
-@media (max-width: 720px) {
-  .game-page {
-    padding: 5px;
+.save-textarea:focus {
+  border-color: #7568df;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.file-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.file-actions button,
+.settings-list button {
+  border: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f0f1f6;
+  font-weight: 750;
+}
+
+.settings-list {
+  display: grid;
+  gap: 9px;
+}
+
+.empty {
+  text-align: center;
+  padding: 50px 20px;
+  color: #777c8d;
+}
+
+.empty div {
+  font-size: 50px;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 25px;
+  transform: translateX(-50%);
+  z-index: 2000;
+  background: #22263f;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 99px;
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.25);
+  font-size: 13px;
+  font-weight: 750;
+  max-width: min(90vw, 600px);
+  text-align: center;
+}
+
+.ending-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(36,30,76,.94),
+      rgba(52,74,120,.94)
+    );
+  overflow-y: auto;
+}
+
+.ending-card {
+  width: min(800px, 95vw);
+  background: white;
+  border-radius: 30px;
+  padding: 35px;
+  text-align: center;
+  box-shadow:
+    0 30px 100px rgba(0,0,0,.4);
+}
+
+.ending-icon {
+  font-size: 70px;
+}
+
+.ending-kicker {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #7465d9;
+}
+
+.ending-card h1 {
+  font-size: 38px;
+  margin: 8px 0;
+}
+
+.ending-card > p {
+  color: #727789;
+}
+
+.ending-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(3, 1fr);
+  gap: 9px;
+  margin: 22px 0;
+}
+
+.ending-stats div {
+  background: #f5f6fa;
+  border-radius: 14px;
+  padding: 13px;
+}
+
+.ending-stats b,
+.ending-stats span {
+  display: block;
+}
+
+.ending-stats b {
+  font-size: 23px;
+}
+
+.ending-stats span {
+  margin-top: 3px;
+  color: #777c8d;
+  font-size: 10px;
+}
+
+.ending-message {
+  background: #fff7d7;
+  padding: 15px;
+  border-radius: 15px;
+  font-weight: 800;
+}
+
+.ending-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, 1fr);
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.ending-actions button {
+  border: 0;
+  border-radius: 13px;
+  padding: 12px;
+  background: #292e4c;
+  color: white;
+  font-weight: 800;
+}
+
+.ending-actions .danger-btn {
+  background: #d95367;
+}
+
+@media (max-width: 850px) {
+  .stats {
+    grid-template-columns:
+      repeat(3, 1fr);
   }
 
-  .console {
-    border-radius: 18px;
-    padding: 7px;
+  .shop-grid,
+  .cert-grid,
+  .property-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .screen {
-    padding: 8px;
-    min-height: 700px;
+  .npc-grid {
+    grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 650px) {
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    padding: 12px;
   }
 
-  .top-actions {
-    width: 100%;
-    justify-content: flex-start;
+  .brand {
+    font-size: 17px;
+  }
+
+  .subtitle {
+    font-size: 8px;
+  }
+
+  .game-shell {
+    width: calc(100% - 12px);
+    margin-top: 9px;
+  }
+
+  .hud {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
   .stats {
-    justify-content: flex-start;
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .stat {
-    font-size: 9px;
-  }
-
-  .stage {
-    min-height: 490px;
-  }
-
-  .quiz-options {
+  .action-grid {
     grid-template-columns: 1fr;
   }
 
-  .controller-label {
+  .npc-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom-actions {
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
+
+  .controller {
+    padding: 12px;
+  }
+
+  .controller-info b {
     display: none;
   }
 
-  .ending-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .shop-grid,
+  .cert-grid,
+  .property-grid {
+    grid-template-columns: 1fr;
   }
 
-  .action-bar button span {
-    display: none;
+  .competition-summary {
+    grid-template-columns: 1fr;
   }
 
-  .location-btn {
-    flex: 1 1 30%;
-  }
-}
-
-@media (max-width: 450px) {
-  .stats {
-    gap: 3px;
+  .title-grid {
+    grid-template-columns: 1fr;
   }
 
-  .stat {
-    padding: 4px 5px;
+  .ending-card {
+    padding: 23px 15px;
   }
 
-  .npc-row {
-    gap: 8px;
+  .ending-card h1 {
+    font-size: 28px;
   }
 
-  .npc > span {
-    font-size: 36px;
+  .ending-stats {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .npc small {
-    font-size: 8px;
+  .ending-actions {
+    grid-template-columns: 1fr;
   }
 
-  .class-label {
-    font-size: 9px;
+  .file-actions {
+    grid-template-columns: 1fr;
   }
 
-  .location-btn {
-    font-size: 8px;
+  .ranking-row {
+    grid-template-columns:
+      35px 38px 1fr auto;
   }
 
-  .shop-info b {
-    font-size: 9px;
+  .ranking-avatar {
+    font-size: 25px;
   }
 
-  .shop-info small,
-  .shop-info strong {
-    font-size: 8px;
+  .ranking-score {
+    font-size: 15px;
   }
 }
 `;
+
+export default App;
