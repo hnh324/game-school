@@ -59,6 +59,7 @@ export default function App() {
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-x-hidden relative">
 
+  <!-- CANVAS PHÁO HOA ĂN MỪNG -->
   <canvas id="fireworksCanvas" class="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
 
   <div class="retro-console-frame border-4 rounded-[36px] p-3 sm:p-5 w-full max-w-4xl flex flex-col relative z-10">
@@ -104,22 +105,22 @@ export default function App() {
         </div>
 
         <div class="flex items-center gap-2 flex-wrap font-mono text-[11px]">
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Sức Khỏe">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Sức Khỏe">
             <span>❤️</span><span id="statHp" class="text-rose-400 font-bold">85</span>
           </div>
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Năng Lượng">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Năng Lượng">
             <span>⚡</span><span id="statEnergy" class="text-amber-400 font-bold">100</span>
           </div>
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tâm Trạng">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Tâm Trạng">
             <span>😊</span><span id="statMood" class="text-yellow-400 font-bold">75</span>
           </div>
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Điểm Học Tập">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Điểm Học Tập">
             <span>📚</span><span id="statStudy" class="text-sky-400 font-bold">50</span>
           </div>
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tình Cảm Triệu Mẫn">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Tình Cảm Triệu Mẫn">
             <span>💕</span><span id="statLove" class="text-pink-400 font-bold">20%</span>
           </div>
-          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tiền Tiết Kiệm">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2 py-1 rounded-lg border border-slate-800" title="Tiền Tiết Kiệm">
             <span>💰</span><span id="statMoney" class="text-emerald-400 font-bold">30.000đ</span>
           </div>
         </div>
@@ -517,6 +518,166 @@ export default function App() {
   </div>
 
   <script>
+    function triggerSkipSchoolAction() {
+      if (isSellingAllowed()) return;
+      if (STATE.stats.energy < 15) {
+        showStatAlert('Quá mệt mỏi, không đủ sức leo tường!', 'text-rose-400');
+        return;
+      }
+
+      const activities = [
+        { name: 'Quán Net Cyber đầu hẻm', mood: +25, energy: -15, desc: 'Làm vài ván game leo rank cùng tụi bạn cực đã!' },
+        { name: 'Lượn phố ăn kem hồ con rùa', mood: +20, energy: -10, desc: 'Gió mát rượi thổi tan mọi áp lực bài vở cấp 3.' },
+        { name: 'Quán bi-a cùng Tuấn bóng rổ', mood: +20, energy: -15, desc: 'Làm vài đường cơ xuất thần khiến lũ bạn trầm trồ.' }
+      ];
+
+      const act = activities[Math.floor(Math.random() * activities.length)];
+      const caught = Math.random() < 0.35;
+
+      if (caught) {
+        audio.playWrong();
+        modifyStats({ mood: -20, study: -6, rep: -10, energy: -15 });
+        alert(\`🚨 BỊ BẮT QUẢ TANG!\\nThầy giám thị Nam phục kích ngay chân tường rào. Bạn bị bắt lên phòng giám thị ghi sổ đầu bài và trừ điểm hạnh kiểm!\`);
+        STATE.todayEvents.push(\`Trèo tường trốn học đi \${act.name} và bị thầy giám thị tóm sống, phải chép phạt mỏi tay.\`);
+      } else {
+        audio.playSuccess();
+        modifyStats({ mood: act.mood, energy: act.energy, study: -3 });
+        showStatAlert(\`🎉 Trốn học thành công tới \${act.name}! (+\${act.mood} 😊)\`, 'text-emerald-400');
+        STATE.todayEvents.push(\`Liều mình trốn học ra \${act.name}. \${act.desc}\`);
+      }
+
+      advanceTime();
+    }
+
+    function openGiftShopModal() {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const card = document.getElementById('giftShopCard');
+      card.classList.remove('hidden');
+
+      const container = document.getElementById('giftShopItemsList');
+      container.innerHTML = '';
+
+      const hol = HOLIDAYS[STATE.day];
+
+      SPECIAL_GIFTS.forEach(g => {
+        const row = document.createElement('div');
+        row.className = 'bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs hover:border-pink-500/50 transition';
+        row.innerHTML = \`
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">\${g.icon}</span>
+            <div>
+              <div class="font-bold text-slate-200">\${g.name}</div>
+              <div class="text-[10px] text-slate-400">\${g.desc}</div>
+              <div class="text-[10px] text-pink-400 font-mono mt-0.5">Giá: \${g.cost.toLocaleString('vi-VN')}đ • Hiệu quả: +\${g.loveGain}% 💕</div>
+            </div>
+          </div>
+          <button onclick="buyAndGiveGift('\${g.id}')" class="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-lg text-[11px] shrink-0">
+            Tặng Mẫn
+          </button>
+        \`;
+        container.appendChild(row);
+      });
+    }
+
+    function buyAndGiveGift(giftId) {
+      const g = SPECIAL_GIFTS.find(x => x.id === giftId);
+      if (!g) return;
+
+      if (STATE.stats.money < g.cost) {
+        showStatAlert('💸 Tiền tiết kiệm không đủ để mua món quà này!', 'text-rose-400');
+        audio.playWrong();
+        return;
+      }
+
+      const hol = HOLIDAYS[STATE.day];
+      const multiplier = hol ? hol.bonus : 1.0;
+      const finalLove = Math.round(g.loveGain * multiplier);
+
+      modifyStats({
+        money: -g.cost,
+        love: +finalLove,
+        mood: +15
+      });
+
+      audio.playCash();
+      triggerFireworks();
+
+      if (hol) {
+        alert(\`🌸 ĐÚNG DỊP LỄ \${hol.name.toUpperCase()}!\\nTriệu Mẫn đỏ ửng mặt đón nhận \${g.name} từ bạn. Nụ cười rạng rỡ của Mẫn khiến tim bạn đập loạn nhịp! (+\${finalLove}% Tình Cảm 💕)\`);
+        STATE.todayEvents.push(\`Nhân dịp \${hol.name}, tặng Triệu Mẫn \${g.name}. Mẫn xúc động ôm chặt món quà vào lòng.\`);
+      } else {
+        alert(\`💕 Triệu Mẫn bất ngờ và mỉm cười bẽn lẽn nhận lấy \${g.name}: "Cảm ơn \${STATE.playerName} nhiều nhé, Mẫn sẽ luôn giữ gìn thật cẩn thận!" (+\${finalLove}% Tình Cảm)\`);
+        STATE.todayEvents.push(\`Tặng Triệu Mẫn \${g.name}. Mẫn ngắm nghía mãi không rời mắt.\`);
+      }
+
+      closeOverlayCard();
+      checkAchievements();
+    }
+
+    function openCertModal() {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const card = document.getElementById('certModalCard');
+      card.classList.remove('hidden');
+
+      const container = document.getElementById('certListContainer');
+      container.innerHTML = '';
+
+      CERTIFICATES_DEF.forEach(cert => {
+        const earned = STATE.certsEarned && STATE.certsEarned.includes(cert.id);
+        const row = document.createElement('div');
+        row.className = \`bg-slate-950 p-2.5 rounded-xl border \${earned ? 'border-emerald-500/80 bg-emerald-950/20' : 'border-slate-800'} flex items-center justify-between text-xs\`;
+        row.innerHTML = \`
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">\${cert.icon}</span>
+            <div>
+              <div class="font-bold \${earned ? 'text-emerald-300' : 'text-slate-200'}">\${cert.name}</div>
+              <div class="text-[10px] text-slate-400">\${cert.desc}</div>
+              <div class="text-[10px] text-blue-400 font-mono mt-0.5">Lệ phí thi: \${cert.cost.toLocaleString('vi-VN')}đ • Yêu cầu: \${cert.reqStudy} 📚</div>
+            </div>
+          </div>
+          <button \${earned ? 'disabled' : ''} onclick="takeCertExam('\${cert.id}')" class="px-3 py-1.5 \${earned ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'} font-bold rounded-lg text-[11px] shrink-0">
+            \${earned ? 'ĐÃ ĐẠT' : 'Đăng Ký Thi'}
+          </button>
+        \`;
+        container.appendChild(row);
+      });
+    }
+
+    function takeCertExam(certId) {
+      const cert = CERTIFICATES_DEF.find(c => c.id === certId);
+      if (!cert) return;
+
+      if (STATE.stats.money < cert.cost) {
+        showStatAlert('💸 Không đủ lệ phí dự thi chứng chỉ!', 'text-rose-400');
+        audio.playWrong();
+        return;
+      }
+
+      if (STATE.stats.study < cert.reqStudy) {
+        alert(\`⚠️️ Kiến thức chưa vững!\\nBạn cần ít nhất \${cert.reqStudy} điểm Học Tập để vượt qua kỳ thi \${cert.name}. Hãy lên thư viện cày đề thêm nhé!\`);
+        return;
+      }
+
+      modifyStats({
+        money: -cert.cost,
+        rep: +15,
+        energy: -20
+      });
+
+      if (!STATE.certsEarned) STATE.certsEarned = [];
+      STATE.certsEarned.push(cert.id);
+
+      audio.playSuccess();
+      triggerFireworks();
+      alert(\`🎉 XUẤT SẮC VƯỢT QUA KỲ THI!\\nBạn chính thức nhận được \${cert.name}! Hồ sơ học thuật của bạn sáng rực rỡ, thầy cô và Triệu Mẫn đều ngợi khen!\`);
+      STATE.todayEvents.push(\`Thi đỗ xuất sắc \${cert.name}, khẳng định năng lực vượt trội.\`);
+
+      closeOverlayCard();
+      checkAchievements();
+    }
+
     function checkHoliday() {
       const hol = HOLIDAYS[STATE.day];
       const badge = document.getElementById('uiHolidayBadge');
