@@ -19,7 +19,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v17";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v18";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -1886,23 +1886,6 @@ export default function App(){
   ]);
 
   /* -----------------------------------------
-     TỰ ĐỘNG MỞ KỲ THI TẠI ĐÚNG MỐC
-  ----------------------------------------- */
-
-  useEffect(()=>{
-    if(!currentExam || game.isGameOver) return;
-
-    const examKey = `${currentExam.day}-${currentExam.timeIndex}`;
-
-    if(examAutoOpenedRef.current === examKey) return;
-    if(game.examResults?.[currentExam.id]) return;
-    if(examDismissedRef.current === examKey) return;
-
-    examAutoOpenedRef.current = examKey;
-    startQuiz("exam",null,currentExam);
-  },[currentExam,game.isGameOver,game.examResults,startQuiz]);
-
-  /* -----------------------------------------
      DAY CHANGE TOAST
   ----------------------------------------- */
 
@@ -2014,6 +1997,24 @@ export default function App(){
     setQuizFeedback(null);
     setOverlay(mode==="exam" ? "exam" : mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
   },[canDoMainActivity,game.dailyOralCheckDone,game.examResults,updateGame]);
+
+  /* -----------------------------------------
+     TỰ ĐỘNG MỞ KỲ THI TẠI ĐÚNG MỐC
+     (đặt sau startQuiz để tránh lỗi TDZ / trắng màn hình)
+  ----------------------------------------- */
+
+  useEffect(()=>{
+    if(!currentExam || game.isGameOver) return;
+
+    const examKey = `${currentExam.day}-${currentExam.timeIndex}`;
+
+    if(examAutoOpenedRef.current === examKey) return;
+    if(game.examResults?.[currentExam.id]) return;
+    if(examDismissedRef.current === examKey) return;
+
+    examAutoOpenedRef.current = examKey;
+    startQuiz("exam",null,currentExam);
+  },[currentExam,game.isGameOver,game.examResults,startQuiz]);
 
   const answerQuiz = useCallback((choiceIndex)=>{
     if(!quiz || quizFeedback) return;
