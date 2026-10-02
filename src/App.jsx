@@ -6,12 +6,11 @@ export default function App() {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Thanh Xuân Rực Rỡ 7.2</title>
+  <title>Thanh Xuân Rực Rỡ 7.4 - Thời Gian Tự Động Trôi</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     body { background-color: #030712; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 12px; overflow-x: hidden; }
 
-    /* KHUNG MÁY CHƠI GAME NINTENDO / CYBERPUNK */
     .console-shell {
       width: 100%;
       max-width: 860px;
@@ -23,14 +22,13 @@ export default function App() {
       position: relative;
     }
 
-    /* MÀN HÌNH CHÍNH CRT */
     .screen-bezel {
       background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
       border: 3px solid #1e293b;
       border-radius: 20px;
       padding: 14px;
       display: flex;
-      flex-col: column;
+      flex-direction: column;
       gap: 12px;
       box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
       position: relative;
@@ -64,7 +62,6 @@ export default function App() {
     .pixel-btn:hover { filter: brightness(1.2); }
     .pixel-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #0f172a; }
 
-    /* MÀU NÚT CHỨC NĂNG */
     .btn-pink { background: #9d174d; border-color: #db2777; color: #fdf2f8; }
     .btn-blue { background: #1e40af; border-color: #3b82f6; color: #eff6ff; }
     .btn-green { background: #065f46; border-color: #10b981; color: #ecfdf5; }
@@ -72,11 +69,9 @@ export default function App() {
     .btn-purple { background: #6b21a8; border-color: #a855f7; color: #faf5ff; }
     .btn-red { background: #991b1b; border-color: #ef4444; color: #fef2f2; }
 
-    /* BỐ CỤC */
     .flex-row-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .flex-wrap { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
-    /* CHỈ SỐ NHANH */
     .stat-chip {
       background: #090d16;
       border: 1px solid #1e293b;
@@ -90,7 +85,6 @@ export default function App() {
       gap: 4px;
     }
 
-    /* KHUNG NỘI DUNG SÂN TRƯỜNG */
     .stage-area {
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.4) 0%, rgba(2, 6, 23, 0.9) 100%);
       border: 2px solid #1e293b;
@@ -103,7 +97,6 @@ export default function App() {
       position: relative;
     }
 
-    /* CÁC THẺ MODAL ĐÈ LÊN MÀN HÌNH */
     .modal-card {
       position: absolute;
       inset: 12px;
@@ -120,12 +113,7 @@ export default function App() {
     }
     .hidden { display: none !important; }
 
-    /* AVATAR BẠN BÈ */
-    .avatar-card {
-      text-align: center;
-      cursor: pointer;
-      transition: transform 0.15s;
-    }
+    .avatar-card { text-align: center; cursor: pointer; transition: transform 0.15s; }
     .avatar-card:hover { transform: scale(1.08); }
     .avatar-icon { font-size: 44px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); }
     .avatar-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: #1e293b; border: 1px solid #334155; margin-top: 4px; display: inline-block; }
@@ -149,16 +137,15 @@ export default function App() {
 </head>
 <body>
 
-  <!-- CANVAS PHÁO HOA ĂN MỪNG -->
   <canvas id="fireworksCanvas" style="position:fixed;inset:0;pointer-events:none;z-index:50;width:100%;height:100%;"></canvas>
 
   <div class="console-shell">
     
-    <!-- TOP TOOLBAR NÚT CHỨC NĂNG -->
+    <!-- TOP TOOLBAR -->
     <div class="flex-row-between" style="border-bottom: 2px solid #1e293b; padding-bottom: 8px; margin-bottom: 10px;">
       <div style="font-size: 10px; font-weight: 900; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
         <span style="width: 8px; height: 8px; background: #34d399; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #34d399;"></span>
-        JRPG SCHOOL TYCOON 7.2
+        JRPG SCHOOL TYCOON 7.4
       </div>
       <div class="flex-wrap">
         <button onclick="openGiftShopModal()" class="pixel-btn btn-pink">🎁 TẶNG QUÀ</button>
@@ -171,25 +158,31 @@ export default function App() {
       </div>
     </div>
 
-    <!-- MÀN HÌNH CHÍNH -->
+    <!-- MAIN SCREEN -->
     <div class="screen-bezel">
 
-      <!-- TOP HUD CHỈ SỐ -->
+      <!-- TOP HUD -->
       <header class="pixel-box flex-row-between" style="flex-wrap: wrap;">
         <div>
           <div style="font-weight: 900; color: #fde047; font-size: 13px; display: flex; align-items: center; gap: 6px;">
             <span id="uiPlayerNameText" style="color: #38bdf8;">HỌC SINH</span> •
             <span id="uiDayOfWeek">THỨ HAI</span> •
-            <span id="uiTimeText" style="color: #34d399; font-family: monospace;">07:30</span>
+            <span id="uiTimeText" style="color: #34d399; font-family: monospace; font-size: 15px; font-weight: 900; background: #020617; padding: 2px 6px; border-radius: 6px; border: 1px solid #1e293b;">07:00</span>
             <span style="background: #1e293b; color: #93c5fd; padding: 2px 6px; border-radius: 6px; font-size: 10px;">NGÀY <b id="uiDayCount">1</b>/45</span>
           </div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px; display: flex; align-items: center; gap: 6px;">
-            <span id="uiCurrentPeriodText">Buổi sáng • Tiết 1-2</span>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+            <span id="uiCurrentPeriodText">Đầu giờ sáng • Chuẩn bị vào lớp</span>
             <span id="uiHolidayBadge" class="hidden" style="background: #9d174d; color: #fbcfe8; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: bold;">🌸 DỊP LỄ</span>
           </div>
         </div>
 
         <div class="flex-wrap">
+          <!-- ĐIỀU TỐC THỜI GIAN -->
+          <div style="display:flex; gap:4px; align-items:center; background:#020617; padding:2px 6px; border-radius:8px; border:1px solid #1e293b; margin-right:4px;">
+            <button onclick="setTimeSpeed(0)" id="btnSpeed0" class="pixel-btn" style="padding:2px 6px; font-size:9px;">⏸️</button>
+            <button onclick="setTimeSpeed(1)" id="btnSpeed1" class="pixel-btn btn-blue" style="padding:2px 6px; font-size:9px;">▶️ 1x</button>
+            <button onclick="setTimeSpeed(2)" id="btnSpeed2" class="pixel-btn" style="padding:2px 6px; font-size:9px;">⏩ 2x</button>
+          </div>
           <div class="stat-chip" title="Sức Khỏe"><span>❤️</span><span id="statHp" style="color:#fb7185;">85</span></div>
           <div class="stat-chip" title="Năng Lượng"><span>⚡</span><span id="statEnergy" style="color:#fde047;">100</span></div>
           <div class="stat-chip" title="Tâm Trạng"><span>😊</span><span id="statMood" style="color:#facc15;">75</span></div>
@@ -199,11 +192,10 @@ export default function App() {
         </div>
       </header>
 
-      <!-- SÂN TRƯỜNG & KHU TƯƠNG TÁC -->
+      <!-- STAGE AREA -->
       <section class="stage-area">
         <div id="statAlertBox">+5 📚 Học tập</div>
 
-        <!-- TIÊU ĐỀ KHU VỰC VÀ TRẠNG THÁI BÁN HÀNG -->
         <div class="flex-row-between">
           <div style="background: rgba(2,6,23,0.8); border: 1px solid #334155; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; color: #fde047;">
             <span id="locIcon">🏫</span> <span id="locTitle">LỚP 12A3 - KHỐI CHUYÊN</span>
@@ -218,32 +210,32 @@ export default function App() {
           </div>
         </div>
 
-        <!-- NHÂN VẬT & MÔ TẢ -->
+        <!-- AVATARS -->
         <div id="sceneryAvatarGroup" style="text-align: center; margin: 16px 0;">
           <div style="display: flex; justify-content: center; gap: 36px; margin-bottom: 12px;">
-            <div class="avatar-card floating-sprite" onclick="interactNPC('lan')">
+            <div class="avatar-card" onclick="interactNPC('lan')">
               <div class="avatar-icon">👧</div>
               <div class="avatar-tag" style="color:#7dd3fc;">Lan (Bạn Thân)</div>
             </div>
-            <div class="avatar-card floating-sprite" style="animation-delay: 0.5s;" onclick="interactNPC('mẫn')">
+            <div class="avatar-card" onclick="interactNPC('mẫn')">
               <div class="avatar-icon">👸</div>
               <div class="avatar-tag" style="color:#f472b6; border-color:#be185d;">Triệu Mẫn (Lớp Phó) 💕</div>
             </div>
-            <div class="avatar-card floating-sprite" style="animation-delay: 1s;" onclick="interactNPC('tuan')">
+            <div class="avatar-card" onclick="interactNPC('tuan')">
               <div class="avatar-icon">🏀</div>
               <div class="avatar-tag" style="color:#fde047;">Tuấn (Bóng Rổ)</div>
             </div>
           </div>
 
           <div style="background: linear-gradient(90deg, #2563eb, #7c3aed); color: white; font-weight: 900; font-size: 12px; padding: 6px 14px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.4);">
-            SÁNG + RA CHƠI + SAU 17H: BÁN THEO ORDER • CÒN LẠI VỀ HỌC
+            THỜI GIAN ĐANG TỰ ĐỘNG CHẠY • ĐẾN GIỜ QUẦY SẼ TỰ ĐÓNG/MỞ!
           </div>
           <p id="sceneNarrative" style="font-size: 11px; color: #cbd5e1; font-style: italic; max-width: 500px; margin: 8px auto 0; line-height: 1.5;">
-            "Khách đặt đơn và chấm sao tip tiền! Vừa gom vốn vừa thi chứng chỉ quốc tế và chinh phục trái tim Triệu Mẫn!"
+            "Đồng hồ đang tự động trôi từng phút! Sáng, ra chơi và tan trường khách tự tới mua đồ. Giờ học hãy tranh thủ cày đề ôn thi!"
           </p>
         </div>
 
-        <!-- ĐIỀU HƯỚNG 5 ĐỊA ĐIỂM -->
+        <!-- NAVIGATION -->
         <nav class="flex-row-between" style="border-top: 1px solid #1e293b; padding-top: 8px;">
           <button onclick="gotoLocation('class')" class="pixel-btn" style="flex:1;">🏫 Lớp Học</button>
           <button onclick="gotoLocation('canteen')" class="pixel-btn" style="flex:1;">🍜 Căn Tin</button>
@@ -252,12 +244,15 @@ export default function App() {
           <button onclick="gotoLocation('home')" class="pixel-btn" style="flex:1;">🏠 Về Nhà</button>
         </nav>
 
-        <!-- ==================== CÁC MODAL OVERLAY ==================== -->
+        <!-- ==================== CÁC MODAL ==================== -->
 
-        <!-- 1. QUẦY ORDER HỌC ĐƯỜNG -->
+        <!-- 1. QUẦY ORDER (TỰ ĐỘNG KHÁCH TỚI) -->
         <div id="shopOrderCard" class="modal-card hidden" style="border-color:#10b981;">
           <div class="flex-row-between" style="border-bottom: 1px solid #334155; padding-bottom: 6px;">
-            <div style="font-weight: 900; color: #34d399; font-size: 13px;">🛎️ QUẦY ORDER & ĐÁNH GIÁ 5 SAO</div>
+            <div>
+              <div style="font-weight: 900; color: #34d399; font-size: 13px;">🛎️ QUẦY ORDER HỌC ĐƯỜNG</div>
+              <div style="font-size: 9px; color: #cbd5e1;">Khách tự động kéo tới đặt đơn, chuẩn bị hàng để giao nhé!</div>
+            </div>
             <button onclick="closeOverlayCard()" class="pixel-btn">✕ Đóng</button>
           </div>
           <div style="background:#020617; padding:8px; border-radius:8px; display:flex; justify-content:space-around; font-size:10px; font-family:monospace;">
@@ -268,15 +263,15 @@ export default function App() {
           </div>
           <div id="orderListContainer" style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto;"></div>
           <div class="flex-row-between" style="border-top:1px solid #334155; padding-top:8px;">
-            <button onclick="openWholesaleTab()" class="pixel-btn btn-blue">🚚 Chợ Sỉ Nhập Hàng</button>
-            <button onclick="spawnCustomerOrder()" class="pixel-btn btn-green">📢 Gọi Khách Mới (-8 ⚡)</button>
+            <button onclick="openWholesaleTab()" class="pixel-btn btn-blue" style="flex:1;">🚚 Chợ Sỉ Nhập Hàng</button>
+            <div style="font-size:10px; color:#fde047; font-family:monospace; margin-left:8px;" id="orderAutoStatusText">⏳ Khách đang đến theo thời gian...</div>
           </div>
         </div>
 
         <!-- 2. CHỢ SỈ NHẬP HÀNG -->
         <div id="wholesaleCard" class="modal-card hidden" style="border-color:#3b82f6;">
           <div class="flex-row-between" style="border-bottom: 1px solid #334155; padding-bottom: 6px;">
-            <div style="font-weight: 900; color: #60a5fa; font-size: 13px;">🚚 CHỢ SỈ ĐẦU MỐI (NHẬP HÀNG)</div>
+            <div style="font-weight: 900; color: #60a5fa; font-size: 13px;">🚚 CHỢ SỈ ĐẦU MỐI (NHẬP HÀNG TRẢ ORDER)</div>
             <button onclick="openShopOrderCard()" class="pixel-btn">← Quay lại Order</button>
           </div>
           <div id="wholesaleListContainer" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto;"></div>
@@ -340,18 +335,14 @@ export default function App() {
           </div>
           <div style="font-size: 11px; line-height: 1.6; display: flex; flex-direction: column; gap: 8px;">
             <div style="background:#020617; padding:8px; border-radius:8px; border:1px solid #1e293b;">
-              <b style="color:#fde047;">1. Quy Tắc Thời Gian Bất Di Bất Dịch:</b><br/>
-              • Sáng (07:30), Ra Chơi (09:15) & Sau 17:00: Nhận đơn Order kiếm tiền vốn.<br/>
-              • Giờ học chính khóa: Quầy đóng cửa! Phải tự học hoặc bấm <b>"Trốn học đi chơi"</b> (coi chừng bị bắt!).
+              <b style="color:#fde047;">1. Thời Gian Tự Động Trôi:</b><br/>
+              • Giờ học sẽ liên tục trôi theo thời gian thực (có thể bấm ⏸️ tạm dừng hoặc ⏩ tua nhanh trên góc).<br/>
+              • Đến các mốc giờ ra chơi, tan trường quầy sẽ tự động mở và khách tự tới mua đồ!
             </div>
             <div style="background:#020617; padding:8px; border-radius:8px; border:1px solid #1e293b;">
-              <b style="color:#34d399;">2. Nhận Order & Tip Tiền:</b><br/>
-              • Giao đúng đơn nhận 5⭐ và tiền tip. Hết hàng thì vào "Chợ Sỉ" nhập về giao.
-            </div>
-            <div style="background:#020617; padding:8px; border-radius:8px; border:1px solid #1e293b;">
-              <b style="color:#f472b6;">3. Thi Cử & Triệu Mẫn:</b><br/>
-              • Ngày 22 thi Giữa kỳ, Ngày 45 thi Tốt nghiệp.<br/>
-              • Tặng quà vào các dịp lễ (20/10, Valentine, Noel) để nhận x2 tình cảm 💕!
+              <b style="color:#34d399;">2. Nhận Order & Trốn Học:</b><br/>
+              • Giao đúng đơn nhận 5⭐ và tiền tip. Hết hàng thì vào "Chợ Sỉ" nhập về giao.<br/>
+              • Trong giờ học có thể chọn học bài hoặc bấm "Trốn học đi chơi" xả stress!
             </div>
           </div>
           <button onclick="closeOverlayCard()" class="pixel-btn btn-yellow" style="padding:8px;">ĐÃ HIỂU, VÀO GAME NGAY! 🌸</button>
@@ -443,7 +434,7 @@ export default function App() {
       <!-- BOTTOM CONTROL BAR -->
       <footer class="pixel-box flex-row-between">
         <button id="btnFooterSell" onclick="openShopOrderCard()" class="pixel-btn btn-green" style="flex:1; padding:8px;">
-          🛎️ Nhận Order
+          🛎️ Quầy Order
         </button>
         <button onclick="startClassroomLesson()" class="pixel-btn" style="flex:1; padding:8px;">
           📖 Học Tập
@@ -464,119 +455,171 @@ export default function App() {
 
   <script>
     /* =============================================================
-       1. HIỆU ỨNG PHÁO HOA ĂN MỪNG
+       1. TRẠNG THÁI GAME & ĐỒNG HỒ TỰ ĐỘNG
        ============================================================= */
-    class FireworkParticle {
-      constructor(x, y, color) {
-        this.x = x; this.y = y; this.color = color;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6 + 2;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        this.alpha = 1;
-        this.decay = Math.random() * 0.02 + 0.015;
-      }
-      update() {
-        this.x += this.vx; this.y += this.vy; this.vy += 0.08;
-        this.alpha -= this.decay;
-      }
-      draw(ctx) {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+    const STATE = {
+      playerName: 'Bạn',
+      day: 1,
+      totalDays: 45,
+      // Thời gian tính theo phút trong ngày (từ 07:00 = 420 phút, đến 22:30 = 1350 phút)
+      minuteOfDay: 420,
+      timeSpeed: 1, // 0: pause, 1: normal (1.5s = 1 phút), 2: fast (0.75s = 1 phút)
+      location: 'class',
+      stats: {
+        hp: 85, energy: 100, mood: 75, study: 50, friends: 40, love: 20, reputation: 15, money: 30000,
+        midtermScore: 0, finalScore: 0, totalBanhTrangSold: 0, totalTipsReceived: 0
+      },
+      certsEarned: [],
+      unlockedAchievements: [],
+      inventory: [
+        { id: 'banh_trang', count: 3 },
+        { id: 'tra_sua_chai', count: 2 },
+        { id: 'but_cute', count: 2 },
+        { id: 'de_cuong', count: 1 }
+      ],
+      customerOrders: [
+        { id: 1, customer: 'Lan (Bạn Thân)', avatar: '👧', itemId: 'banh_trang', qty: 2, dialogue: 'Đói bụng quá, để cho tao 2 bịch bánh tráng bơ nha!', tip: 2000 },
+        { id: 2, customer: 'Triệu Mẫn (Lớp Phó)', avatar: '👸', itemId: 'tra_sua_chai', qty: 1, dialogue: 'Bạn còn chai trà sữa nào mát lạnh không? Mình khát quá!', tip: 5000 }
+      ],
+      todayEvents: [],
+      diaryEntries: [],
+      exam: { type: 'midterm', inProgress: false, currentStep: 0, questions: [], correctCount: 0 }
+    };
+
+    const DAYS_OF_WEEK = ['THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY', 'CHỦ NHẬT'];
+
+    // XÁC ĐỊNH KHUNG GIỜ VÀ QUYỀN BÁN HÀNG DỰA TRÊN PHÚT TRONG NGÀY
+    function getCurrentSchedule() {
+      const m = STATE.minuteOfDay;
+      if (m >= 420 && m < 510) {
+        return { text: 'Đầu giờ sáng • Chuẩn bị vào lớp', canSell: true }; // 07:00 - 08:30
+      } else if (m >= 510 && m < 555) {
+        return { text: 'Tiết 1-2 chính khóa • Tập trung học bài', canSell: false }; // 08:30 - 09:15
+      } else if (m >= 555 && m < 585) {
+        return { text: 'Giờ ra chơi 30 phút • Khách tới đông đúc!', canSell: true }; // 09:15 - 09:45
+      } else if (m >= 585 && m < 690) {
+        return { text: 'Tiết 3-4 chính khóa • Cấm buôn bán', canSell: false }; // 09:45 - 11:30
+      } else if (m >= 690 && m < 810) {
+        return { text: 'Tan trường trưa & Nghỉ trưa căn tin', canSell: false }; // 11:30 - 13:30
+      } else if (m >= 810 && m < 1020) {
+        return { text: 'Buổi chiều • Thư viện / Tự học', canSell: false }; // 13:30 - 17:00
+      } else if (m >= 1020 && m < 1110) {
+        return { text: 'Chiều muộn sau 17:00 • Tan trường nhận order', canSell: true }; // 17:00 - 18:30
+      } else {
+        return { text: 'Buổi tối • Góc học tập tại nhà', canSell: false }; // 18:30 - 22:30
       }
     }
 
-    const fireworksCanvas = document.getElementById('fireworksCanvas');
-    const fwCtx = fireworksCanvas.getContext('2d');
-    let fwParticles = [];
-
-    function resizeFwCanvas() {
-      fireworksCanvas.width = window.innerWidth;
-      fireworksCanvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeFwCanvas);
-    resizeFwCanvas();
-
-    function triggerFireworks() {
-      const colors = ['#f43f5e', '#38bdf8', '#fbbf24', '#a855f7', '#34d399', '#f97316'];
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 3;
-
-      for (let burst = 0; burst < 3; burst++) {
-        setTimeout(() => {
-          const bx = cx + (Math.random() - 0.5) * 300;
-          const by = cy + (Math.random() - 0.5) * 150;
-          const col = colors[Math.floor(Math.random() * colors.length)];
-          for (let i = 0; i < 50; i++) {
-            fwParticles.push(new FireworkParticle(bx, by, col));
-          }
-        }, burst * 200);
-      }
+    function isSellingAllowed() {
+      return getCurrentSchedule().canSell;
     }
 
-    function animateFireworks() {
-      fwCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
-      for (let i = fwParticles.length - 1; i >= 0; i--) {
-        fwParticles[i].update();
-        fwParticles[i].draw(fwCtx);
-        if (fwParticles[i].alpha <= 0) fwParticles.splice(i, 1);
-      }
-      requestAnimationFrame(animateFireworks);
-    }
-    animateFireworks();
-
-    /* =============================================================
-       2. ÂM THANH 8-BIT
-       ============================================================= */
-    class RetroAudio {
-      constructor() { this.ctx = null; this.enabled = true; }
-      init() {
-        if (!this.ctx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          this.ctx = new AudioContext();
+    /* ĐỒNG HỒ TỰ ĐỘNG CHẠY */
+    let clockInterval = null;
+    function startAutoClock() {
+      if (clockInterval) clearInterval(clockInterval);
+      clockInterval = setInterval(() => {
+        if (STATE.timeSpeed === 0) return; // Tạm dừng
+        
+        STATE.minuteOfDay += 1; // Nhích 1 phút
+        
+        // Hết ngày lúc 22:30 (1350 phút) -> Kích hoạt Nhật Ký
+        if (STATE.minuteOfDay >= 1350) {
+          STATE.minuteOfDay = 420; // Reset về 07:00 sáng hôm sau
+          triggerEndOfDayDiary();
+        } else {
+          updateHUD();
         }
-        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-      }
-      playTone(freq, type = 'square', duration = 0.15, vol = 0.15) {
-        if (!this.enabled) return; this.init();
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        osc.start(now); osc.stop(now + duration);
-      }
-      playSuccess() {
-        if (!this.enabled) return; this.init();
-        [523.25, 659.25, 783.99, 1046.50].forEach((f, idx) => {
-          setTimeout(() => this.playTone(f, 'triangle', 0.2, 0.2), idx * 70);
-        });
-      }
-      playWrong() {
-        if (!this.enabled) return; this.init();
-        [280, 220, 160].forEach((f, idx) => {
-          setTimeout(() => this.playTone(f, 'sawtooth', 0.2, 0.25), idx * 90);
-        });
-      }
-      playCash() {
-        if (!this.enabled) return; this.init();
-        [987, 1318, 1567].forEach((f, idx) => {
-          setTimeout(() => this.playTone(f, 'sine', 0.18, 0.2), idx * 80);
-        });
+      }, STATE.timeSpeed === 2 ? 600 : 1200);
+    }
+
+    function setTimeSpeed(spd) {
+      STATE.timeSpeed = spd;
+      document.getElementById('btnSpeed0').className = spd === 0 ? 'pixel-btn btn-yellow' : 'pixel-btn';
+      document.getElementById('btnSpeed1').className = spd === 1 ? 'pixel-btn btn-blue' : 'pixel-btn';
+      document.getElementById('btnSpeed2').className = spd === 2 ? 'pixel-btn btn-green' : 'pixel-btn';
+      startAutoClock();
+    }
+
+    function updateHUD() {
+      const hours = Math.floor(STATE.minuteOfDay / 60);
+      const mins = STATE.minuteOfDay % 60;
+      const timeStr = \`\${String(hours).padStart(2, '0')}:\${String(mins).padStart(2, '0')}\`;
+
+      const dayOfWeekIdx = (STATE.day - 1) % 7;
+      const sched = getCurrentSchedule();
+
+      document.getElementById('uiPlayerNameText').textContent = STATE.playerName.toUpperCase();
+      document.getElementById('uiDayOfWeek').textContent = DAYS_OF_WEEK[dayOfWeekIdx];
+      document.getElementById('uiTimeText').textContent = timeStr;
+      document.getElementById('uiCurrentPeriodText').textContent = sched.text;
+      document.getElementById('uiDayCount').textContent = STATE.day;
+
+      document.getElementById('statHp').textContent = STATE.stats.hp;
+      document.getElementById('statEnergy').textContent = STATE.stats.energy;
+      document.getElementById('statMood').textContent = STATE.stats.mood;
+      document.getElementById('statStudy').textContent = STATE.stats.study;
+      document.getElementById('statLove').textContent = \`\${STATE.stats.love}%\`;
+      document.getElementById('statMoney').textContent = \`\${STATE.stats.money.toLocaleString('vi-VN')}đ\`;
+
+      const statusTag = document.getElementById('businessStatusTag');
+      const btnSell = document.getElementById('btnFooterSell');
+      const btnSkip = document.getElementById('btnSkipSchool');
+
+      if (sched.canSell) {
+        statusTag.textContent = '🟢 ĐƯỢC PHÉP BÁN HÀNG';
+        statusTag.style.background = '#064e3b';
+        statusTag.style.borderColor = '#10b981';
+        statusTag.style.color = '#a7f3d0';
+        btnSell.className = 'pixel-btn btn-green';
+        btnSkip.classList.add('hidden');
+      } else {
+        statusTag.textContent = '🔒 GIỜ HỌC / ĐÓNG CỬA HÀNG';
+        statusTag.style.background = '#4c0519';
+        statusTag.style.borderColor = '#e11d48';
+        statusTag.style.color = '#fecdd3';
+        btnSell.className = 'pixel-btn';
+        btnSkip.classList.remove('hidden');
       }
     }
-    const audio = new RetroAudio();
 
     /* =============================================================
-       3. CƠ SỞ DỮ LIỆU
+       2. TỰ ĐỘNG KHÁCH ĐẾN MUA HÀNG THEO CHU KỲ
+       ============================================================= */
+    let customerArrivalTimer = null;
+    function startAutoCustomerSpawner() {
+      if (customerArrivalTimer) clearInterval(customerArrivalTimer);
+      customerArrivalTimer = setInterval(() => {
+        if (isSellingAllowed() && STATE.customerOrders.length < 4 && STATE.timeSpeed > 0) {
+          autoSpawnCustomer();
+        }
+      }, 5000);
+    }
+
+    function autoSpawnCustomer() {
+      const customers = [
+        { name: 'Tuấn (Bóng Rổ)', avatar: '🏀', itemId: 'tra_sua_chai', qty: 2, dialogue: 'Đá banh khát khô họng, cho 2 chai trà sữa lẹ!', tip: 4000 },
+        { name: 'Hoàng Nam', avatar: '🤓', itemId: 'de_cuong', qty: 1, dialogue: 'Photo cho mình 1 bộ đề cương toán nha, gửi thêm ít tiền!', tip: 5000 },
+        { name: 'Bảo Trân', avatar: '✨', itemId: 'but_cute', qty: 2, dialogue: 'Bút viết êm tay ghê, giao nhanh mình gửi thêm tiền nước!', tip: 3000 },
+        { name: 'Triệu Mẫn', avatar: '👸', itemId: 'banh_trang', qty: 1, dialogue: 'Bánh tráng thơm quá, để cho Mẫn một phần nhen!', tip: 8000 },
+        { name: 'Lan (Bạn Thân)', avatar: '👧', itemId: 'banh_trang', qty: 1, dialogue: 'Đói bụng quá, lấy tao một phần bánh tráng ăn lót dạ!', tip: 2500 }
+      ];
+      const newCust = customers[Math.floor(Math.random() * customers.length)];
+      STATE.customerOrders.push({
+        id: Date.now(), customer: newCust.name, avatar: newCust.avatar,
+        itemId: newCust.itemId, qty: newCust.qty, dialogue: newCust.dialogue, tip: newCust.tip
+      });
+      audio.playTone(700, 'sine', 0.1);
+      showStatAlert(\`🛎️ \${newCust.name} vừa ghé quầy order món!\`, '#38bdf8');
+      
+      const shopCard = document.getElementById('shopOrderCard');
+      if (shopCard && !shopCard.classList.contains('hidden')) {
+        renderOrders();
+      }
+    }
+
+    /* =============================================================
+       3. TOÀN BỘ CƠ SỞ DỮ LIỆU & LOGIC SỰ KIỆN
        ============================================================= */
     const WHOLESALE_ITEMS = [
       { id: 'banh_trang', name: 'Bánh Tráng Cuộn Bơ', wholesalePrice: 8500, retailPrice: 12000, icon: '🌯' },
@@ -630,52 +673,6 @@ export default function App() {
       { id: 'five_star_service', name: 'Đại Sứ Dịch Vụ', icon: '⭐', desc: 'Tích lũy tổng tiền tip vượt 50.000đ', check: (s) => s.totalTipsReceived >= 50000 }
     ];
 
-    const STATE = {
-      playerName: 'Bạn',
-      day: 1,
-      totalDays: 45,
-      timeIndex: 0,
-      location: 'class',
-      stats: {
-        hp: 85, energy: 100, mood: 75, study: 50, friends: 40, love: 20, reputation: 15, money: 30000,
-        midtermScore: 0, finalScore: 0, totalBanhTrangSold: 0, totalTipsReceived: 0
-      },
-      certsEarned: [],
-      unlockedAchievements: [],
-      inventory: [
-        { id: 'banh_trang', count: 2 },
-        { id: 'tra_sua_chai', count: 1 },
-        { id: 'but_cute', count: 1 },
-        { id: 'de_cuong', count: 1 }
-      ],
-      customerOrders: [
-        { id: 1, customer: 'Lan (Bạn Thân)', avatar: '👧', itemId: 'banh_trang', qty: 2, dialogue: 'Đói bụng quá, để cho tao 2 bịch bánh tráng bơ nha!', tip: 2000, stars: 5 },
-        { id: 2, customer: 'Triệu Mẫn (Lớp Phó)', avatar: '👸', itemId: 'tra_sua_chai', qty: 1, dialogue: 'Bạn còn chai trà sữa nào mát lạnh không? Mình khát quá!', tip: 5000, stars: 5 }
-      ],
-      todayEvents: [],
-      diaryEntries: [],
-      exam: { type: 'midterm', inProgress: false, currentStep: 0, questions: [], correctCount: 0 }
-    };
-
-    const TIME_PERIODS = [
-      { text: '07:30', name: 'Buổi sáng • Tiết 1-2', canSell: true },
-      { text: '09:15', name: 'Giờ ra chơi 15 phút', canSell: true },
-      { text: '11:30', name: 'Tan trường trưa • Học bài / Trốn học', canSell: false },
-      { text: '14:00', name: 'Buổi chiều • Thư viện / Học tập', canSell: false },
-      { text: '17:00', name: 'Chiều muộn sau 17h • Tan trường nhận order', canSell: true },
-      { text: '20:30', name: 'Buổi tối • Tự học khuya tại nhà', canSell: false }
-    ];
-
-    const DAYS_OF_WEEK = ['THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY', 'CHỦ NHẬT'];
-
-    function isSellingAllowed() {
-      const cur = TIME_PERIODS[STATE.timeIndex];
-      return cur && cur.canSell === true;
-    }
-
-    /* =============================================================
-       4. LOGIC GAME & MODAL
-       ============================================================= */
     function closeOverlayCard() {
       document.querySelectorAll('.modal-card').forEach(c => c.classList.add('hidden'));
     }
@@ -693,7 +690,7 @@ export default function App() {
         titleEl.textContent = 'LỚP 12A3 - KHỐI CHUYÊN';
         iconEl.textContent = '🏫';
         descEl.textContent = isSellingAllowed() 
-          ? \`Đang trong giờ bán hàng! Bạn bè đang tìm \${STATE.playerName} order bánh tráng, trà sữa.\`
+          ? \`Đang trong giờ bán hàng! Bạn bè đang tự động ghé quầy order bánh tráng, trà sữa.\`
           : 'Giờ học chính khóa! Cất đồ buôn bán vào cặp và tập trung học hoặc trốn học đi chơi!';
       } else if (loc === 'canteen') {
         titleEl.textContent = 'CĂN TIN TRƯỜNG - CÔ NĂM';
@@ -708,7 +705,7 @@ export default function App() {
         titleEl.textContent = 'SÂN TRƯỜNG & CÂY BÀNG';
         iconEl.textContent = '🌿';
         descEl.textContent = isSellingAllowed()
-          ? 'Sau 17:00 học sinh ùa ra sân trường, cơ hội nhận đơn order kiếm thêm tiền!'
+          ? 'Sau 17:00 học sinh ùa ra sân trường, khách tự động kéo tới order đông vui!'
           : 'Sân trường rợp bóng mát, nơi bạn bè thư giãn sau các ca học.';
       } else if (loc === 'home') {
         titleEl.textContent = 'PHÒNG NGỦ & BÀN HỌC Ở NHÀ';
@@ -734,7 +731,8 @@ export default function App() {
         modifyStats({ mood: +25, energy: -15, study: -3 });
         showStatAlert('🎉 Trốn học thành công ra quán Net làm vài ván rank! (+25 😊)', '#34d399');
       }
-      advanceTime();
+      STATE.minuteOfDay += 30; // Trốn học mất 30 phút
+      updateHUD();
     }
 
     function openShopOrderCard() {
@@ -759,7 +757,7 @@ export default function App() {
       container.innerHTML = '';
 
       if (STATE.customerOrders.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:16px; color:#94a3b8; font-size:11px;">Hết đơn order rồi! Bấm "Gọi Khách Mới" để đón khách tiếp nhé.</div>';
+        container.innerHTML = '<div style="text-align:center; padding:16px; color:#94a3b8; font-size:11px;">Khách đang trên đường tới quầy, bạn chờ vài giây nhé...</div>';
         return;
       }
 
@@ -811,36 +809,14 @@ export default function App() {
       if (ord.itemId === 'banh_trang') STATE.stats.totalBanhTrangSold = (STATE.stats.totalBanhTrangSold || 0) + ord.qty;
       STATE.stats.totalTipsReceived = (STATE.stats.totalTipsReceived || 0) + ord.tip;
 
-      modifyStats({ money: +profit, mood: +5, energy: -5, rep: +4, love: isCrush ? +10 : 0 });
+      modifyStats({ money: +profit, mood: +5, energy: -2, rep: +4, love: isCrush ? +10 : 0 });
 
       STATE.customerOrders.splice(idx, 1);
       audio.playCash();
-      showStatAlert(\`⭐ Khách chấm 5 sao! +\${profit.toLocaleString('vi-VN')}đ (Tip: \${ord.tip.toLocaleString('vi-VN')}đ)\`, '#34d399');
+      showStatAlert(\`⭐ Khách nhận hàng và gửi tip: +\${profit.toLocaleString('vi-VN')}đ\`, '#34d399');
 
       renderOrders();
       checkAchievements();
-    }
-
-    function spawnCustomerOrder() {
-      if (!isSellingAllowed()) return;
-      if (STATE.stats.energy < 8) {
-        showStatAlert('Bạn quá mệt mỏi để tiếp khách!', '#fb7185');
-        return;
-      }
-      const customers = [
-        { name: 'Tuấn (Bóng Rổ)', avatar: '🏀', itemId: 'tra_sua_chai', qty: 2, dialogue: \`Khát khô họng, \${STATE.playerName} cho 2 chai trà sữa lẹ!\`, tip: 4000 },
-        { name: 'Hoàng Nam', avatar: '🤓', itemId: 'de_cuong', qty: 1, dialogue: \`Cho mình xin 1 bộ đề cương toán nha, gửi thêm ít tiền!\`, tip: 5000 },
-        { name: 'Bảo Trân', avatar: '✨', itemId: 'but_cute', qty: 2, dialogue: 'Bút viết êm tay ghê, giao nhanh mình gửi thêm tiền nước!', tip: 3000 },
-        { name: 'Triệu Mẫn', avatar: '👸', itemId: 'banh_trang', qty: 1, dialogue: \`Bánh tráng bơ thơm nức mũi, để cho Mẫn một phần nhen!\`, tip: 8000 }
-      ];
-      const newCust = customers[Math.floor(Math.random() * customers.length)];
-      STATE.customerOrders.push({
-        id: Date.now(), customer: newCust.name, avatar: newCust.avatar,
-        itemId: newCust.itemId, qty: newCust.qty, dialogue: newCust.dialogue, tip: newCust.tip
-      });
-      modifyStats({ energy: -8 });
-      audio.playTone(600, 'triangle', 0.15);
-      renderOrders();
     }
 
     function openWholesaleTab() {
@@ -1069,7 +1045,6 @@ export default function App() {
       exportSaveCode();
     }
 
-    /* UTF-8 SAFE BASE64 CLOUD SAVE */
     function exportSaveCode() {
       try {
         const jsonStr = JSON.stringify(STATE);
@@ -1142,7 +1117,8 @@ export default function App() {
         audio.playWrong();
         showStatAlert('😭 Sai rồi! Ghi nhớ để thi nhé.', '#fb7185');
       }
-      advanceTime();
+      STATE.minuteOfDay += 20; // Trả lời câu hỏi tốn 20 phút
+      updateHUD();
       checkAchievements();
     }
 
@@ -1150,7 +1126,8 @@ export default function App() {
       document.getElementById('classroomQuizCard').classList.add('hidden');
       modifyStats({ energy: +10, study: -5, hp: -2 });
       showStatAlert('😴 Ngủ gục trong giờ học! (+10 ⚡, -5 📚)', '#fde047');
-      advanceTime();
+      STATE.minuteOfDay += 30;
+      updateHUD();
     });
 
     function interactNPC(who) {
@@ -1159,16 +1136,19 @@ export default function App() {
         if (STATE.stats.energy < 10) { showStatAlert('Bạn quá mệt để bắt chuyện!', '#fb7185'); return; }
         modifyStats({ energy: -10, mood: +15, love: +7, study: +3 });
         showStatAlert(\`💕 Triệu Mẫn mỉm cười động viên \${STATE.playerName}! (+7 💕, +3 📚)\`, '#f472b6');
-        advanceTime();
+        STATE.minuteOfDay += 15;
+        updateHUD();
         checkAchievements();
       } else if (who === 'lan') {
         modifyStats({ energy: -10, mood: +10, friends: +8, study: +4 });
         showStatAlert(\`👧 Lan rủ \${STATE.playerName} cùng làm bài tập! (+8 👥, +4 📚)\`, '#38bdf8');
-        advanceTime();
+        STATE.minuteOfDay += 15;
+        updateHUD();
       } else if (who === 'tuan') {
         modifyStats({ energy: -15, hp: +10, mood: +10, friends: +8 });
         showStatAlert('🏀 Làm một ván bóng rổ nạp lại tinh thần! (+10 ❤️, +10 😊)', '#fde047');
-        advanceTime();
+        STATE.minuteOfDay += 20;
+        updateHUD();
       }
     }
 
@@ -1183,15 +1163,6 @@ export default function App() {
       if (changes.money !== undefined) STATE.stats.money = Math.max(0, STATE.stats.money + changes.money);
       updateHUD();
       saveGame();
-    }
-
-    function advanceTime() {
-      STATE.timeIndex++;
-      if (STATE.timeIndex >= TIME_PERIODS.length) {
-        triggerEndOfDayDiary();
-      } else {
-        updateHUD();
-      }
     }
 
     function triggerEndOfDayDiary() {
@@ -1209,7 +1180,7 @@ export default function App() {
       document.getElementById('btnContinueFromDiary').onclick = () => {
         closeOverlayCard();
         STATE.day++;
-        STATE.timeIndex = 0;
+        STATE.minuteOfDay = 420;
         gotoLocation('class');
         checkHoliday();
         if (STATE.day === 22) triggerExam('midterm');
@@ -1316,7 +1287,8 @@ export default function App() {
       modifyStats({ money: -cost, energy: energy, mood: mood });
       audio.playCash();
       showStatAlert(\`😋 Đã ăn \${name}! (+ \${energy} ⚡)\`, '#34d399');
-      advanceTime();
+      STATE.minuteOfDay += 15;
+      updateHUD();
     }
 
     function openDiaryManual() {
@@ -1325,44 +1297,6 @@ export default function App() {
       document.getElementById('diaryTitle').textContent = \`NHẬT KÝ ĐÃ LƯU (NGÀY \${STATE.day})\`;
       document.getElementById('diaryContentText').innerText = \`Tiến trình ngày \${STATE.day}: Điểm học tập \${STATE.stats.study}, Ví tiền \${STATE.stats.money.toLocaleString('vi-VN')}đ.\`;
       document.getElementById('btnContinueFromDiary').onclick = () => closeOverlayCard();
-    }
-
-    function updateHUD() {
-      const curPeriod = TIME_PERIODS[STATE.timeIndex] || TIME_PERIODS[0];
-      const dayOfWeekIdx = (STATE.day - 1) % 7;
-
-      document.getElementById('uiPlayerNameText').textContent = STATE.playerName.toUpperCase();
-      document.getElementById('uiDayOfWeek').textContent = DAYS_OF_WEEK[dayOfWeekIdx];
-      document.getElementById('uiTimeText').textContent = curPeriod.text;
-      document.getElementById('uiCurrentPeriodText').textContent = curPeriod.name;
-      document.getElementById('uiDayCount').textContent = STATE.day;
-
-      document.getElementById('statHp').textContent = STATE.stats.hp;
-      document.getElementById('statEnergy').textContent = STATE.stats.energy;
-      document.getElementById('statMood').textContent = STATE.stats.mood;
-      document.getElementById('statStudy').textContent = STATE.stats.study;
-      document.getElementById('statLove').textContent = \`\${STATE.stats.love}%\`;
-      document.getElementById('statMoney').textContent = \`\${STATE.stats.money.toLocaleString('vi-VN')}đ\`;
-
-      const statusTag = document.getElementById('businessStatusTag');
-      const btnSell = document.getElementById('btnFooterSell');
-      const btnSkip = document.getElementById('btnSkipSchool');
-
-      if (curPeriod.canSell) {
-        statusTag.textContent = '🟢 ĐƯỢC PHÉP BÁN HÀNG';
-        statusTag.style.background = '#064e3b';
-        statusTag.style.borderColor = '#10b981';
-        statusTag.style.color = '#a7f3d0';
-        btnSell.className = 'pixel-btn btn-green';
-        btnSkip.classList.add('hidden');
-      } else {
-        statusTag.textContent = '🔒 GIỜ HỌC / ĐÓNG CỬA HÀNG';
-        statusTag.style.background = '#4c0519';
-        statusTag.style.borderColor = '#e11d48';
-        statusTag.style.color = '#fecdd3';
-        btnSell.className = 'pixel-btn';
-        btnSkip.classList.remove('hidden');
-      }
     }
 
     function showStatAlert(text, color) {
@@ -1390,12 +1324,25 @@ export default function App() {
       e.target.textContent = audio.enabled ? '🔊 BẬT ÂM' : '🔇 TẮT ÂM';
     });
 
+    function checkHoliday() {
+      const hol = HOLIDAYS[STATE.day];
+      const badge = document.getElementById('uiHolidayBadge');
+      if (hol) {
+        badge.classList.remove('hidden');
+        badge.textContent = \`🌸 \${hol.name}\`;
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       loadGame();
       gotoLocation('class');
       updateHUD();
       checkHoliday();
       checkAchievements();
+      startAutoClock();
+      startAutoCustomerSpawner();
       if (STATE.playerName === 'Bạn') openNameModal();
       else openHelpModal();
     });
@@ -1406,7 +1353,7 @@ export default function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, overflow: 'hidden' }}>
       <iframe
-        title="Thanh Xuân Rực Rỡ 7.2"
+        title="Thanh Xuân Rực Rỡ 7.4"
         srcDoc={gameHtml}
         style={{ width: '100%', height: '100%', border: 'none' }}
       />
