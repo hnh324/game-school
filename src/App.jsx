@@ -2,2191 +2,1164 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 /* =========================================================
    THANH XUÂN RỰC RỠ
-   Deluxe Career & Assets Edition
-   180 câu hỏi: 20 câu x 9 môn
-   ========================================================= */
+   Deluxe Career & Fashion Edition
+   - 1 file App.jsx
+   - 16 mốc thời gian / ngày
+   - Không giới hạn 1 hoạt động / mốc
+   - Quick Activities
+   - Fashion / Outfit
+   - 180 câu hỏi
+   - NPC
+   - Nghề
+   - Chứng chỉ
+   - Tài sản
+   - Nhật ký
+   - Thi đua
+   - Save code
+========================================================= */
+
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v6";
+const SLOT_SECONDS = 30;
+
+/* =========================================================
+   THỜI GIAN
+========================================================= */
 
 const TIME_SLOTS = [
+  "06:30",
+  "07:00",
   "07:30",
-  "09:15",
-  "11:30",
-  "14:00",
-  "17:00",
-  "20:30",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:30",
+  "14:30",
+  "15:30",
+  "16:30",
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+  "22:00",
 ];
 
-const SLOT_SECONDS = 45;
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v6";
+const PERIOD_NAMES = [
+  "Buổi sáng",
+  "Buổi sáng",
+  "Buổi sáng",
+  "Tiết học",
+  "Tiết học",
+  "Tiết học",
+  "Cuối buổi sáng",
+  "Nghỉ trưa",
+  "Buổi chiều",
+  "Buổi chiều",
+  "Buổi chiều",
+  "Tan học",
+  "Buổi tối",
+  "Buổi tối",
+  "Buổi tối",
+  "Buổi tối",
+  "Kết thúc ngày",
+];
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 const clamp = (n, min = 0, max = 100) =>
   Math.max(min, Math.min(max, Number(n) || 0));
 
 const money = (n) =>
-  new Intl.NumberFormat("vi-VN").format(Math.round(n || 0)) + "đ";
+  `${Math.round(Number(n) || 0).toLocaleString("vi-VN")}đ`;
 
-const clone = (x) => JSON.parse(JSON.stringify(x));
+const signed = (n) => {
+  const x = Number(n) || 0;
+  return x > 0 ? `+${x}` : `${x}`;
+};
 
-const q = (subject, question, choices, answer, explanation = "") => ({
-  subject,
-  q: question,
-  choices,
-  answer,
-  explanation,
-});
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const clone = (obj) => JSON.parse(JSON.stringify(obj));
+
+const addStat = (g, key, amount) => {
+  g.stats[key] = clamp(g.stats[key] + amount);
+};
+
+const addMoney = (g, amount) => {
+  g.stats.money = Math.max(0, g.stats.money + amount);
+};
+
+const addCompetition = (g, amount) => {
+  const n = Math.max(0, Math.round(amount || 0));
+  g.competitionPoints += n;
+  g.dailyCompetition.player += n;
+};
+
+const addRelationship = (g, id, amount) => {
+  g.relationships[id] = clamp((g.relationships[id] || 0) + amount);
+};
 
 /* =========================================================
    180 CÂU HỎI
-   ========================================================= */
+   9 MÔN × 20 CÂU
+========================================================= */
+
+const VAN_QUESTIONS = [
+  ["Vợ nhặt", "Tác phẩm Vợ nhặt của ai?", ["Kim Lân", "Nam Cao", "Tô Hoài", "Nguyễn Tuân"], 0, "Vợ nhặt là truyện ngắn nổi tiếng của Kim Lân."],
+  ["Vợ nhặt", "Bối cảnh chính của Vợ nhặt gắn với sự kiện nào?", ["Nạn đói 1945", "Cách mạng tháng Tám 1930", "Kháng chiến chống Mỹ", "Đổi mới"], 0, "Tác phẩm lấy bối cảnh nạn đói năm 1945."],
+  ["Đoàn thuyền đánh cá", "“Mặt trời xuống biển như hòn lửa” sử dụng biện pháp gì?", ["So sánh", "Hoán dụ", "Nói quá", "Điệp ngữ"], 0, "Hình ảnh mặt trời được so sánh với hòn lửa."],
+  ["Truyện Kiều", "Tác giả Truyện Kiều là ai?", ["Nguyễn Du", "Nguyễn Trãi", "Nguyễn Đình Chiểu", "Hồ Xuân Hương"], 0, "Nguyễn Du là tác giả Truyện Kiều."],
+  ["Chí Phèo", "Chí Phèo là tác phẩm của ai?", ["Nam Cao", "Kim Lân", "Ngô Tất Tố", "Vũ Trọng Phụng"], 0, "Chí Phèo là truyện ngắn của Nam Cao."],
+  ["Tây Tiến", "Tây Tiến được sáng tác bởi nhà thơ nào?", ["Quang Dũng", "Tố Hữu", "Chính Hữu", "Huy Cận"], 0, "Quang Dũng sáng tác Tây Tiến."],
+  ["Việt Bắc", "Việt Bắc là tác phẩm của ai?", ["Tố Hữu", "Quang Dũng", "Xuân Quỳnh", "Bằng Việt"], 0, "Việt Bắc là trường ca thơ của Tố Hữu."],
+  ["Tuyên ngôn Độc lập", "Tuyên ngôn Độc lập năm 1945 do ai đọc?", ["Hồ Chí Minh", "Võ Nguyên Giáp", "Phạm Văn Đồng", "Trường Chinh"], 0, "Chủ tịch Hồ Chí Minh đọc Tuyên ngôn Độc lập ngày 2/9/1945."],
+  ["Đất Nước", "Đoạn trích Đất Nước thuộc trường ca nào?", ["Mặt đường khát vọng", "Việt Bắc", "Đất nước", "Những người đi tới biển"], 0, "Đất Nước của Nguyễn Khoa Điềm thuộc trường ca Mặt đường khát vọng."],
+  ["Sóng", "Sóng là tác phẩm của ai?", ["Xuân Quỳnh", "Hàn Mặc Tử", "Lưu Trọng Lư", "Chế Lan Viên"], 0, "Sóng là bài thơ nổi tiếng của Xuân Quỳnh."],
+  ["Người lái đò sông Đà", "Tác giả Người lái đò sông Đà là ai?", ["Nguyễn Tuân", "Nguyễn Minh Châu", "Tô Hoài", "Thạch Lam"], 0, "Nguyễn Tuân nổi tiếng với phong cách tài hoa, uyên bác."],
+  ["Vợ chồng A Phủ", "Vợ chồng A Phủ của tác giả nào?", ["Tô Hoài", "Kim Lân", "Nam Cao", "Nguyễn Tuân"], 0, "Tô Hoài viết Vợ chồng A Phủ."],
+  ["Rừng xà nu", "Rừng xà nu là tác phẩm của ai?", ["Nguyễn Trung Thành", "Nguyễn Minh Châu", "Nguyễn Khoa Điềm", "Tô Hoài"], 0, "Nguyễn Trung Thành là tác giả Rừng xà nu."],
+  ["Chiếc thuyền ngoài xa", "Chiếc thuyền ngoài xa của ai?", ["Nguyễn Minh Châu", "Nguyễn Tuân", "Nam Cao", "Kim Lân"], 0, "Đây là truyện ngắn của Nguyễn Minh Châu."],
+  ["Ai đã đặt tên cho dòng sông?", "Tác giả Ai đã đặt tên cho dòng sông? là ai?", ["Hoàng Phủ Ngọc Tường", "Nguyễn Tuân", "Tố Hữu", "Xuân Diệu"], 0, "Hoàng Phủ Ngọc Tường là tác giả bút ký này."],
+  ["Hai đứa trẻ", "Hai đứa trẻ là tác phẩm của ai?", ["Thạch Lam", "Nam Cao", "Vũ Trọng Phụng", "Nguyễn Công Hoan"], 0, "Hai đứa trẻ là truyện ngắn của Thạch Lam."],
+  ["Chữ người tử tù", "Chữ người tử tù của ai?", ["Nguyễn Tuân", "Nguyễn Du", "Nam Cao", "Tô Hoài"], 0, "Nguyễn Tuân viết Chữ người tử tù."],
+  ["Lão Hạc", "Lão Hạc là tác phẩm của nhà văn nào?", ["Nam Cao", "Kim Lân", "Thạch Lam", "Ngô Tất Tố"], 0, "Lão Hạc là truyện ngắn nổi tiếng của Nam Cao."],
+  ["Đồng chí", "Đồng chí là bài thơ của ai?", ["Chính Hữu", "Quang Dũng", "Tố Hữu", "Huy Cận"], 0, "Chính Hữu viết Đồng chí."],
+  ["Bếp lửa", "Bếp lửa là tác phẩm của ai?", ["Bằng Việt", "Xuân Quỳnh", "Tố Hữu", "Chế Lan Viên"], 0, "Bằng Việt sáng tác Bếp lửa."],
+];
+
+const LY_QUESTIONS = [
+  ["Công suất", "Đơn vị SI của công suất là gì?", ["W", "J", "N", "Pa"], 0, "Công suất có đơn vị watt (W)."],
+  ["Newton", "Định luật II Newton có công thức nào?", ["F = ma", "F = m/a", "F = a/m", "F = mv"], 0, "Lực bằng khối lượng nhân gia tốc."],
+  ["Vận tốc", "Đơn vị thường dùng của vận tốc là gì?", ["m/s", "kg", "N", "J"], 0, "Trong SI, vận tốc có đơn vị m/s."],
+  ["Ohm", "Định luật Ohm cho đoạn mạch có công thức?", ["U = IR", "U = I/R", "I = UR", "R = UI"], 0, "U = IR."],
+  ["Mạch nối tiếp", "Trong mạch nối tiếp, đại lượng nào giống nhau qua các phần tử?", ["Cường độ dòng điện", "Hiệu điện thế", "Điện trở", "Công suất"], 0, "Dòng điện qua các phần tử nối tiếp có cùng cường độ."],
+  ["Mạch song song", "Trong mạch song song, đại lượng nào giống nhau?", ["Hiệu điện thế", "Cường độ dòng điện", "Điện trở", "Công suất"], 0, "Các nhánh song song có cùng hiệu điện thế."],
+  ["Động năng", "Động năng của vật được tính bằng?", ["1/2mv²", "mv", "mgh", "Fs"], 0, "Động năng Wđ = 1/2mv²."],
+  ["Thế năng", "Thế năng trọng trường gần mặt đất là?", ["mgh", "1/2mv²", "ma", "UI"], 0, "Wt = mgh."],
+  ["Công cơ học", "Công của lực không đổi được tính bằng?", ["Fs cosα", "F/s", "Fs sinα", "mgh/t"], 0, "A = Fs cosα."],
+  ["Tần số", "Đơn vị của tần số là?", ["Hz", "W", "V", "Ω"], 0, "Hertz (Hz)."],
+  ["Ánh sáng", "Tốc độ ánh sáng trong chân không xấp xỉ?", ["3×10⁸ m/s", "3×10⁶ m/s", "3×10⁴ m/s", "3×10² m/s"], 0, "Giá trị gần đúng là 3×10⁸ m/s."],
+  ["Thấu kính", "Thấu kính hội tụ có tác dụng chính là?", ["Hội tụ chùm tia", "Phân kỳ chùm tia", "Hấp thụ ánh sáng", "Phản xạ hoàn toàn"], 0, "Thấu kính hội tụ làm các tia tới song song hội tụ."],
+  ["Dòng điện", "Đơn vị của cường độ dòng điện là?", ["A", "V", "Ω", "W"], 0, "Ampe (A)."],
+  ["Điện trở", "Đơn vị của điện trở là?", ["Ω", "A", "V", "J"], 0, "Ohm (Ω)."],
+  ["Máy biến áp", "Máy biến áp thông thường hoạt động với?", ["Dòng điện xoay chiều", "Dòng điện một chiều", "Cả hai như nhau", "Không cần điện"], 0, "Máy biến áp dựa trên hiện tượng cảm ứng điện từ và dùng AC."],
+  ["Động lượng", "Động lượng được tính bằng?", ["p = mv", "p = ma", "p = F/s", "p = mgh"], 0, "Động lượng p = mv."],
+  ["Gia tốc", "Đơn vị của gia tốc là?", ["m/s²", "m/s", "N", "J"], 0, "Gia tốc có đơn vị m/s²."],
+  ["Công suất điện", "Công suất điện được tính bằng?", ["P = UI", "P = U/I", "P = IR", "P = U+I"], 0, "P = UI."],
+  ["Sóng", "Quan hệ giữa vận tốc, bước sóng và tần số là?", ["v = λf", "v = λ/f", "v = f/λ", "v = λ+f"], 0, "Công thức sóng v = λf."],
+  ["Âm thanh", "Âm thanh không truyền được trong môi trường nào?", ["Chân không", "Không khí", "Nước", "Kim loại"], 0, "Âm thanh cần môi trường vật chất để truyền."],
+];
+
+const HOA_QUESTIONS = [
+  ["pH", "Dung dịch có pH < 7 thường có tính gì?", ["Axit", "Bazơ", "Trung tính", "Muối"], 0, "pH nhỏ hơn 7 thường biểu thị môi trường axit."],
+  ["NaCl", "NaCl thuộc loại hợp chất nào?", ["Ion", "Cộng hóa trị không cực", "Kim loại", "Polymer"], 0, "NaCl là hợp chất ion."],
+  ["Nguyên tử", "Số hiệu nguyên tử cho biết số lượng?", ["Proton", "Neutron", "Electron lớp ngoài cùng", "Phân tử"], 0, "Số hiệu nguyên tử Z bằng số proton."],
+  ["O2", "O2 là công thức của?", ["Khí oxygen", "Khí hydrogen", "Khí nitrogen", "Khí carbon dioxide"], 0, "O2 là phân tử oxygen."],
+  ["H2O", "Khối lượng mol của H2O gần bằng?", ["18 g/mol", "16 g/mol", "20 g/mol", "2 g/mol"], 0, "2×1 + 16 = 18 g/mol."],
+  ["CO2", "CO2 thuộc loại hợp chất nào?", ["Oxide", "Axit", "Bazơ", "Muối"], 0, "CO2 là oxide của carbon."],
+  ["HCl", "HCl trong nước là?", ["Axit", "Bazơ", "Muối", "Kim loại"], 0, "HCl là acid hydrochloric."],
+  ["NaOH", "NaOH là?", ["Bazơ", "Axit", "Muối", "Oxide"], 0, "NaOH là một bazơ mạnh."],
+  ["Trung hòa", "Axit + bazơ thường tạo ra?", ["Muối và nước", "Kim loại", "Oxygen", "Polymer"], 0, "Phản ứng trung hòa tạo muối và nước."],
+  ["Xúc tác", "Chất xúc tác có tác dụng gì?", ["Thay đổi tốc độ phản ứng", "Luôn bị tiêu hao hoàn toàn", "Làm phản ứng dừng", "Tạo nguyên tố mới"], 0, "Xúc tác làm thay đổi tốc độ phản ứng và thường không bị tiêu hao."],
+  ["Bảng tuần hoàn", "Nhóm 1 gồm các kim loại nào đặc trưng?", ["Kim loại kiềm", "Halogen", "Khí hiếm", "Kim loại chuyển tiếp"], 0, "Nhóm 1 là nhóm kim loại kiềm, trừ hydrogen."],
+  ["Oxi hóa", "Quá trình oxi hóa theo quan niệm electron là?", ["Nhường electron", "Nhận electron", "Nhận proton", "Nhường neutron"], 0, "Oxi hóa là quá trình nhường electron."],
+  ["Khử", "Quá trình khử là?", ["Nhận electron", "Nhường electron", "Nhận neutron", "Tạo proton"], 0, "Khử là quá trình nhận electron."],
+  ["Avogadro", "Một mol chứa khoảng bao nhiêu hạt?", ["6,02×10²³", "6,02×10²⁰", "9,8×10²³", "3×10⁸"], 0, "Hằng số Avogadro khoảng 6,02×10²³."],
+  ["Fe và CuSO4", "Fe + CuSO4 tạo ra?", ["FeSO4 và Cu", "Fe2O3", "CuO và Fe", "H2SO4"], 0, "Sắt đẩy đồng ra khỏi muối: Fe + CuSO4 → FeSO4 + Cu."],
+  ["Đá vôi", "Thành phần chính của đá vôi là?", ["CaCO3", "NaCl", "CaO", "CO"], 0, "Đá vôi chủ yếu chứa calcium carbonate CaCO3."],
+  ["Methane", "CH4 là?", ["Methane", "Ethanol", "Ethene", "Acetic acid"], 0, "CH4 là methane."],
+  ["Ethanol", "C2H5OH là?", ["Ethanol", "Methane", "Glucose", "Acetic acid"], 0, "C2H5OH là ethanol."],
+  ["Este hóa", "Axit + alcohol thường tạo?", ["Este và nước", "Muối và oxygen", "Bazơ", "Kim loại"], 0, "Phản ứng ester hóa tạo este và nước."],
+  ["Polymer", "Chất nào là polymer?", ["Polyethylene", "NaCl", "H2O", "CO2"], 0, "Polyethylene là polymer tổng hợp."],
+];
+
+const SINH_QUESTIONS = [
+  ["Tế bào", "Bào quan thường được gọi là 'nhà máy năng lượng'?", ["Ty thể", "Ribosome", "Lục lạp", "Nhân"], 0, "Ty thể là nơi diễn ra phần lớn quá trình hô hấp tế bào."],
+  ["DNA", "Các base của DNA gồm?", ["A, T, G, C", "A, U, G, C", "A, B, C, D", "X, Y, Z, T"], 0, "DNA chứa A, T, G, C."],
+  ["Quang hợp", "Quang hợp ở thực vật chủ yếu diễn ra tại?", ["Lục lạp", "Ty thể", "Ribosome", "Không bào"], 0, "Lục lạp chứa chlorophyll và là nơi quang hợp."],
+  ["Protein", "Bào quan trực tiếp tham gia tổng hợp protein?", ["Ribosome", "Lysosome", "Không bào", "Trung thể"], 0, "Ribosome là nơi diễn ra quá trình dịch mã."],
+  ["Nhiễm sắc thể", "Tế bào soma người bình thường có bao nhiêu NST?", ["46", "23", "44", "48"], 0, "Tế bào soma người có 46 NST, gồm 23 cặp."],
+  ["Giao tử", "Giao tử người bình thường có bao nhiêu NST?", ["23", "46", "44", "92"], 0, "Giao tử là tế bào đơn bội, có 23 NST."],
+  ["Mendel", "Gregor Mendel nổi tiếng với nghiên cứu?", ["Di truyền học", "Tiến hóa", "Sinh thái học", "Vi sinh"], 0, "Mendel đặt nền móng cho di truyền học."],
+  ["Kiểu gen", "Kiểu gen là?", ["Tổ hợp gene của cá thể", "Đặc điểm quan sát được", "Môi trường sống", "Quần thể"], 0, "Kiểu gen là toàn bộ tổ hợp gene của cá thể."],
+  ["Alen trội", "Alen trội biểu hiện khi?", ["Có mặt trong kiểu gen theo quy luật tương ứng", "Luôn cần hai bản sao", "Chỉ khi không có môi trường", "Không bao giờ biểu hiện"], 0, "Alen trội có thể biểu hiện ở trạng thái đồng hợp hoặc dị hợp theo quy luật Mendel."],
+  ["Hệ sinh thái", "Hệ sinh thái gồm?", ["Thành phần hữu sinh và vô sinh", "Chỉ động vật", "Chỉ thực vật", "Chỉ đất"], 0, "Hệ sinh thái gồm quần xã sinh vật và môi trường vô sinh."],
+  ["Chuỗi thức ăn", "Chuỗi thức ăn thường bắt đầu bằng?", ["Sinh vật sản xuất", "Động vật ăn thịt", "Sinh vật phân giải", "Con người"], 0, "Sinh vật sản xuất thường là mắt xích đầu tiên."],
+  ["Hô hấp", "Hô hấp tế bào có vai trò chính là?", ["Giải phóng năng lượng", "Tạo ánh sáng", "Tạo đất", "Tạo nước biển"], 0, "Hô hấp tế bào giải phóng năng lượng từ chất hữu cơ."],
+  ["Máu", "Hồng cầu có chức năng chính?", ["Vận chuyển oxygen", "Tiêu hóa thức ăn", "Tạo insulin", "Lọc nước tiểu"], 0, "Hemoglobin trong hồng cầu giúp vận chuyển oxygen."],
+  ["Tim", "Tim người bình thường có bao nhiêu ngăn?", ["4", "2", "3", "5"], 0, "Tim gồm 2 tâm nhĩ và 2 tâm thất."],
+  ["Insulin", "Insulin được tiết ra chủ yếu bởi?", ["Tuyến tụy", "Gan", "Thận", "Tim"], 0, "Tế bào beta ở tuyến tụy tiết insulin."],
+  ["Thận", "Đơn vị chức năng của thận là?", ["Nephron", "Neuron", "Alveolus", "Ribosome"], 0, "Nephron là đơn vị cấu tạo và chức năng của thận."],
+  ["Darwin", "Charles Darwin nổi tiếng với học thuyết?", ["Tiến hóa bằng chọn lọc tự nhiên", "Tế bào", "Di truyền Mendel", "Vi trùng học"], 0, "Darwin phát triển học thuyết chọn lọc tự nhiên."],
+  ["Giảm phân", "Giảm phân tạo ra tế bào có bộ NST?", ["Đơn bội", "Lưỡng bội", "Tam bội", "Tứ bội"], 0, "Giảm phân tạo giao tử đơn bội."],
+  ["Đột biến", "Đột biến là?", ["Biến đổi vật chất di truyền", "Biến đổi thời tiết", "Thay đổi thức ăn", "Thay đổi môi trường בלבד"], 0, "Đột biến là biến đổi trong vật chất di truyền."],
+  ["Vaccine", "Vaccine có tác dụng chủ yếu là?", ["Kích thích đáp ứng miễn dịch", "Làm tăng đường huyết", "Thay thế máu", "Tiêu hóa protein"], 0, "Vaccine giúp hệ miễn dịch hình thành đáp ứng bảo vệ."],
+];
+
+const SU_QUESTIONS = [
+  ["1945", "Cách mạng tháng Tám thành công vào năm nào?", ["1945", "1944", "1946", "1954"], 0, "Cách mạng tháng Tám diễn ra năm 1945."],
+  ["Điện Biên Phủ", "Chiến thắng Điện Biên Phủ diễn ra năm?", ["1954", "1950", "1953", "1956"], 0, "Chiến thắng Điện Biên Phủ năm 1954."],
+  ["Geneva", "Hiệp định Genève về Đông Dương được ký năm?", ["1954", "1950", "1968", "1973"], 0, "Hiệp định Genève được ký năm 1954."],
+  ["1975", "Ngày 30/4/1975 gắn với sự kiện nào?", ["Giải phóng miền Nam, thống nhất đất nước", "Đổi mới", "Gia nhập ASEAN", "Tổng tuyển cử 1946"], 0, "Ngày 30/4/1975 đánh dấu thắng lợi của chiến dịch Hồ Chí Minh."],
+  ["Độc lập", "Tuyên ngôn Độc lập được đọc ngày nào?", ["2/9/1945", "19/8/1945", "30/4/1975", "7/5/1954"], 0, "Ngày Quốc khánh Việt Nam là 2/9/1945."],
+  ["Đảng", "Đảng Cộng sản Việt Nam thành lập năm nào?", ["1930", "1925", "1945", "1954"], 0, "Đảng được thành lập năm 1930."],
+  ["Ba Đình", "Tuyên ngôn Độc lập được đọc tại đâu?", ["Quảng trường Ba Đình", "Dinh Độc Lập", "Bến Nhà Rồng", "Quảng trường Lam Sơn"], 0, "Chủ tịch Hồ Chí Minh đọc Tuyên ngôn tại Quảng trường Ba Đình."],
+  ["ASEAN", "ASEAN được thành lập năm nào?", ["1967", "1954", "1975", "1986"], 0, "ASEAN thành lập năm 1967."],
+  ["Liên Hợp Quốc", "Liên Hợp Quốc được thành lập năm nào?", ["1945", "1939", "1954", "1960"], 0, "Liên Hợp Quốc ra đời năm 1945."],
+  ["Đổi mới", "Việt Nam bắt đầu công cuộc Đổi mới từ Đại hội nào?", ["Đại hội VI", "Đại hội IV", "Đại hội VIII", "Đại hội X"], 0, "Đại hội VI năm 1986 đề ra đường lối Đổi mới."],
+  ["Bạch Đằng", "Năm 938, Ngô Quyền đánh thắng quân nào trên sông Bạch Đằng?", ["Nam Hán", "Tống", "Mông - Nguyên", "Minh"], 0, "Ngô Quyền đánh bại quân Nam Hán năm 938."],
+  ["Lam Sơn", "Khởi nghĩa Lam Sơn bắt đầu năm nào?", ["1418", "1428", "1407", "1471"], 0, "Khởi nghĩa Lam Sơn bắt đầu năm 1418."],
+  ["Tây Sơn", "Phong trào Tây Sơn bùng nổ vào năm nào?", ["1771", "1789", "1802", "1750"], 0, "Phong trào Tây Sơn bắt đầu năm 1771."],
+  ["Quang Trung", "Chiến thắng Ngọc Hồi - Đống Đa gắn với vua nào?", ["Quang Trung", "Gia Long", "Lê Lợi", "Trần Nhân Tông"], 0, "Quang Trung đại phá quân Thanh năm 1789."],
+  ["Pháp xâm lược", "Pháp nổ súng xâm lược Việt Nam năm 1858 tại?", ["Đà Nẵng", "Hà Nội", "Huế", "Sài Gòn"], 0, "Quân Pháp nổ súng tại Đà Nẵng năm 1858."],
+  ["Hà Nội", "Ngày 19/8/1945 gắn với sự kiện nào?", ["Khởi nghĩa giành chính quyền ở Hà Nội", "Chiến thắng Điện Biên Phủ", "Ký Hiệp định Paris", "Đổi mới"], 0, "Ngày 19/8/1945, Hà Nội giành chính quyền."],
+  ["Chiến tranh", "Chiến tranh Việt Nam kết thúc vào năm?", ["1975", "1973", "1976", "1968"], 0, "Năm 1975 đánh dấu kết thúc chiến tranh."],
+  ["TP.HCM", "Sài Gòn - Gia Định được mang tên Thành phố Hồ Chí Minh từ năm?", ["1976", "1975", "1986", "1990"], 0, "Tên Thành phố Hồ Chí Minh được Quốc hội quyết định năm 1976."],
+  ["Paris", "Hiệp định Paris về chấm dứt chiến tranh, lập lại hòa bình ở Việt Nam ký năm?", ["1973", "1972", "1975", "1968"], 0, "Hiệp định Paris được ký năm 1973."],
+  ["ASEAN", "Việt Nam gia nhập ASEAN vào năm nào?", ["1995", "1990", "1986", "2000"], 0, "Việt Nam trở thành thành viên ASEAN năm 1995."],
+];
+
+const DIA_QUESTIONS = [
+  ["Khí hậu", "Việt Nam có kiểu khí hậu chủ yếu nào?", ["Nhiệt đới gió mùa", "Ôn đới", "Hàn đới", "Hoang mạc"], 0, "Việt Nam nằm trong vùng nhiệt đới gió mùa."],
+  ["Đồng bằng", "Đồng bằng sông Hồng nằm chủ yếu ở?", ["Miền Bắc", "Miền Trung", "Tây Nguyên", "Nam Bộ"], 0, "Đồng bằng sông Hồng thuộc khu vực Bắc Bộ."],
+  ["Đồng bằng", "Đồng bằng sông Cửu Long nằm ở?", ["Nam Bộ", "Bắc Bộ", "Tây Bắc", "Bắc Trung Bộ"], 0, "Đồng bằng sông Cửu Long nằm ở Nam Bộ."],
+  ["Fansipan", "Đỉnh núi cao nhất Việt Nam là?", ["Fansipan", "Bạch Mã", "Ngọc Linh", "Langbiang"], 0, "Fansipan cao khoảng 3.143 m."],
+  ["Sông", "Sông nào là một trong những hệ thống sông lớn của miền Bắc?", ["Sông Hồng", "Sông Đồng Nai", "Sông Tiền", "Sông Hậu"], 0, "Sông Hồng là hệ thống sông lớn ở miền Bắc."],
+  ["Biển", "Bờ biển Việt Nam dài khoảng bao nhiêu?", ["Hơn 3.000 km", "500 km", "1.000 km", "10.000 km"], 0, "Bờ biển Việt Nam dài khoảng 3.260 km."],
+  ["Khu vực", "Việt Nam thuộc khu vực nào của châu Á?", ["Đông Nam Á", "Đông Á", "Nam Á", "Tây Á"], 0, "Việt Nam nằm ở Đông Nam Á."],
+  ["Biển Đông", "Việt Nam giáp vùng biển nào?", ["Biển Đông", "Địa Trung Hải", "Biển Đỏ", "Biển Baltic"], 0, "Biển Đông nằm ở phía đông và đông nam Việt Nam."],
+  ["Gió mùa", "Gió mùa Đông Bắc ảnh hưởng rõ nhất đến?", ["Miền Bắc", "Đồng bằng sông Cửu Long", "Nam Trung Bộ", "Tây Nguyên"], 0, "Gió mùa Đông Bắc ảnh hưởng mạnh tới miền Bắc."],
+  ["Gió mùa", "Gió mùa Tây Nam hoạt động mạnh vào?", ["Mùa hạ", "Mùa đông", "Mùa xuân בלבד", "Quanh năm như nhau"], 0, "Gió mùa Tây Nam chủ yếu hoạt động mùa hạ."],
+  ["Tây Nguyên", "Tây Nguyên nổi tiếng với loại đất nào?", ["Đất đỏ bazan", "Đất phù sa", "Đất mặn", "Đất cát"], 0, "Đất đỏ bazan thích hợp với cây công nghiệp lâu năm."],
+  ["Nông nghiệp", "Đồng bằng sông Cửu Long là vùng sản xuất mạnh về?", ["Lúa gạo", "Than đá", "Bauxite", "Chè"], 0, "Đây là vùng sản xuất lúa lớn nhất cả nước."],
+  ["Dân cư", "Đồng bằng sông Hồng có đặc điểm?", ["Mật độ dân số cao", "Dân cư rất thưa", "Không có đô thị", "Chỉ làm lâm nghiệp"], 0, "Đồng bằng sông Hồng có mật độ dân số cao."],
+  ["Rừng", "Bảo vệ rừng có ý nghĩa quan trọng đối với?", ["Bảo vệ đất và nguồn nước", "Tăng sa mạc hóa", "Giảm đa dạng sinh học", "Tăng xói mòn"], 0, "Rừng giúp bảo vệ đất, nước và đa dạng sinh học."],
+  ["Đô thị hóa", "Đô thị hóa diễn ra mạnh ở?", ["Các thành phố lớn", "Vùng núi xa xôi", "Đảo hoang", "Nơi không có dân cư"], 0, "Các đô thị lớn có tốc độ đô thị hóa cao."],
+  ["Than", "Tỉnh nổi tiếng về khai thác than ở Việt Nam?", ["Quảng Ninh", "Đồng Tháp", "An Giang", "Lâm Đồng"], 0, "Quảng Ninh là vùng than lớn của Việt Nam."],
+  ["Bauxite", "Bauxite tập trung nhiều ở?", ["Tây Nguyên", "Đồng bằng sông Hồng", "Đồng bằng sông Cửu Long", "Đông Bắc"], 0, "Tây Nguyên có trữ lượng bauxite lớn."],
+  ["Dầu khí", "Dầu khí của Việt Nam tập trung đáng kể ở?", ["Thềm lục địa phía Nam", "Tây Bắc", "Đồng bằng sông Hồng", "Tây Nguyên"], 0, "Dầu khí tập trung nhiều ở thềm lục địa phía Nam."],
+  ["Thủy sản", "Nuôi trồng thủy sản phát triển mạnh ở?", ["Đồng bằng sông Cửu Long", "Tây Bắc", "Tây Nguyên", "Đông Bắc"], 0, "ĐBSCL có điều kiện thuận lợi cho nuôi trồng thủy sản."],
+  ["Du lịch", "Một lợi thế của du lịch Việt Nam là?", ["Đa dạng khí hậu và cảnh quan", "Chỉ có một mùa", "Không có biển", "Không có di sản"], 0, "Việt Nam có biển, núi, đồng bằng và nhiều cảnh quan đa dạng."],
+];
+
+const ANH_QUESTIONS = [
+  ["Grammar", "If I were you, I ___ harder.", ["would study", "will study", "studied", "study"], 0, "Câu điều kiện loại 2 dùng would + V."],
+  ["Grammar", "She ___ here since 2020.", ["has lived", "lived", "lives", "is living"], 0, "Since + mốc thời gian thường dùng hiện tại hoàn thành."],
+  ["Past Simple", "Yesterday, I ___ to school.", ["went", "go", "have gone", "going"], 0, "Yesterday là dấu hiệu của quá khứ đơn."],
+  ["Present Perfect", "I ___ my homework.", ["have finished", "finish", "finished yesterday", "am finish"], 0, "Have finished là hiện tại hoàn thành."],
+  ["Comparison", "This book is ___ than that one.", ["more interesting", "most interesting", "interestingest", "more interest"], 0, "Tính từ dài dùng more + adjective."],
+  ["Superlative", "She is ___ student in the class.", ["the tallest", "taller", "tall", "most tall"], 0, "So sánh nhất dùng the + adjective-est với tính từ ngắn."],
+  ["Modal", "You ___ wear a helmet when riding a motorbike.", ["must", "might", "couldn't", "would"], 0, "Must diễn tả sự bắt buộc."],
+  ["Passive", "The book ___ by Nam.", ["was written", "wrote", "writes", "is write"], 0, "Bị động quá khứ: was/were + V3."],
+  ["Reported Speech", "He said that he ___ tired.", ["was", "is", "will", "be"], 0, "Lùi thì: am/is → was trong câu tường thuật quá khứ."],
+  ["Conditional", "If it rains, we ___ home.", ["will stay", "stayed", "would stayed", "stay yesterday"], 0, "Điều kiện loại 1: If + hiện tại, will + V."],
+  ["Conjunction", "___ it was raining, we went out.", ["Although", "Because", "So", "Therefore"], 0, "Although diễn tả sự tương phản."],
+  ["Reason", "I stayed home ___ I was sick.", ["because", "although", "but", "despite"], 0, "Because dùng để nêu nguyên nhân."],
+  ["Plural", "The plural of child is?", ["children", "childs", "childes", "childrens"], 0, "Child → children."],
+  ["Advice", "You ___ see a doctor.", ["should", "mustn't", "can't", "wouldn't"], 0, "Should thường dùng để đưa lời khuyên."],
+  ["Preposition", "She is interested ___ music.", ["in", "on", "at", "for"], 0, "Cụm đúng: be interested in."],
+  ["Expression", "I look forward to ___ you.", ["meeting", "meet", "met", "to meet"], 0, "Look forward to + V-ing."],
+  ["Used to", "I used to ___ football.", ["play", "playing", "played", "plays"], 0, "Used to + động từ nguyên mẫu."],
+  ["Too...to", "The box is too heavy ___.", ["to carry", "carrying", "carry", "carried"], 0, "Too + adjective + to V."],
+  ["Neither", "___ Tom nor Mary is here.", ["Neither", "Either", "Both", "All"], 0, "Neither...nor mang nghĩa không... cũng không."],
+  ["Vocabulary", "Which word means the natural world around us?", ["environment", "equipment", "employment", "entertainment"], 0, "Environment = môi trường."],
+];
+
+const GDCD_QUESTIONS = [
+  ["Pháp luật", "Hiến pháp được hiểu là?", ["Luật cơ bản của Nhà nước", "Một nội quy lớp học", "Một hợp đồng", "Một quyển sách giáo khoa"], 0, "Hiến pháp là luật cơ bản của Nhà nước."],
+  ["Bình đẳng", "Bình đẳng trước pháp luật có nghĩa là?", ["Mọi người có quyền và nghĩa vụ theo quy định pháp luật", "Không cần tuân thủ luật", "Chỉ người giàu mới có quyền", "Chỉ cán bộ mới chịu trách nhiệm"], 0, "Mọi người đều bình đẳng trước pháp luật trong phạm vi quy định."],
+  ["Tự do", "Quyền tự do ngôn luận phải được thực hiện như thế nào?", ["Trong khuôn khổ pháp luật", "Muốn nói gì cũng được", "Không cần tôn trọng người khác", "Có thể xâm phạm bí mật người khác"], 0, "Quyền tự do luôn gắn với giới hạn do pháp luật quy định."],
+  ["Thuế", "Thuế là khoản đóng góp như thế nào?", ["Bắt buộc theo quy định pháp luật", "Hoàn toàn tự nguyện", "Chỉ dành cho học sinh", "Chỉ doanh nghiệp mới đóng"], 0, "Thuế là khoản nộp theo quy định của pháp luật."],
+  ["Giao thông", "Khi đèn đỏ bật, người tham gia giao thông phải?", ["Dừng lại", "Tăng tốc", "Đi ngược chiều", "Bấm còi liên tục"], 0, "Đèn đỏ báo hiệu phải dừng."],
+  ["Hợp đồng", "Hợp đồng là sự thỏa thuận nhằm?", ["Xác lập quyền và nghĩa vụ", "Xóa mọi trách nhiệm", "Không có giá trị", "Thay thế Hiến pháp"], 0, "Hợp đồng tạo lập quyền và nghĩa vụ giữa các bên."],
+  ["Nhân phẩm", "Tôn trọng nhân phẩm người khác là?", ["Ứng xử đúng mực và không xúc phạm", "Đăng thông tin riêng tư", "Chế giễu người khác", "Bịa đặt thông tin"], 0, "Mỗi người cần tôn trọng danh dự và nhân phẩm của người khác."],
+  ["Đời tư", "Thông tin đời tư của người khác nên được?", ["Tôn trọng và bảo vệ theo pháp luật", "Tự ý đăng lên mạng", "Bán cho người khác", "Công khai mọi lúc"], 0, "Đời tư và dữ liệu cá nhân cần được tôn trọng."],
+  ["Môi trường", "Bảo vệ môi trường là trách nhiệm của?", ["Mọi cá nhân và tổ chức", "Chỉ công ty môi trường", "Chỉ học sinh", "Chỉ Nhà nước"], 0, "Bảo vệ môi trường là trách nhiệm chung."],
+  ["Trung thực", "Trung thực trong học tập thể hiện qua?", ["Tự làm bài, không gian lận", "Chép bài", "Mua điểm", "Nhờ người thi hộ"], 0, "Trung thực là một phẩm chất đạo đức quan trọng."],
+  ["Khoan dung", "Khoan dung là?", ["Tôn trọng và biết tha thứ phù hợp", "Chấp nhận mọi hành vi phạm luật", "Không quan tâm ai", "Luôn đồng ý với mọi người"], 0, "Khoan dung không đồng nghĩa với bỏ qua hành vi trái pháp luật."],
+  ["Quyền và nghĩa vụ", "Quyền của công dân thường đi kèm với?", ["Nghĩa vụ và trách nhiệm", "Không có trách nhiệm", "Đặc quyền tuyệt đối", "Miễn tuân thủ pháp luật"], 0, "Quyền và nghĩa vụ của công dân gắn bó với nhau."],
+  ["Tự vệ", "Phòng vệ chính đáng cần được thực hiện?", ["Trong giới hạn pháp luật cho phép", "Bằng mọi cách", "Không có giới hạn", "Bất kể hậu quả"], 0, "Phòng vệ phải phù hợp quy định pháp luật."],
+  ["Tài sản", "Quyền sở hữu thường gồm?", ["Chiếm hữu, sử dụng, định đoạt", "Chỉ mua bán", "Chỉ sử dụng", "Chỉ cất giữ"], 0, "Ba quyền cơ bản là chiếm hữu, sử dụng và định đoạt."],
+  ["Người tiêu dùng", "Khi mua hàng, người tiêu dùng nên?", ["Kiểm tra thông tin và hóa đơn", "Không cần xem sản phẩm", "Đưa mật khẩu ngân hàng", "Bỏ qua nguồn gốc"], 0, "Kiểm tra thông tin giúp bảo vệ quyền lợi người tiêu dùng."],
+  ["Bình đẳng giới", "Bình đẳng giới hướng tới?", ["Cơ hội và quyền bình đẳng", "Một giới có mọi quyền", "Phân biệt nghề nghiệp", "Hạn chế cơ hội"], 0, "Bình đẳng giới nhằm bảo đảm quyền và cơ hội bình đẳng."],
+  ["Mạng xã hội", "Khi sử dụng mạng xã hội nên?", ["Tôn trọng pháp luật và quyền riêng tư", "Đăng mọi thông tin cá nhân của người khác", "Lan truyền tin chưa kiểm chứng", "Mạo danh người khác"], 0, "Ứng xử trên mạng cũng cần tuân thủ pháp luật."],
+  ["Tình nguyện", "Hoạt động tình nguyện thường thể hiện?", ["Tinh thần tự nguyện và trách nhiệm cộng đồng", "Ép buộc", "Vụ lợi bắt buộc", "Trốn tránh trách nhiệm"], 0, "Tình nguyện hướng tới đóng góp cho cộng đồng trên tinh thần tự nguyện."],
+  ["Nhà nước pháp quyền", "Trong Nhà nước pháp quyền, ai phải tuân thủ pháp luật?", ["Mọi tổ chức và cá nhân", "Chỉ người dân", "Chỉ doanh nghiệp", "Chỉ học sinh"], 0, "Mọi cá nhân, tổ chức đều phải tuân thủ pháp luật."],
+  ["Trách nhiệm", "Khi làm sai, thái độ phù hợp là?", ["Nhận trách nhiệm và khắc phục", "Đổ lỗi cho người khác", "Che giấu", "Xóa bằng chứng"], 0, "Nhận trách nhiệm và khắc phục là cách ứng xử tích cực."],
+];
+
+const MEO_QUESTIONS = [
+  ["Câu đố", "Thứ gì có rất nhiều phím nhưng không mở được ổ khóa?", ["Bàn phím", "Chìa khóa", "Cửa", "Tủ"], 0, "Bàn phím có nhiều phím nhưng không phải chìa khóa."],
+  ["Câu đố", "Thứ gì đi lên đi xuống nhưng không di chuyển?", ["Cầu thang", "Xe máy", "Thang máy", "Con người"], 0, "Cầu thang có hướng lên xuống nhưng đứng yên."],
+  ["Câu đố", "Cái gì có kim và mặt nhưng không có tay?", ["Đồng hồ", "Con mèo", "Cái bàn", "Cái kéo"], 0, "Đồng hồ có kim và mặt đồng hồ."],
+  ["Câu đố", "Cái gì có cổ nhưng không có đầu?", ["Cái chai", "Con người", "Con ngựa", "Cái bàn"], 0, "Chai có phần cổ chai."],
+  ["Câu đố", "Cái gì càng lau càng ướt?", ["Khăn", "Bàn", "Sàn", "Giấy"], 0, "Khăn lau nước sẽ bị ướt."],
+  ["Câu đố", "Cái gì có một mắt nhưng không nhìn thấy?", ["Cây kim", "Con mèo", "Con chim", "Cái cốc"], 0, "Kim khâu có mắt kim."],
+  ["Câu đố", "Cái gì có răng nhưng không cắn?", ["Cái lược", "Con chó", "Cá mập", "Con ngựa"], 0, "Lược có các răng lược."],
+  ["Câu đố", "Cái gì có thành phố, sông nhưng không có người và nước thật?", ["Bản đồ", "Quyển sách", "Điện thoại", "Tivi"], 0, "Bản đồ có ký hiệu thành phố và sông."],
+  ["Câu đố", "Cái gì có nhiều chữ nhưng không biết nói?", ["Quyển sách", "Con người", "Điện thoại", "Radio"], 0, "Sách có chữ nhưng không tự nói."],
+  ["Câu đố", "Tháng nào cũng có ít nhất 28 ngày?", ["Tất cả các tháng", "Tháng 2 בלבד", "Tháng 1", "Tháng 12"], 0, "Mọi tháng đều có ít nhất 28 ngày."],
+  ["Câu đố", "Thứ gì đi vòng quanh thế giới nhưng vẫn nằm ở một góc?", ["Tem thư", "Máy bay", "Xe", "Con tàu"], 0, "Tem nằm ở góc phong bì nhưng có thể đi khắp thế giới."],
+  ["Câu đố", "Cái gì có chân nhưng không đi?", ["Cái bàn", "Con chó", "Con mèo", "Con người"], 0, "Bàn có chân bàn."],
+  ["Câu đố", "Cái gì có thể bắt nhưng không thể ném?", ["Cảm lạnh", "Quả bóng", "Con cá", "Chiếc túi"], 0, "Ta có thể 'catch a cold'."],
+  ["Câu đố", "Thứ gì thuộc về bạn nhưng người khác dùng nhiều hơn?", ["Tên của bạn", "Đôi giày", "Xe của bạn", "Nhà bạn"], 0, "Người khác thường gọi tên bạn nhiều hơn chính bạn."],
+  ["Câu đố", "Cái gì có mặt và hai tay nhưng không có chân?", ["Đồng hồ", "Cái ghế", "Con người", "Cái kéo"], 0, "Đồng hồ có mặt và hai kim."],
+  ["Câu đố", "Cái gì có rất nhiều lỗ nhưng vẫn giữ được nước?", ["Miếng bọt biển", "Cái rổ", "Cái lưới", "Cái sàng"], 0, "Bọt biển có nhiều lỗ nhỏ nhưng giữ nước."],
+  ["Câu đố", "Cái gì có thể bị phá vỡ mà không cần chạm vào?", ["Lời hứa", "Cái ly", "Cánh cửa", "Chiếc bàn"], 0, "Ta có thể phá vỡ một lời hứa."],
+  ["Câu đố", "Cái gì rơi xuống nhưng không bao giờ đi lên?", ["Mưa", "Bóng", "Khói", "Bóng bay"], 0, "Mưa rơi xuống mặt đất."],
+  ["Câu đố", "Cái gì có đầu và đuôi nhưng không có thân?", ["Đồng xu", "Con cá", "Con rắn", "Cái chai"], 0, "Đồng xu có mặt đầu và mặt đuôi."],
+  ["Câu đố", "Càng lấy đi nhiều thì nó càng lớn là gì?", ["Cái hố", "Cái túi", "Cái hộp", "Đống sách"], 0, "Càng đào lấy đất thì cái hố càng lớn."],
+];
+
+const toQuestions = (subject, key, rows) =>
+  rows.map((r, i) => ({
+    id: `${key}${String(i + 1).padStart(2, "0")}`,
+    subject,
+    topic: r[0],
+    q: r[1],
+    choices: r[2],
+    answer: r[3],
+    explanation: r[4],
+  }));
 
 const QUIZ_BANK = [
-  /* ==================== VĂN 20 ==================== */
-
-  q(
-    "Văn",
-    'Tác phẩm "Vợ nhặt" của nhà văn nào?',
-    ["Kim Lân", "Nam Cao", "Tô Hoài", "Nguyễn Minh Châu"],
-    0,
-    "Kim Lân là tác giả của Vợ nhặt."
-  ),
-  q(
-    "Văn",
-    '"Mặt trời xuống biển như hòn lửa" sử dụng biện pháp tu từ nào?',
-    ["Ẩn dụ", "So sánh", "Hoán dụ", "Điệp ngữ"],
-    1,
-    'Từ "như" tạo nên phép so sánh.'
-  ),
-  q(
-    "Văn",
-    'Tác phẩm "Tây Tiến" được sáng tác bởi ai?',
-    ["Chính Hữu", "Quang Dũng", "Tố Hữu", "Huy Cận"],
-    1,
-    "Quang Dũng là tác giả Tây Tiến."
-  ),
-  q(
-    "Văn",
-    "Nhân vật Mị xuất hiện trong tác phẩm nào?",
-    ["Vợ chồng A Phủ", "Vợ nhặt", "Rừng xà nu", "Chiếc thuyền ngoài xa"],
-    0,
-    "Mị là nhân vật chính trong Vợ chồng A Phủ."
-  ),
-  q(
-    "Văn",
-    '"Đồng chí" là bài thơ của ai?',
-    ["Chính Hữu", "Phạm Tiến Duật", "Quang Dũng", "Hữu Thỉnh"],
-    0,
-    "Đồng chí của Chính Hữu."
-  ),
-  q(
-    "Văn",
-    '"Chiếc thuyền ngoài xa" đặt ra vấn đề nổi bật nào?',
-    [
-      "Cách nhìn đời và con người đa diện",
-      "Tình yêu thiên nhiên",
-      "Tuổi trẻ học đường",
-      "Khát vọng chinh phục biển",
-    ],
-    0,
-    "Tác phẩm nhấn mạnh cách nhìn đời sống đa diện, sâu sắc."
-  ),
-  q(
-    "Văn",
-    'Thể thơ của bài "Sóng" là gì?',
-    ["Lục bát", "Thất ngôn", "Năm chữ", "Thơ tự do"],
-    3,
-    "Sóng được viết theo thể thơ năm chữ biến thể."
-  ),
-  q(
-    "Văn",
-    'Tác giả "Ai đã đặt tên cho dòng sông?" là ai?',
-    ["Hoàng Phủ Ngọc Tường", "Nguyễn Tuân", "Nguyễn Khoa Điềm", "Xuân Diệu"],
-    0,
-    "Đây là bút ký nổi tiếng của Hoàng Phủ Ngọc Tường."
-  ),
-  q(
-    "Văn",
-    '"Đất Nước" là đoạn trích trong trường ca nào?',
-    ["Mặt đường khát vọng", "Việt Bắc", "Máu và hoa", "Những người đi tới biển"],
-    0,
-    "Đất Nước thuộc trường ca Mặt đường khát vọng."
-  ),
-  q(
-    "Văn",
-    '"Rừng xà nu" do ai sáng tác?',
-    ["Nguyễn Trung Thành", "Nguyễn Thi", "Nguyễn Minh Châu", "Lê Minh Khuê"],
-    0,
-    "Nguyễn Trung Thành còn có bút danh Nguyên Ngọc."
-  ),
-  q(
-    "Văn",
-    'Hình ảnh "cây xà nu" trong Rừng xà nu chủ yếu tượng trưng cho điều gì?',
-    [
-      "Sức sống cộng đồng và tinh thần đấu tranh",
-      "Sự giàu có",
-      "Tuổi thơ",
-      "Thiên nhiên yên bình",
-    ],
-    0,
-    "Xà nu gắn với sức sống và sự kiên cường của dân làng Xô Man."
-  ),
-  q(
-    "Văn",
-    "Nhà thơ Xuân Quỳnh nổi tiếng với bài thơ nào?",
-    ["Sóng", "Tây Tiến", "Đồng chí", "Việt Bắc"],
-    0,
-    "Sóng là một trong những bài thơ tiêu biểu của Xuân Quỳnh."
-  ),
-  q(
-    "Văn",
-    '"Việt Bắc" được sáng tác trong hoàn cảnh nào?',
-    [
-      "Sau chiến thắng Điện Biên Phủ",
-      "Khi tác giả đi du học",
-      "Trong thời kỳ đổi mới",
-      "Sau năm 1975",
-    ],
-    0,
-    "Bài thơ ra đời tháng 10/1954."
-  ),
-  q(
-    "Văn",
-    "Phương thức biểu đạt chính của văn bản nghị luận là gì?",
-    ["Tự sự", "Miêu tả", "Nghị luận", "Biểu cảm"],
-    2,
-    "Nghị luận dùng lập luận và bằng chứng để làm rõ quan điểm."
-  ),
-  q(
-    "Văn",
-    "Trong văn nghị luận, luận điểm là gì?",
-    [
-      "Ý kiến chính cần làm sáng tỏ",
-      "Một câu chuyện",
-      "Một hình ảnh",
-      "Một từ khóa",
-    ],
-    0,
-    "Luận điểm là quan điểm được triển khai bằng lý lẽ và bằng chứng."
-  ),
-  q(
-    "Văn",
-    "Biện pháp điệp ngữ là gì?",
-    [
-      "Lặp lại từ hoặc cụm từ có chủ ý",
-      "Đối lập hai ý",
-      "So sánh hai sự vật",
-      "Nói quá sự thật",
-    ],
-    0,
-    "Điệp ngữ là lặp lại có dụng ý để nhấn mạnh."
-  ),
-  q(
-    "Văn",
-    '"Người lái đò Sông Đà" của ai?',
-    ["Nguyễn Tuân", "Nam Cao", "Tô Hoài", "Vũ Trọng Phụng"],
-    0,
-    "Nguyễn Tuân viết Người lái đò Sông Đà."
-  ),
-  q(
-    "Văn",
-    "Phong cách nghệ thuật Nguyễn Tuân thường nổi bật ở đặc điểm nào?",
-    [
-      "Tài hoa, uyên bác",
-      "Mộc mạc, giản dị hoàn toàn",
-      "Khoa học, khô khan",
-      "Chỉ viết về thiếu nhi",
-    ],
-    0,
-    "Nguyễn Tuân nổi tiếng với phong cách tài hoa, uyên bác."
-  ),
-  q(
-    "Văn",
-    '"Chữ người tử tù" thuộc thể loại nào?',
-    ["Truyện ngắn", "Thơ", "Kịch", "Tùy bút"],
-    0,
-    "Đây là truyện ngắn nổi tiếng của Nguyễn Tuân."
-  ),
-  q(
-    "Văn",
-    "Mục đích chính của thao tác lập luận so sánh là gì?",
-    [
-      "Làm rõ đối tượng qua sự tương đồng hoặc khác biệt",
-      "Kể lại sự việc",
-      "Miêu tả phong cảnh",
-      "Bộc lộ cảm xúc cá nhân",
-    ],
-    0,
-    "So sánh giúp làm nổi bật đặc điểm của đối tượng."
-  ),
-
-  /* ==================== LÝ 20 ==================== */
-
-  q(
-    "Lý",
-    "Đơn vị SI của công suất là gì?",
-    ["Joule", "Watt", "Newton", "Pascal"],
-    1,
-    "Công suất có đơn vị watt (W)."
-  ),
-  q(
-    "Lý",
-    "Định luật II Newton được biểu diễn bằng công thức nào?",
-    ["F = ma", "P = UI", "A = Pt", "v = s/t"],
-    0,
-    "Hợp lực F bằng khối lượng m nhân gia tốc a."
-  ),
-  q(
-    "Lý",
-    "Vận tốc được tính bằng công thức nào?",
-    ["v=s/t", "v=t/s", "v=s.t", "v=m/V"],
-    0,
-    "Vận tốc bằng quãng đường chia thời gian."
-  ),
-  q(
-    "Lý",
-    "Đơn vị của cường độ dòng điện là gì?",
-    ["Volt", "Ohm", "Ampere", "Watt"],
-    2,
-    "Cường độ dòng điện đo bằng ampe (A)."
-  ),
-  q(
-    "Lý",
-    "Đơn vị hiệu điện thế là gì?",
-    ["Volt", "Ampere", "Ohm", "Tesla"],
-    0,
-    "Hiệu điện thế đo bằng volt (V)."
-  ),
-  q(
-    "Lý",
-    "Điện trở của vật dẫn được đo bằng đơn vị nào?",
-    ["Ohm", "Volt", "Watt", "Joule"],
-    0,
-    "Điện trở có đơn vị ohm (Ω)."
-  ),
-  q(
-    "Lý",
-    "Công thức định luật Ohm cho đoạn mạch là gì?",
-    ["I=U/R", "U=I/R", "R=UI", "I=UR"],
-    0,
-    "I = U/R."
-  ),
-  q(
-    "Lý",
-    "Công suất điện có thể tính bằng công thức nào?",
-    ["P=UI", "P=U/I", "P=I/U", "P=R/U"],
-    0,
-    "P = UI."
-  ),
-  q(
-    "Lý",
-    "Gia tốc trọng trường gần mặt đất có giá trị xấp xỉ?",
-    ["0,98 m/s²", "9,8 m/s²", "98 m/s²", "980 m/s²"],
-    1,
-    "g xấp xỉ 9,8 m/s²."
-  ),
-  q(
-    "Lý",
-    "Động năng của vật phụ thuộc vào yếu tố nào?",
-    ["Khối lượng và vận tốc", "Chỉ khối lượng", "Chỉ độ cao", "Nhiệt độ"],
-    0,
-    "Wđ = 1/2 mv²."
-  ),
-  q(
-    "Lý",
-    "Thế năng trọng trường phụ thuộc vào?",
-    [
-      "Khối lượng, độ cao và g",
-      "Chỉ vận tốc",
-      "Chỉ nhiệt độ",
-      "Điện trở",
-    ],
-    0,
-    "Wt = mgh."
-  ),
-  q(
-    "Lý",
-    "Âm thanh không truyền được trong môi trường nào?",
-    ["Chất rắn", "Chất lỏng", "Chất khí", "Chân không"],
-    3,
-    "Âm cần môi trường vật chất để truyền."
-  ),
-  q(
-    "Lý",
-    "Ánh sáng truyền trong chân không với tốc độ xấp xỉ?",
-    ["3×10^8 m/s", "3×10^6 m/s", "3×10^4 m/s", "3×10^2 m/s"],
-    0,
-    "Tốc độ ánh sáng trong chân không khoảng 300.000 km/s."
-  ),
-  q(
-    "Lý",
-    "Thấu kính hội tụ có đặc điểm nào?",
-    [
-      "Dày ở giữa, mỏng ở rìa",
-      "Mỏng ở giữa, dày ở rìa",
-      "Phẳng hoàn toàn",
-      "Không làm lệch tia sáng",
-    ],
-    0,
-    "Thấu kính hội tụ thường dày ở giữa."
-  ),
-  q(
-    "Lý",
-    "Lực ma sát trượt thường có hướng như thế nào?",
-    [
-      "Cùng hướng chuyển động",
-      "Ngược hướng chuyển động tương đối",
-      "Vuông góc trọng lực",
-      "Luôn hướng lên",
-    ],
-    1,
-    "Ma sát chống lại chuyển động tương đối."
-  ),
-  q(
-    "Lý",
-    "Nhiệt lượng cần để làm nóng vật phụ thuộc vào?",
-    [
-      "Khối lượng, nhiệt dung riêng và độ tăng nhiệt độ",
-      "Chỉ khối lượng",
-      "Chỉ thể tích",
-      "Chỉ áp suất",
-    ],
-    0,
-    "Q = mcΔt."
-  ),
-  q(
-    "Lý",
-    "Hiện tượng cảm ứng điện từ liên quan đến sự biến thiên của?",
-    ["Từ thông", "Khối lượng", "Nhiệt độ phòng", "Áp suất khí quyển"],
-    0,
-    "Biến thiên từ thông tạo ra suất điện động cảm ứng."
-  ),
-  q(
-    "Lý",
-    "Trong mạch nối tiếp, đại lượng nào có cùng giá trị qua các phần tử?",
-    ["Cường độ dòng điện", "Hiệu điện thế", "Điện trở", "Công suất"],
-    0,
-    "Dòng điện qua các phần tử nối tiếp như nhau."
-  ),
-  q(
-    "Lý",
-    "Trong mạch song song, đại lượng nào có cùng giá trị trên các nhánh?",
-    ["Hiệu điện thế", "Cường độ dòng điện", "Điện trở", "Công suất"],
-    0,
-    "Hiệu điện thế giữa hai đầu các nhánh song song bằng nhau."
-  ),
-  q(
-    "Lý",
-    "Một vật đứng yên chịu tác dụng của hai lực cân bằng thì?",
-    ["Vật tiếp tục đứng yên", "Vật tăng tốc", "Vật đổi hướng", "Vật luôn rơi"],
-    0,
-    "Hai lực cân bằng không làm thay đổi trạng thái chuyển động."
-  ),
-
-  /* ==================== HÓA 20 ==================== */
-
-  q(
-    "Hóa",
-    "Dung dịch có pH < 7 có tính chất gì?",
-    ["Axit", "Bazơ", "Trung tính", "Không xác định"],
-    0,
-    "pH nhỏ hơn 7 là môi trường axit."
-  ),
-  q(
-    "Hóa",
-    "Công thức hóa học của nước là gì?",
-    ["H2O", "CO2", "O2", "H2"],
-    0,
-    "Nước gồm hai H và một O."
-  ),
-  q(
-    "Hóa",
-    "NaCl thuộc loại hợp chất nào?",
-    ["Hợp chất ion", "Đơn chất kim loại", "Axit", "Bazơ"],
-    0,
-    "NaCl hình thành từ ion Na+ và Cl-."
-  ),
-  q(
-    "Hóa",
-    "Khí oxi có công thức?",
-    ["O2", "O3", "CO2", "H2O"],
-    0,
-    "Oxi phân tử tồn tại chủ yếu dạng O2."
-  ),
-  q(
-    "Hóa",
-    "CO2 là khí gì?",
-    ["Carbon dioxide", "Oxygen", "Hydrogen", "Nitrogen"],
-    0,
-    "CO2 là carbon dioxide."
-  ),
-  q(
-    "Hóa",
-    "Kim loại nào thường được dùng làm dây dẫn điện?",
-    ["Đồng", "Lưu huỳnh", "Clo", "Iot"],
-    0,
-    "Đồng dẫn điện tốt."
-  ),
-  q(
-    "Hóa",
-    "HCl là?",
-    ["Axit clohiđric", "Natri hiđroxit", "Natri clorua", "Axit sunfuric"],
-    0,
-    "HCl là axit clohiđric."
-  ),
-  q(
-    "Hóa",
-    "NaOH thuộc loại nào?",
-    ["Bazơ", "Axit", "Muối", "Oxide axit"],
-    0,
-    "NaOH là bazơ mạnh."
-  ),
-  q(
-    "Hóa",
-    "H2SO4 là?",
-    ["Axit sunfuric", "Axit nitric", "Axit clohiđric", "Bazơ"],
-    0,
-    "H2SO4 là axit sulfuric."
-  ),
-  q(
-    "Hóa",
-    "Phản ứng giữa axit và bazơ tạo muối và nước gọi là?",
-    ["Trung hòa", "Oxi hóa", "Trùng hợp", "Nhiệt phân"],
-    0,
-    "Đó là phản ứng trung hòa."
-  ),
-  q(
-    "Hóa",
-    "Nguyên tố có ký hiệu Fe là?",
-    ["Sắt", "Flo", "Kẽm", "Đồng"],
-    0,
-    "Fe là sắt."
-  ),
-  q(
-    "Hóa",
-    "Nguyên tố có ký hiệu Cu là?",
-    ["Đồng", "Canxi", "Cacbon", "Coban"],
-    0,
-    "Cu là đồng."
-  ),
-  q(
-    "Hóa",
-    "Khí chiếm tỉ lệ lớn nhất trong không khí là?",
-    ["Nitơ", "Oxi", "CO2", "Hidro"],
-    0,
-    "Nitơ chiếm khoảng 78% thể tích không khí."
-  ),
-  q(
-    "Hóa",
-    "Số oxi hóa của O trong H2O thường là?",
-    ["-2", "+2", "0", "-1"],
-    0,
-    "O thường có số oxi hóa -2 trong hợp chất."
-  ),
-  q(
-    "Hóa",
-    "Chất xúc tác có tác dụng chủ yếu là gì?",
-    [
-      "Làm thay đổi tốc độ phản ứng",
-      "Làm tăng khối lượng sản phẩm",
-      "Luôn bị tiêu hao hoàn toàn",
-      "Làm đổi màu mọi chất",
-    ],
-    0,
-    "Chất xúc tác làm thay đổi tốc độ phản ứng."
-  ),
-  q(
-    "Hóa",
-    "Dung dịch NaCl dẫn điện vì?",
-    [
-      "Có các ion chuyển động tự do",
-      "Không có ion",
-      "Chỉ có phân tử nước",
-      "Có kim loại rắn",
-    ],
-    0,
-    "NaCl phân li thành Na+ và Cl-."
-  ),
-  q(
-    "Hóa",
-    "Công thức của methane là?",
-    ["CH4", "C2H6", "CO2", "CH3OH"],
-    0,
-    "Methane có công thức CH4."
-  ),
-  q(
-    "Hóa",
-    "Ethanol có công thức nào?",
-    ["C2H5OH", "CH4", "CH3COOH", "C6H6"],
-    0,
-    "Ethanol là C2H5OH."
-  ),
-  q(
-    "Hóa",
-    "Kim loại nào phản ứng mạnh với nước ở điều kiện thường?",
-    ["Natri", "Đồng", "Bạc", "Vàng"],
-    0,
-    "Natri phản ứng mạnh với nước."
-  ),
-  q(
-    "Hóa",
-    "Quá trình đốt cháy thường là phản ứng với?",
-    ["Oxi", "Nitơ", "Heli", "Neon"],
-    0,
-    "Đốt cháy thường là quá trình chất phản ứng với O2."
-  ),
-
-  /* ==================== SINH 20 ==================== */
-
-  q(
-    "Sinh",
-    'Bào quan được xem là "nhà máy năng lượng" của tế bào là?',
-    ["Ti thể", "Ribosome", "Nhân", "Không bào"],
-    0,
-    "Ti thể tạo phần lớn ATP cho tế bào."
-  ),
-  q(
-    "Sinh",
-    "DNA có những loại base nitơ nào?",
-    ["A,T,G,C", "A,U,G,C", "A,T,U,G", "G,C,U,T"],
-    0,
-    "DNA chứa A, T, G, C."
-  ),
-  q(
-    "Sinh",
-    "RNA sử dụng base nào thay cho thymine?",
-    ["Uracil", "Cytosine", "Guanine", "Adenine"],
-    0,
-    "RNA có uracil (U) thay cho thymine."
-  ),
-  q(
-    "Sinh",
-    "Quang hợp ở thực vật chủ yếu diễn ra trong?",
-    ["Lục lạp", "Ti thể", "Ribosome", "Nhân"],
-    0,
-    "Lục lạp chứa diệp lục."
-  ),
-  q(
-    "Sinh",
-    "Sắc tố quang hợp chủ yếu ở cây xanh là?",
-    ["Diệp lục", "Melanin", "Hemoglobin", "Keratin"],
-    0,
-    "Diệp lục hấp thụ ánh sáng."
-  ),
-  q(
-    "Sinh",
-    "Đơn vị cấu tạo và chức năng cơ bản của cơ thể sống là?",
-    ["Tế bào", "Mô", "Cơ quan", "Hệ cơ quan"],
-    0,
-    "Tế bào là đơn vị cơ bản của sự sống."
-  ),
-  q(
-    "Sinh",
-    "Quá trình phân chia tế bào tạo hai tế bào con giống nhau về cơ bản là?",
-    ["Nguyên phân", "Giảm phân", "Thụ tinh", "Phiên mã"],
-    0,
-    "Nguyên phân tạo hai tế bào con."
-  ),
-  q(
-    "Sinh",
-    "Giảm phân có vai trò quan trọng trong việc tạo?",
-    ["Giao tử", "Tế bào cơ", "Tế bào da", "Hồng cầu trưởng thành"],
-    0,
-    "Giảm phân tạo giao tử."
-  ),
-  q(
-    "Sinh",
-    "Nhiễm sắc thể nằm chủ yếu ở đâu trong tế bào nhân thực?",
-    ["Nhân", "Màng tế bào", "Không bào", "Thành tế bào"],
-    0,
-    "NST nằm trong nhân."
-  ),
-  q(
-    "Sinh",
-    "Enzyme có bản chất chủ yếu là?",
-    ["Protein", "Lipid", "Tinh bột", "Muối khoáng"],
-    0,
-    "Phần lớn enzyme là protein."
-  ),
-  q(
-    "Sinh",
-    "Hệ tuần hoàn có chức năng chính là?",
-    ["Vận chuyển các chất", "Tiêu hóa thức ăn", "Tạo xương", "Điều hòa thân nhiệt duy nhất"],
-    0,
-    "Máu vận chuyển khí, dinh dưỡng và chất thải."
-  ),
-  q(
-    "Sinh",
-    "Hồng cầu có chức năng nổi bật là?",
-    ["Vận chuyển oxygen", "Tạo kháng thể chủ yếu", "Tiêu hóa protein", "Co cơ"],
-    0,
-    "Hemoglobin giúp vận chuyển O2."
-  ),
-  q(
-    "Sinh",
-    "Cơ quan trao đổi khí chủ yếu ở người là?",
-    ["Phổi", "Gan", "Thận", "Dạ dày"],
-    0,
-    "Phổi là cơ quan hô hấp chính."
-  ),
-  q(
-    "Sinh",
-    "Thận có vai trò quan trọng trong?",
-    ["Lọc máu và tạo nước tiểu", "Trao đổi khí", "Tiêu hóa tinh bột", "Bơm máu"],
-    0,
-    "Thận lọc máu và tạo nước tiểu."
-  ),
-  q(
-    "Sinh",
-    "Hormone insulin có vai trò chủ yếu gì?",
-    ["Giúp hạ đường huyết", "Tăng nhịp tim", "Tiêu hóa lipid", "Tạo hồng cầu"],
-    0,
-    "Insulin giúp giảm glucose máu."
-  ),
-  q(
-    "Sinh",
-    "Hệ thần kinh trung ương gồm?",
-    ["Não và tủy sống", "Tim và phổi", "Gan và thận", "Dạ dày và ruột"],
-    0,
-    "Não và tủy sống tạo thành hệ thần kinh trung ương."
-  ),
-  q(
-    "Sinh",
-    "Trong chuỗi thức ăn, sinh vật sản xuất thường là?",
-    ["Thực vật xanh", "Động vật ăn thịt", "Nấm", "Vi khuẩn phân giải"],
-    0,
-    "Thực vật tự dưỡng tạo chất hữu cơ."
-  ),
-  q(
-    "Sinh",
-    "Sinh vật phân giải có vai trò gì?",
-    ["Phân hủy chất hữu cơ", "Tạo ánh sáng", "Ăn mọi động vật", "Ngăn chu trình vật chất"],
-    0,
-    "Sinh vật phân giải giúp hoàn trả chất khoáng."
-  ),
-  q(
-    "Sinh",
-    "Đột biến là?",
-    ["Biến đổi trong vật chất di truyền", "Một loại thức ăn", "Quá trình hô hấp", "Một cơ quan"],
-    0,
-    "Đột biến là biến đổi trong vật chất di truyền."
-  ),
-  q(
-    "Sinh",
-    "Miễn dịch giúp cơ thể?",
-    ["Chống lại tác nhân gây bệnh", "Tăng chiều cao trực tiếp", "Tạo năng lượng từ ánh sáng", "Thay thế mọi tế bào"],
-    0,
-    "Hệ miễn dịch chống lại tác nhân lạ."
-  ),
-
-  /* ==================== SỬ 20 ==================== */
-
-  q(
-    "Sử",
-    "Cách mạng tháng Tám ở Việt Nam diễn ra năm nào?",
-    ["1945", "1930", "1954", "1975"],
-    0,
-    "Cách mạng tháng Tám thành công năm 1945."
-  ),
-  q(
-    "Sử",
-    "Đảng Cộng sản Việt Nam được thành lập năm nào?",
-    ["1930", "1945", "1954", "1960"],
-    0,
-    "Đảng được thành lập ngày 3/2/1930."
-  ),
-  q(
-    "Sử",
-    "Chiến thắng Điện Biên Phủ diễn ra năm nào?",
-    ["1954", "1945", "1968", "1975"],
-    0,
-    "Chiến thắng Điện Biên Phủ năm 1954."
-  ),
-  q(
-    "Sử",
-    "Hiệp định Genève về Đông Dương được ký năm?",
-    ["1954", "1946", "1968", "1973"],
-    0,
-    "Hiệp định Genève được ký năm 1954."
-  ),
-  q(
-    "Sử",
-    "Ngày Quốc khánh Việt Nam là?",
-    ["2/9/1945", "30/4/1975", "7/5/1954", "19/8/1945"],
-    0,
-    "Ngày 2/9/1945, Chủ tịch Hồ Chí Minh đọc Tuyên ngôn Độc lập."
-  ),
-  q(
-    "Sử",
-    "Chiến dịch Hồ Chí Minh kết thúc vào ngày nào?",
-    ["30/4/1975", "2/9/1945", "7/5/1954", "19/12/1946"],
-    0,
-    "Ngày 30/4/1975."
-  ),
-  q(
-    "Sử",
-    "Hiệp định Paris về chấm dứt chiến tranh, lập lại hòa bình ở Việt Nam ký năm?",
-    ["1973", "1968", "1975", "1954"],
-    0,
-    "Hiệp định Paris được ký năm 1973."
-  ),
-  q(
-    "Sử",
-    "Phong trào Xô viết Nghệ-Tĩnh diễn ra chủ yếu trong thời gian nào?",
-    ["1930-1931", "1945-1946", "1954-1955", "1968-1969"],
-    0,
-    "Đây là phong trào cách mạng 1930-1931."
-  ),
-  q(
-    "Sử",
-    "Mặt trận Việt Minh được thành lập năm nào?",
-    ["1941", "1930", "1945", "1954"],
-    0,
-    "Việt Minh thành lập năm 1941."
-  ),
-  q(
-    "Sử",
-    "Nhà Trần đánh bại quân Nguyên-Mông lần thứ ba vào năm?",
-    ["1288", "1258", "1285", "1077"],
-    0,
-    "Chiến thắng Bạch Đằng năm 1288."
-  ),
-  q(
-    "Sử",
-    "Chiến thắng Bạch Đằng năm 938 gắn với nhân vật nào?",
-    ["Ngô Quyền", "Lý Thường Kiệt", "Trần Hưng Đạo", "Lê Lợi"],
-    0,
-    "Ngô Quyền lãnh đạo chiến thắng năm 938."
-  ),
-  q(
-    "Sử",
-    "Lý Thường Kiệt nổi tiếng với chiến thắng nào?",
-    ["Phòng tuyến sông Như Nguyệt", "Bạch Đằng 938", "Điện Biên Phủ", "Chi Lăng"],
-    0,
-    "Ông chỉ huy cuộc kháng chiến chống Tống."
-  ),
-  q(
-    "Sử",
-    "Khởi nghĩa Lam Sơn gắn với nhân vật nào?",
-    ["Lê Lợi", "Quang Trung", "Ngô Quyền", "Đinh Bộ Lĩnh"],
-    0,
-    "Lê Lợi lãnh đạo khởi nghĩa Lam Sơn."
-  ),
-  q(
-    "Sử",
-    "Quang Trung đại phá quân Thanh vào năm?",
-    ["1789", "1771", "1802", "1858"],
-    0,
-    "Chiến thắng Ngọc Hồi - Đống Đa năm 1789."
-  ),
-  q(
-    "Sử",
-    "Thực dân Pháp nổ súng mở đầu cuộc xâm lược Việt Nam tại?",
-    ["Đà Nẵng", "Hà Nội", "Huế", "Sài Gòn"],
-    0,
-    "Pháp tấn công Đà Nẵng năm 1858."
-  ),
-  q(
-    "Sử",
-    "Phong trào Đông Du gắn với nhà yêu nước nào?",
-    ["Phan Bội Châu", "Phan Châu Trinh", "Nguyễn Tất Thành", "Huỳnh Thúc Kháng"],
-    0,
-    "Phan Bội Châu khởi xướng phong trào Đông Du."
-  ),
-  q(
-    "Sử",
-    "Nguyễn Tất Thành ra đi tìm đường cứu nước năm nào?",
-    ["1911", "1905", "1920", "1930"],
-    0,
-    "Người ra đi năm 1911."
-  ),
-  q(
-    "Sử",
-    "Cương lĩnh chính trị đầu tiên của Đảng được thông qua năm?",
-    ["1930", "1941", "1945", "1954"],
-    0,
-    "Cương lĩnh được thông qua khi thành lập Đảng năm 1930."
-  ),
-  q(
-    "Sử",
-    "Phong trào Đồng Khởi bùng nổ mạnh mẽ ở tỉnh nào?",
-    ["Bến Tre", "Quảng Ninh", "Lạng Sơn", "Lào Cai"],
-    0,
-    "Bến Tre là nơi phong trào phát triển mạnh."
-  ),
-  q(
-    "Sử",
-    "Tổng tiến công và nổi dậy Tết Mậu Thân diễn ra năm?",
-    ["1968", "1965", "1972", "1975"],
-    0,
-    "Tết Mậu Thân là năm 1968."
-  ),
-
-  /* ==================== ĐỊA 20 ==================== */
-
-  q(
-    "Địa",
-    "Việt Nam nằm trong kiểu khí hậu chủ yếu nào?",
-    ["Nhiệt đới gió mùa", "Ôn đới hải dương", "Hoang mạc", "Cận cực"],
-    0,
-    "Việt Nam có khí hậu nhiệt đới gió mùa."
-  ),
-  q(
-    "Địa",
-    "Đồng bằng sông Hồng nằm chủ yếu ở?",
-    ["Miền Bắc", "Miền Trung", "Tây Nguyên", "Nam Bộ"],
-    0,
-    "Đồng bằng sông Hồng thuộc Bắc Bộ."
-  ),
-  q(
-    "Địa",
-    "Đồng bằng lớn nhất Việt Nam là?",
-    ["Đồng bằng sông Cửu Long", "Đồng bằng sông Hồng", "Đồng bằng Thanh Hóa", "Đồng bằng Nghệ An"],
-    0,
-    "Đồng bằng sông Cửu Long có diện tích lớn nhất."
-  ),
-  q(
-    "Địa",
-    "Dãy núi cao nhất Việt Nam là?",
-    ["Hoàng Liên Sơn", "Trường Sơn Bắc", "Bạch Mã", "Đông Triều"],
-    0,
-    "Hoàng Liên Sơn có đỉnh Fansipan."
-  ),
-  q(
-    "Địa",
-    "Đỉnh núi cao nhất Việt Nam là?",
-    ["Fansipan", "Ngọc Linh", "Tây Côn Lĩnh", "Bạch Mã"],
-    0,
-    "Fansipan cao khoảng 3.143 m."
-  ),
-  q(
-    "Địa",
-    "Hai quần đảo Hoàng Sa và Trường Sa thuộc vùng biển nào?",
-    ["Biển Đông", "Biển Đỏ", "Địa Trung Hải", "Biển Đen"],
-    0,
-    "Hai quần đảo nằm trên Biển Đông."
-  ),
-  q(
-    "Địa",
-    "Cà phê được trồng tập trung nhiều ở vùng nào?",
-    ["Tây Nguyên", "Đồng bằng sông Hồng", "Đông Bắc", "Duyên hải Bắc Bộ"],
-    0,
-    "Tây Nguyên là vùng chuyên canh cà phê lớn."
-  ),
-  q(
-    "Địa",
-    "Trung tâm kinh tế lớn nhất phía Nam Việt Nam là?",
-    ["TP. Hồ Chí Minh", "Cần Thơ", "Đà Lạt", "Biên Hòa"],
-    0,
-    "TP. Hồ Chí Minh là cực tăng trưởng kinh tế lớn."
-  ),
-  q(
-    "Địa",
-    "Sông nào dài nhất chảy hoàn toàn trên lãnh thổ Việt Nam?",
-    ["Sông Đồng Nai", "Sông Hồng", "Sông Đà", "Sông Cả"],
-    0,
-    "Sông Đồng Nai là hệ thống sông lớn."
-  ),
-  q(
-    "Địa",
-    "Vùng biển Việt Nam thuộc?",
-    ["Tây Thái Bình Dương, Biển Đông", "Đại Tây Dương", "Bắc Băng Dương", "Địa Trung Hải"],
-    0,
-    "Việt Nam có vùng biển thuộc Biển Đông."
-  ),
-  q(
-    "Địa",
-    "Tài nguyên khoáng sản nổi bật ở thềm lục địa phía Nam là?",
-    ["Dầu khí", "Than đá", "Sắt", "Bauxite"],
-    0,
-    "Dầu khí là tài nguyên quan trọng."
-  ),
-  q(
-    "Địa",
-    "Bauxite tập trung nhiều ở vùng nào?",
-    ["Tây Nguyên", "Đồng bằng sông Hồng", "Đông Nam Bộ", "Bắc Trung Bộ"],
-    0,
-    "Tây Nguyên có trữ lượng bauxite lớn."
-  ),
-  q(
-    "Địa",
-    "Gió mùa mùa đông ở miền Bắc có hướng chủ yếu?",
-    ["Đông Bắc", "Tây Nam", "Đông Nam", "Tây Bắc"],
-    0,
-    "Gió mùa Đông Bắc hoạt động vào mùa đông."
-  ),
-  q(
-    "Địa",
-    "Gió mùa mùa hạ chủ yếu mang theo khối khí?",
-    ["Nóng ẩm", "Lạnh khô", "Rất lạnh", "Khô hạn quanh năm"],
-    0,
-    "Gió mùa hạ mang tính nóng ẩm."
-  ),
-  q(
-    "Địa",
-    "Đô thị hóa là quá trình?",
-    [
-      "Gia tăng dân cư và hoạt động kinh tế đô thị",
-      "Giảm số đô thị",
-      "Chỉ tăng diện tích rừng",
-      "Chỉ phát triển nông nghiệp",
-    ],
-    0,
-    "Đô thị hóa gắn với gia tăng dân cư đô thị."
-  ),
-  q(
-    "Địa",
-    "Ngành kinh tế sử dụng nhiều lao động và tạo hàng xuất khẩu lớn là?",
-    ["Công nghiệp chế biến, chế tạo", "Khai thác vàng thủ công", "Săn bắt", "Du mục"],
-    0,
-    "Công nghiệp chế biến, chế tạo có vai trò lớn."
-  ),
-  q(
-    "Địa",
-    "Vùng nào có thế mạnh nổi bật về thủy điện?",
-    ["Trung du và miền núi Bắc Bộ", "Đồng bằng sông Hồng", "Đồng bằng sông Cửu Long", "Duyên hải Nam Trung Bộ"],
-    0,
-    "Địa hình dốc tạo tiềm năng thủy điện."
-  ),
-  q(
-    "Địa",
-    "Cây lúa được trồng nhiều nhất ở?",
-    ["Đồng bằng sông Cửu Long", "Tây Nguyên", "Đông Nam Bộ", "Trung du miền núi Bắc Bộ"],
-    0,
-    "Đồng bằng sông Cửu Long là vùng sản xuất lúa lớn nhất."
-  ),
-  q(
-    "Địa",
-    "Đông Nam Bộ có thế mạnh nổi bật nào?",
-    ["Công nghiệp và dịch vụ", "Trồng chè ôn đới", "Chăn nuôi du mục", "Chỉ trồng lúa"],
-    0,
-    "Đông Nam Bộ phát triển mạnh công nghiệp và dịch vụ."
-  ),
-  q(
-    "Địa",
-    "Vùng kinh tế trọng điểm phía Nam có hạt nhân là?",
-    ["TP. Hồ Chí Minh", "Huế", "Lào Cai", "Hải Phòng"],
-    0,
-    "TP. Hồ Chí Minh là hạt nhân."
-  ),
-
-  /* ==================== ANH 20 ==================== */
-
-  q(
-    "Anh",
-    "Choose the correct sentence:",
-    [
-      "She have lived here since 2020.",
-      "She has lived here since 2020.",
-      "She lived here since 2020.",
-      "She living here since 2020.",
-    ],
-    1,
-    "Present perfect: has + V3 with since."
-  ),
-  q(
-    "Anh",
-    "If I were you, I ___ harder.",
-    ["study", "studied", "would study", "will study"],
-    2,
-    "Second conditional: If + past, would + V."
-  ),
-  q(
-    "Anh",
-    'The opposite of "expensive" is?',
-    ["cheap", "large", "modern", "heavy"],
-    0,
-    "Expensive ↔ cheap."
-  ),
-  q(
-    "Anh",
-    "She is interested ___ music.",
-    ["on", "at", "in", "for"],
-    2,
-    "The phrase is interested in."
-  ),
-  q(
-    "Anh",
-    "I have known him ___ five years.",
-    ["since", "for", "from", "at"],
-    1,
-    "Use for with a duration."
-  ),
-  q(
-    "Anh",
-    "He ___ to school every day.",
-    ["go", "goes", "going", "gone"],
-    1,
-    "He/she/it takes -s in present simple."
-  ),
-  q(
-    "Anh",
-    "Yesterday, they ___ football.",
-    ["play", "plays", "played", "playing"],
-    2,
-    "Yesterday signals past simple."
-  ),
-  q(
-    "Anh",
-    "There ___ many books on the table.",
-    ["is", "are", "was", "be"],
-    1,
-    "Plural noun books → are."
-  ),
-  q(
-    "Anh",
-    "My brother is ___ than me.",
-    ["tall", "taller", "tallest", "more tall"],
-    1,
-    "Comparative adjective: taller."
-  ),
-  q(
-    "Anh",
-    "This is the ___ movie I have ever seen.",
-    ["good", "better", "best", "well"],
-    2,
-    "Superlative: the best."
-  ),
-  q(
-    "Anh",
-    "You should ___ your homework.",
-    ["do", "does", "did", "doing"],
-    0,
-    "Modal should + base verb."
-  ),
-  q(
-    "Anh",
-    '"Could you help me?" is a request for?',
-    ["Permission/help", "A prediction", "A past habit", "A comparison"],
-    0,
-    "It is a polite request for help."
-  ),
-  q(
-    "Anh",
-    'The word "rapid" is closest in meaning to?',
-    ["slow", "quick", "weak", "quiet"],
-    1,
-    "Rapid means quick."
-  ),
-  q(
-    "Anh",
-    "We went to the cinema ___ Sunday.",
-    ["in", "at", "on", "from"],
-    2,
-    "Use on with days."
-  ),
-  q(
-    "Anh",
-    "I am looking forward to ___ you.",
-    ["see", "seeing", "saw", "seen"],
-    1,
-    "Look forward to + V-ing."
-  ),
-  q(
-    "Anh",
-    "The book ___ by George Orwell is famous.",
-    ["write", "wrote", "written", "writing"],
-    2,
-    "Past participle phrase: written by."
-  ),
-  q(
-    "Anh",
-    "She asked me where I ___.",
-    ["live", "lived", "am live", "living"],
-    1,
-    "Reported speech commonly backshifts live → lived."
-  ),
-  q(
-    "Anh",
-    '"Although it was raining, we went out" means?',
-    [
-      "We stayed home because of rain.",
-      "We went out despite the rain.",
-      "It did not rain.",
-      "We waited until summer.",
-    ],
-    1,
-    "Although introduces contrast."
-  ),
-  q(
-    "Anh",
-    'What is the noun form of "decide"?',
-    ["decision", "decidingly", "decisive", "decided"],
-    0,
-    "Decision is the noun."
-  ),
-  q(
-    "Anh",
-    'Choose the correct passive sentence: "People speak English worldwide."',
-    [
-      "English speaks worldwide.",
-      "English is spoken worldwide.",
-      "English was speak worldwide.",
-      "English has speak worldwide.",
-    ],
-    1,
-    "Present simple passive: is + V3."
-  ),
-
-  /* ==================== GDCD 20 ==================== */
-
-  q(
-    "GDCD",
-    "Pháp luật có vai trò nào sau đây?",
-    [
-      "Điều chỉnh các quan hệ xã hội",
-      "Chỉ áp dụng cho trẻ em",
-      "Chỉ mang tính khuyến nghị",
-      "Không liên quan đến công dân",
-    ],
-    0,
-    "Pháp luật là công cụ quản lý xã hội."
-  ),
-  q(
-    "GDCD",
-    "Bình đẳng trước pháp luật có nghĩa là?",
-    [
-      "Mọi người đều được đối xử theo quy định pháp luật",
-      "Ai giàu cũng được ưu tiên",
-      "Không ai phải tuân thủ luật",
-      "Chỉ cán bộ mới bình đẳng",
-    ],
-    0,
-    "Mọi công dân bình đẳng về quyền và nghĩa vụ theo pháp luật."
-  ),
-  q(
-    "GDCD",
-    "Một biểu hiện của trách nhiệm công dân là?",
-    ["Tuân thủ pháp luật", "Cố tình vi phạm quy định", "Xâm phạm tài sản người khác", "Gian lận"],
-    0,
-    "Tuân thủ pháp luật là trách nhiệm cơ bản."
-  ),
-  q(
-    "GDCD",
-    "Quyền tự do ngôn luận phải được thực hiện như thế nào?",
-    ["Trong khuôn khổ pháp luật", "Muốn nói gì cũng được", "Có thể xúc phạm người khác", "Không cần chịu trách nhiệm"],
-    0,
-    "Quyền luôn đi kèm trách nhiệm."
-  ),
-  q(
-    "GDCD",
-    "Hành vi tham gia giao thông an toàn là?",
-    ["Đội mũ bảo hiểm khi đi xe máy", "Vượt đèn đỏ", "Đi ngược chiều", "Dùng điện thoại khi lái xe"],
-    0,
-    "Đội mũ bảo hiểm là hành vi an toàn."
-  ),
-  q(
-    "GDCD",
-    "Tôn trọng người khác thể hiện ở?",
-    ["Lắng nghe và không xúc phạm", "Chế giễu điểm yếu", "Ép người khác theo ý mình", "Phát tán bí mật"],
-    0,
-    "Tôn trọng thể hiện qua giao tiếp văn minh."
-  ),
-  q(
-    "GDCD",
-    "Quyền sở hữu tài sản bao gồm các quyền cơ bản nào?",
-    ["Chiếm hữu, sử dụng, định đoạt", "Chỉ mua bán", "Chỉ cất giữ", "Chỉ cho thuê"],
-    0,
-    "Ba quyền cơ bản là chiếm hữu, sử dụng, định đoạt."
-  ),
-  q(
-    "GDCD",
-    "Khi phát hiện hành vi vi phạm pháp luật, công dân nên?",
-    ["Báo cơ quan có thẩm quyền phù hợp", "Tự ý trả thù", "Che giấu", "Lan truyền tin chưa kiểm chứng"],
-    0,
-    "Nên thông báo cho cơ quan có thẩm quyền."
-  ),
-  q(
-    "GDCD",
-    "Tiết kiệm là biểu hiện của?",
-    ["Sử dụng hợp lý nguồn lực", "Phung phí", "Vô trách nhiệm", "Tiêu dùng bất chấp"],
-    0,
-    "Tiết kiệm giúp sử dụng nguồn lực hiệu quả."
-  ),
-  q(
-    "GDCD",
-    "Một người có quyền và nghĩa vụ học tập nhằm?",
-    ["Phát triển bản thân và đóng góp xã hội", "Chỉ để giải trí", "Không cần kỹ năng", "Tránh mọi trách nhiệm"],
-    0,
-    "Học tập giúp phát triển con người và xã hội."
-  ),
-  q(
-    "GDCD",
-    "Bảo vệ môi trường là trách nhiệm của?",
-    ["Mọi cá nhân và tổ chức", "Chỉ nhà nước", "Chỉ học sinh", "Chỉ doanh nghiệp"],
-    0,
-    "Bảo vệ môi trường là trách nhiệm chung."
-  ),
-  q(
-    "GDCD",
-    "Khi sử dụng thông tin trên mạng, hành vi phù hợp là?",
-    ["Kiểm chứng trước khi chia sẻ", "Chia sẻ tin giả", "Đăng dữ liệu riêng tư của người khác", "Xúc phạm người khác"],
-    0,
-    "Kiểm chứng nguồn giúp hạn chế thông tin sai lệch."
-  ),
-  q(
-    "GDCD",
-    "Tự chủ là khả năng?",
-    ["Làm chủ suy nghĩ, cảm xúc và hành vi", "Luôn làm theo bạn bè", "Không nghe ai", "Trốn tránh trách nhiệm"],
-    0,
-    "Tự chủ giúp kiểm soát hành vi phù hợp."
-  ),
-  q(
-    "GDCD",
-    "Hợp tác là?",
-    ["Cùng làm việc vì mục tiêu chung", "Làm việc một mình", "Cạnh tranh bằng mọi giá", "Không chia sẻ"],
-    0,
-    "Hợp tác dựa trên phối hợp."
-  ),
-  q(
-    "GDCD",
-    "Khoan dung là?",
-    ["Tôn trọng và chấp nhận khác biệt hợp lý", "Đồng ý với mọi hành vi sai", "Không quan tâm ai", "Phân biệt đối xử"],
-    0,
-    "Khoan dung không đồng nghĩa với chấp nhận hành vi sai."
-  ),
-  q(
-    "GDCD",
-    "Một biểu hiện của sống có trách nhiệm là?",
-    ["Hoàn thành việc mình đã cam kết", "Đổ lỗi cho người khác", "Bỏ việc giữa chừng", "Trốn tránh hậu quả"],
-    0,
-    "Trách nhiệm gắn với cam kết."
-  ),
-  q(
-    "GDCD",
-    "Quyền riêng tư của người khác nên được?",
-    ["Tôn trọng", "Công khai tùy ý", "Bán cho người khác", "Đăng lên mạng"],
-    0,
-    "Thông tin riêng tư cần được bảo vệ."
-  ),
-  q(
-    "GDCD",
-    "Khi có mâu thuẫn, cách ứng xử phù hợp là?",
-    ["Bình tĩnh trao đổi và tìm giải pháp", "Đe dọa", "Đánh nhau", "Đăng bài xúc phạm"],
-    0,
-    "Đối thoại bình tĩnh giúp giải quyết xung đột."
-  ),
-  q(
-    "GDCD",
-    "Một hành vi thể hiện lòng yêu nước là?",
-    ["Tuân thủ pháp luật và đóng góp cho cộng đồng", "Phá hoại tài sản công", "Xả rác nơi công cộng", "Gian lận"],
-    0,
-    "Yêu nước được thể hiện bằng hành động có trách nhiệm."
-  ),
-  q(
-    "GDCD",
-    "Công dân có nghĩa vụ nào đối với Nhà nước và xã hội?",
-    ["Tuân thủ pháp luật và thực hiện nghĩa vụ theo quy định", "Không cần tuân thủ luật", "Chỉ đòi quyền lợi", "Tự đặt luật riêng"],
-    0,
-    "Quyền luôn gắn với nghĩa vụ."
-  ),
-
-  /* ==================== ĐỐ MẸO 20 ==================== */
-
-  q(
-    "Mẹo",
-    "Cái gì có nhiều phím nhưng không mở được ổ khóa?",
-    ["Bàn phím", "Chìa khóa", "Cửa", "Tủ"],
-    0,
-    "Bàn phím có nhiều phím nhưng không mở khóa."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng lấy đi càng lớn?",
-    ["Cái hố", "Cái cây", "Cái hộp", "Con đường"],
-    0,
-    "Càng đào đất thì cái hố càng lớn."
-  ),
-  q(
-    "Mẹo",
-    "Tháng nào có 28 ngày?",
-    ["Tháng 2", "Tất cả các tháng", "Tháng 1", "Tháng 12"],
-    1,
-    "Tháng nào cũng có ít nhất 28 ngày."
-  ),
-  q(
-    "Mẹo",
-    "Một người đi dưới mưa nhưng tóc không ướt. Vì sao?",
-    ["Người đó bị hói", "Vì mưa giả", "Vì có ô", "Vì chạy rất nhanh"],
-    0,
-    "Không có tóc thì tóc không thể ướt."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có cổ nhưng không có đầu?",
-    ["Cái áo", "Con người", "Cái bàn", "Cái ghế"],
-    0,
-    "Áo có cổ nhưng không có đầu."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có răng nhưng không cắn?",
-    ["Cái lược", "Con chó", "Con cá mập", "Con người"],
-    0,
-    "Lược có răng nhưng không cắn."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì đi khắp thế giới nhưng vẫn ở một góc?",
-    ["Con tem", "Chiếc xe", "Máy bay", "Con tàu"],
-    0,
-    "Tem nằm ở góc phong bì nhưng có thể đi rất xa."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng lau càng ướt?",
-    ["Khăn", "Bàn", "Giày", "Kính"],
-    0,
-    "Khăn dùng để lau nên hút nước."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có mặt và hai tay nhưng không có chân?",
-    ["Đồng hồ", "Con người", "Cái bàn", "Cái ghế"],
-    0,
-    "Đồng hồ có mặt và kim."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì bạn càng giữ chặt thì càng dễ mất?",
-    ["Hơi thở", "Tiền", "Sách", "Điện thoại"],
-    0,
-    "Giữ hơi thở quá lâu sẽ phải thở ra."
-  ),
-  q(
-    "Mẹo",
-    "Một con vịt đi trước hai con vịt, một con vịt đi sau hai con vịt, một con vịt ở giữa hai con vịt. Có ít nhất bao nhiêu con vịt?",
-    ["3", "4", "5", "6"],
-    0,
-    "Ba con xếp thành hàng là đủ."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng nhiều thì càng khó nhìn thấy?",
-    ["Bóng tối", "Ánh sáng", "Mặt trời", "Cầu vồng"],
-    0,
-    "Bóng tối càng nhiều thì càng khó nhìn."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có thể đầy phòng nhưng không chiếm chỗ?",
-    ["Ánh sáng", "Bàn ghế", "Nước", "Sách"],
-    0,
-    "Ánh sáng có thể lan khắp phòng."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì không có chân nhưng vẫn chạy?",
-    ["Nước", "Cái bàn", "Cái ghế", "Cái tủ"],
-    0,
-    "Nước có thể chảy."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng nói càng mất?",
-    ["Bí mật", "Thời gian", "Tiền", "Sức khỏe"],
-    0,
-    "Nói ra thì bí mật không còn là bí mật."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có thể vỡ dù không bị rơi?",
-    ["Lời hứa", "Cái ly", "Cái kính", "Quả bóng"],
-    0,
-    "Lời hứa có thể bị phá vỡ."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có một mắt nhưng không nhìn thấy?",
-    ["Cây kim", "Con mắt", "Con mèo", "Máy ảnh"],
-    0,
-    "Kim khâu có mắt để luồn chỉ."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng kéo càng ngắn?",
-    ["Điếu thuốc", "Sợi dây", "Cái thước", "Con đường"],
-    0,
-    "Điếu thuốc ngắn dần khi hút."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì có đầu và đuôi nhưng không có thân?",
-    ["Đồng xu", "Con cá", "Con rắn", "Cái áo"],
-    0,
-    "Đồng xu có mặt đầu và mặt đuôi."
-  ),
-  q(
-    "Mẹo",
-    "Cái gì càng chạy càng đứng yên?",
-    ["Đồng hồ", "Con người", "Ô tô", "Con chó"],
-    0,
-    "Kim đồng hồ chạy nhưng đồng hồ vẫn ở vị trí."
-  ),
+  ...toQuestions("Ngữ văn", "van", VAN_QUESTIONS),
+  ...toQuestions("Vật lý", "ly", LY_QUESTIONS),
+  ...toQuestions("Hóa học", "hoa", HOA_QUESTIONS),
+  ...toQuestions("Sinh học", "sinh", SINH_QUESTIONS),
+  ...toQuestions("Lịch sử", "su", SU_QUESTIONS),
+  ...toQuestions("Địa lý", "dia", DIA_QUESTIONS),
+  ...toQuestions("Tiếng Anh", "anh", ANH_QUESTIONS),
+  ...toQuestions("GDCD", "gdcd", GDCD_QUESTIONS),
+  ...toQuestions("Đố mẹo", "meo", MEO_QUESTIONS),
 ];
+
+/* =========================================================
+   THỜI TRANG
+========================================================= */
+
+const FASHION = [
+  /* ÁO */
+  { id:"shirt_white", category:"Áo", name:"Áo sơ mi trắng", icon:"👔", price:0, desc:"Đồng phục quốc dân", bonus:{reputation:2} },
+  { id:"shirt_blue", category:"Áo", name:"Sơ mi xanh biển", icon:"👔", price:25000, desc:"Gọn gàng, trẻ trung", bonus:{mood:2} },
+  { id:"shirt_black", category:"Áo", name:"Sơ mi đen basic", icon:"🖤", price:35000, desc:"Tối giản", bonus:{reputation:2} },
+  { id:"shirt_pink", category:"Áo", name:"Sơ mi hồng pastel", icon:"🌸", price:45000, desc:"Nhẹ nhàng", bonus:{mood:4} },
+  { id:"shirt_green", category:"Áo", name:"Sơ mi xanh mint", icon:"🍃", price:45000, desc:"Fresh", bonus:{mood:4} },
+  { id:"tee_white", category:"Áo", name:"T-shirt trắng", icon:"👕", price:20000, desc:"Đơn giản", bonus:{friends:2} },
+  { id:"tee_black", category:"Áo", name:"T-shirt đen", icon:"🖤", price:25000, desc:"Cool", bonus:{mood:3} },
+  { id:"tee_red", category:"Áo", name:"T-shirt đỏ", icon:"❤️", price:30000, desc:"Nổi bật", bonus:{reputation:3} },
+  { id:"tee_yellow", category:"Áo", name:"T-shirt vàng", icon:"💛", price:30000, desc:"Năng lượng", bonus:{mood:5} },
+  { id:"tee_cloud", category:"Áo", name:"T-shirt mây xanh", icon:"☁️", price:40000, desc:"Cute", bonus:{mood:5} },
+  { id:"hoodie_gray", category:"Áo", name:"Hoodie xám", icon:"🧥", price:70000, desc:"Ấm áp", bonus:{mood:5} },
+  { id:"hoodie_black", category:"Áo", name:"Hoodie đen", icon:"🧥", price:80000, desc:"Street style", bonus:{reputation:5} },
+  { id:"hoodie_pink", category:"Áo", name:"Hoodie hồng", icon:"🩷", price:85000, desc:"Cute style", bonus:{love:5} },
+  { id:"varsity_blue", category:"Áo", name:"Áo varsity xanh", icon:"🏫", price:120000, desc:"Phong cách học đường", bonus:{friends:6} },
+  { id:"varsity_red", category:"Áo", name:"Áo varsity đỏ", icon:"🔥", price:130000, desc:"Nổi bật", bonus:{reputation:6} },
+  { id:"jacket_denim", category:"Áo", name:"Áo khoác denim", icon:"🧥", price:150000, desc:"Denim classic", bonus:{reputation:5} },
+  { id:"jacket_leather", category:"Áo", name:"Áo khoác da", icon:"🧥", price:220000, desc:"Cool ngầu", bonus:{reputation:8} },
+  { id:"cardigan_cream", category:"Áo", name:"Cardigan kem", icon:"🤍", price:95000, desc:"Vintage", bonus:{love:5} },
+  { id:"sweater_bear", category:"Áo", name:"Sweater gấu", icon:"🐻", price:90000, desc:"Dễ thương", bonus:{mood:7} },
+  { id:"jersey", category:"Áo", name:"Áo bóng đá", icon:"⚽", price:65000, desc:"Thể thao", bonus:{friends:5, skill:2} },
+
+  /* QUẦN */
+  { id:"pants_black", category:"Quần", name:"Quần tây đen", icon:"👖", price:0, desc:"Đồng phục", bonus:{reputation:2} },
+  { id:"pants_blue", category:"Quần", name:"Quần jean xanh", icon:"👖", price:55000, desc:"Classic", bonus:{friends:2} },
+  { id:"pants_black_jean", category:"Quần", name:"Jean đen", icon:"👖", price:65000, desc:"Cool", bonus:{reputation:3} },
+  { id:"pants_white", category:"Quần", name:"Jean trắng", icon:"👖", price:75000, desc:"Sạch sẽ", bonus:{mood:3} },
+  { id:"pants_cargo", category:"Quần", name:"Quần cargo", icon:"👖", price:90000, desc:"Street", bonus:{skill:2} },
+  { id:"pants_kaki", category:"Quần", name:"Kaki be", icon:"👖", price:65000, desc:"Smart casual", bonus:{reputation:3} },
+  { id:"pants_gray", category:"Quần", name:"Quần jogger xám", icon:"👖", price:70000, desc:"Thoải mái", bonus:{energy:2} },
+  { id:"pants_green", category:"Quần", name:"Cargo xanh rêu", icon:"🟢", price:95000, desc:"Outdoor", bonus:{skill:3} },
+  { id:"short_black", category:"Quần", name:"Short đen", icon:"🩳", price:40000, desc:"Năng động", bonus:{energy:3} },
+  { id:"short_beige", category:"Quần", name:"Short be", icon:"🩳", price:45000, desc:"Mùa hè", bonus:{mood:3} },
+  { id:"skirt_black", category:"Quần", name:"Chân váy đen", icon:"🖤", price:55000, desc:"Thanh lịch", bonus:{reputation:3} },
+  { id:"skirt_plaid", category:"Quần", name:"Chân váy caro", icon:"🩷", price:70000, desc:"Học đường", bonus:{love:4} },
+  { id:"skirt_white", category:"Quần", name:"Chân váy trắng", icon:"🤍", price:75000, desc:"Nữ tính", bonus:{mood:4} },
+  { id:"wide_pants", category:"Quần", name:"Quần ống rộng", icon:"👖", price:85000, desc:"Fashion", bonus:{reputation:4} },
+
+  /* GIÀY */
+  { id:"shoes_school", category:"Giày", name:"Giày học sinh", icon:"👟", price:0, desc:"Cơ bản", bonus:{reputation:1} },
+  { id:"sneaker_white", category:"Giày", name:"Sneaker trắng", icon:"👟", price:85000, desc:"Clean", bonus:{mood:4} },
+  { id:"sneaker_black", category:"Giày", name:"Sneaker đen", icon:"👟", price:90000, desc:"Basic", bonus:{reputation:3} },
+  { id:"sneaker_red", category:"Giày", name:"Sneaker đỏ", icon:"👟", price:110000, desc:"Nổi bật", bonus:{reputation:5} },
+  { id:"high_top", category:"Giày", name:"High-top", icon:"👟", price:130000, desc:"Street", bonus:{friends:5} },
+  { id:"running", category:"Giày", name:"Giày chạy bộ", icon:"🏃", price:100000, desc:"Thể thao", bonus:{skill:3, energy:2} },
+  { id:"loafer", category:"Giày", name:"Loafer", icon:"👞", price:120000, desc:"Thanh lịch", bonus:{reputation:6} },
+  { id:"boots", category:"Giày", name:"Boot cổ ngắn", icon:"🥾", price:180000, desc:"Cool", bonus:{reputation:7} },
+  { id:"canvas", category:"Giày", name:"Canvas xanh", icon:"👟", price:70000, desc:"Nhẹ nhàng", bonus:{friends:3} },
+  { id:"pink_shoes", category:"Giày", name:"Sneaker hồng", icon:"🩷", price:105000, desc:"Cute", bonus:{love:5} },
+
+  /* BALO */
+  { id:"bag_school", category:"Balo", name:"Balo học sinh", icon:"🎒", price:0, desc:"Balo cơ bản", bonus:{study:2} },
+  { id:"bag_black", category:"Balo", name:"Balo đen premium", icon:"🎒", price:80000, desc:"Gọn và xịn", bonus:{reputation:4} },
+  { id:"bag_pink", category:"Balo", name:"Balo hồng", icon:"🎒", price:90000, desc:"Dễ thương", bonus:{love:5} },
+  { id:"bag_blue", category:"Balo", name:"Balo xanh", icon:"🎒", price:85000, desc:"Năng động", bonus:{friends:4} },
+  { id:"bag_canvas", category:"Balo", name:"Túi canvas", icon:"👜", price:65000, desc:"Vintage", bonus:{mood:4} },
+  { id:"bag_luxury", category:"Balo", name:"Balo luxury", icon:"🎒", price:250000, desc:"Đẳng cấp", bonus:{reputation:10} },
+
+  /* PHỤ KIỆN */
+  { id:"cap_black", category:"Phụ kiện", name:"Mũ lưỡi trai đen", icon:"🧢", price:35000, desc:"Street", bonus:{reputation:2} },
+  { id:"cap_blue", category:"Phụ kiện", name:"Mũ xanh", icon:"🧢", price:35000, desc:"Năng động", bonus:{friends:2} },
+  { id:"cap_pink", category:"Phụ kiện", name:"Mũ hồng", icon:"🧢", price:45000, desc:"Cute", bonus:{love:3} },
+  { id:"glasses", category:"Phụ kiện", name:"Kính tri thức", icon:"👓", price:60000, desc:"Học bá", bonus:{study:5} },
+  { id:"sunglasses", category:"Phụ kiện", name:"Kính thời trang", icon:"🕶️", price:75000, desc:"Cool", bonus:{reputation:6} },
+  { id:"watch", category:"Phụ kiện", name:"Đồng hồ bạc", icon:"⌚", price:150000, desc:"Chín chắn", bonus:{reputation:7} },
+  { id:"smartwatch", category:"Phụ kiện", name:"Smartwatch", icon:"⌚", price:280000, desc:"Công nghệ", bonus:{skill:7} },
+  { id:"necklace", category:"Phụ kiện", name:"Dây chuyền", icon:"📿", price:180000, desc:"Thanh lịch", bonus:{love:7} },
+  { id:"bracelet", category:"Phụ kiện", name:"Vòng tay", icon:"📿", price:80000, desc:"Nhẹ nhàng", bonus:{love:4} },
+  { id:"headphone", category:"Phụ kiện", name:"Tai nghe", icon:"🎧", price:180000, desc:"Music", bonus:{mood:7} },
+  { id:"hairclip", category:"Phụ kiện", name:"Kẹp tóc hoa", icon:"🌸", price:45000, desc:"Xinh xắn", bonus:{love:4} },
+  { id:"backpack_keychain", category:"Phụ kiện", name:"Móc khóa gấu", icon:"🧸", price:30000, desc:"Cute", bonus:{mood:3} },
+
+  /* TÓC */
+  { id:"hair_black", category:"Tóc", name:"Tóc đen tự nhiên", icon:"💇", price:0, desc:"Classic", bonus:{reputation:1} },
+  { id:"hair_brown", category:"Tóc", name:"Tóc nâu", icon:"💇", price:60000, desc:"Ấm áp", bonus:{mood:4} },
+  { id:"hair_short", category:"Tóc", name:"Tóc ngắn năng động", icon:"💇", price:70000, desc:"Năng động", bonus:{friends:4} },
+  { id:"hair_long", category:"Tóc", name:"Tóc dài nữ tính", icon:"💇", price:70000, desc:"Dịu dàng", bonus:{love:4} },
+  { id:"hair_wavy", category:"Tóc", name:"Tóc xoăn nhẹ", icon:"💇", price:100000, desc:"Fashion", bonus:{reputation:5} },
+  { id:"hair_blue", category:"Tóc", name:"Tóc highlight xanh", icon:"💙", price:140000, desc:"Cá tính", bonus:{reputation:8} },
+  { id:"hair_pink", category:"Tóc", name:"Tóc highlight hồng", icon:"🩷", price:150000, desc:"Cute", bonus:{love:8} },
+];
+
+const FASHION_CATEGORIES = ["Áo", "Quần", "Giày", "Balo", "Phụ kiện", "Tóc"];
 
 /* =========================================================
    NPC
-   ========================================================= */
+========================================================= */
 
 const NPCS = [
   {
-    id: "lan",
-    name: "Lan",
-    icon: "👩🏻‍🎓",
-    desc: "Học nhóm, chăm chỉ",
-    act: "Học nhóm",
-    base: 42,
+    id:"lan",
+    name:"Lan",
+    icon:"👧",
+    desc:"Bạn học chăm chỉ, thích học nhóm.",
+    action:"📚 Học nhóm",
+    apply:g=>{
+      addStat(g,"study",3);
+      addStat(g,"friends",4);
+      addRelationship(g,"lan",5);
+      addCompetition(g,3);
+      g.studyActions++;
+    }
   },
   {
-    id: "trieuMan",
-    name: "Triệu Mẫn",
-    icon: "💗",
-    desc: "Dễ thương, tinh tế",
-    act: "Tâm sự",
-    base: 20,
+    id:"trieuMan",
+    name:"Triệu Mẫn",
+    icon:"🌸",
+    desc:"Vịu ơ.",
+    action:"💗 Tâm sự",
+    apply:g=>{
+      addStat(g,"mood",4);
+      addStat(g,"love",4);
+      addStat(g,"friends",3);
+      addRelationship(g,"trieuMan",5);
+      addCompetition(g,2);
+    }
   },
   {
-    id: "tuan",
-    name: "Tuấn",
-    icon: "🧑🏻‍💻",
-    desc: "Thích kỹ năng và công nghệ",
-    act: "Luyện kỹ năng",
-    base: 36,
+    id:"tuan",
+    name:"Tuấn",
+    icon:"👦",
+    desc:"Thích thể thao và kỹ năng.",
+    action:"⚡ Luyện kỹ năng",
+    apply:g=>{
+      addStat(g,"skill",4);
+      addStat(g,"reputation",2);
+      addRelationship(g,"tuan",5);
+      addCompetition(g,3);
+    }
   },
   {
-    id: "minh",
-    name: "Minh",
-    icon: "📚",
-    desc: "Bạn học giỏi, thích ôn bài",
-    act: "Ôn bài",
-    base: 31,
+    id:"minh",
+    name:"Minh",
+    icon:"🧑‍🎓",
+    desc:"Bạn cùng bàn khá thông minh.",
+    action:"📝 Ôn bài",
+    apply:g=>{
+      addStat(g,"study",4);
+      addStat(g,"friends",2);
+      addRelationship(g,"minh",4);
+      addCompetition(g,3);
+      g.studyActions++;
+    }
   },
   {
-    id: "linh",
-    name: "Linh",
-    icon: "🎨",
-    desc: "Năng động, thích CLB",
-    act: "CLB nghệ thuật",
-    base: 28,
+    id:"linh",
+    name:"Linh",
+    icon:"🎨",
+    desc:"Thành viên CLB nghệ thuật.",
+    action:"🎨 Vào CLB",
+    apply:g=>{
+      addStat(g,"mood",5);
+      addStat(g,"friends",5);
+      addStat(g,"skill",2);
+      addRelationship(g,"linh",5);
+      addCompetition(g,2);
+    }
   },
   {
-    id: "phong",
-    name: "Phong",
-    icon: "⚽",
-    desc: "Thích thể thao",
-    act: "Chạy sân trường",
-    base: 34,
-  },
-];
-
-const NPC_MAP = Object.fromEntries(NPCS.map((x) => [x.id, x]));
-
-/* =========================================================
-   DANH HIỆU
-   ========================================================= */
-
-const TITLES = [
-  {
-    id: "starter",
-    name: "Tân Binh Thanh Xuân",
-    icon: "🌱",
-    desc: "Bắt đầu hành trình",
-    ok: () => true,
-  },
-  {
-    id: "diligent",
-    name: "Người Chăm Chỉ",
-    icon: "📚",
-    desc: "Học ít nhất 8 lần",
-    ok: (s) => s.studyActions >= 8,
-  },
-  {
-    id: "scholar",
-    name: "Học Bá",
-    icon: "🏆",
-    desc: "Kiến thức từ 185",
-    ok: (s) => s.stats.study >= 185,
-  },
-  {
-    id: "social",
-    name: "Tâm Điểm Lớp Học",
-    icon: "🤝",
-    desc: "Bạn bè từ 85",
-    ok: (s) => s.stats.friends >= 85,
-  },
-  {
-    id: "skill",
-    name: "Đa Năng",
-    icon: "⚡",
-    desc: "Kỹ năng từ 80",
-    ok: (s) => s.stats.skill >= 80,
-  },
-  {
-    id: "love",
-    name: "Thanh Xuân Có Đôi",
-    icon: "💗",
-    desc: "Tình cảm từ 80",
-    ok: (s) => s.stats.love >= 80,
-  },
-  {
-    id: "certificate",
-    name: "Bộ Sưu Tập Chứng Chỉ",
-    icon: "🎓",
-    desc: "Có ít nhất 3 chứng chỉ",
-    ok: (s) => s.certificates.length >= 3,
-  },
-  {
-    id: "asset",
-    name: "Tay Chơi Tài Sản",
-    icon: "🏠",
-    desc: "Sở hữu ít nhất 2 tài sản",
-    ok: (s) => s.assets.length >= 2,
-  },
-  {
-    id: "competition",
-    name: "Ngôi Sao Thi Đua",
-    icon: "🌟",
-    desc: "100 điểm thi đua",
-    ok: (s) => s.competitionPoints >= 100,
-  },
-  {
-    id: "legend",
-    name: "Thanh Xuân Rực Rỡ",
-    icon: "✨",
-    desc: "Hoàn thành hành trình",
-    ok: (s) => s.isGameOver,
-  },
-];
-
-/* =========================================================
-   CĂN TIN
-   ========================================================= */
-
-const CANTEEN_ITEMS = [
-  {
-    id: "water",
-    name: "Nước suối",
-    icon: "💧",
-    price: 5000,
-    desc: "+8 năng lượng",
-    effect: (g) => {
-      g.stats.energy += 8;
-    },
-  },
-  {
-    id: "milk",
-    name: "Sữa hộp",
-    icon: "🥛",
-    price: 12000,
-    desc: "+12 năng lượng, +2 kiến thức",
-    effect: (g) => {
-      g.stats.energy += 12;
-      g.stats.study += 2;
-    },
-  },
-  {
-    id: "rice",
-    name: "Cơm phần",
-    icon: "🍱",
-    price: 25000,
-    desc: "+40 năng lượng, +5 tâm trạng",
-    effect: (g) => {
-      g.stats.energy += 40;
-      g.stats.mood += 5;
-    },
-  },
-  {
-    id: "cake",
-    name: "Bánh ngọt",
-    icon: "🍰",
-    price: 18000,
-    desc: "+8 tâm trạng",
-    effect: (g) => {
-      g.stats.mood += 8;
-    },
-  },
-];
-
-/* =========================================================
-   TÀI SẢN
-   ========================================================= */
-
-const PROPERTIES = [
-  {
-    id: "bike",
-    name: "Xe đạp xịn",
-    icon: "🚲",
-    price: 500000,
-    desc: "+3 kỹ năng, +2 thi đua",
-    effect: (g) => {
-      g.stats.skill += 3;
-      g.competitionPoints += 2;
-    },
-  },
-  {
-    id: "sedan",
-    name: "Sedan đầu đời",
-    icon: "🚗",
-    price: 1800000,
-    desc: "+5 danh tiếng, +8 thi đua",
-    effect: (g) => {
-      g.stats.reputation += 5;
-      g.competitionPoints += 8;
-    },
-  },
-  {
-    id: "supercar",
-    name: "Siêu xe",
-    icon: "🏎️",
-    price: 5000000,
-    desc: "+10 danh tiếng, +15 thi đua",
-    effect: (g) => {
-      g.stats.reputation += 10;
-      g.competitionPoints += 15;
-    },
-  },
-  {
-    id: "condo",
-    name: "Căn hộ",
-    icon: "🏢",
-    price: 20000000,
-    desc: "+10 tâm trạng, +20 thi đua",
-    effect: (g) => {
-      g.stats.mood += 10;
-      g.competitionPoints += 20;
-    },
-  },
-  {
-    id: "villa",
-    name: "Biệt thự",
-    icon: "🏡",
-    price: 60000000,
-    desc: "+15 tâm trạng, +30 thi đua",
-    effect: (g) => {
-      g.stats.mood += 15;
-      g.competitionPoints += 30;
-    },
-  },
-];
-
-/* =========================================================
-   CHỨNG CHỈ
-   ========================================================= */
-
-const CERTS = [
-  {
-    id: "cert_driver",
-    name: "Bằng lái xe",
-    icon: "🚘",
-    fee: 30000,
-    req: 100,
-    desc: "Mở khóa việc lái xe VIP",
-    questions: [
-      q(
-        "Lái xe",
-        "Đèn đỏ yêu cầu người điều khiển phương tiện?",
-        ["Dừng lại", "Tăng tốc", "Đi ngược chiều", "Bấm còi"],
-        0
-      ),
-      q(
-        "Lái xe",
-        "Dây an toàn dùng để?",
-        [
-          "Giảm nguy cơ chấn thương",
-          "Tăng tốc xe",
-          "Tiết kiệm xăng tuyệt đối",
-          "Thay phanh",
-        ],
-        0
-      ),
-      q(
-        "Lái xe",
-        "Khi buồn ngủ khi lái xe nên?",
-        [
-          "Dừng nghỉ an toàn",
-          "Cố lái nhanh hơn",
-          "Tiếp tục bất chấp",
-          "Tắt đèn",
-        ],
-        0
-      ),
-    ],
-  },
-  {
-    id: "cert_toeic",
-    name: "Chứng chỉ tiếng Anh",
-    icon: "🇬🇧",
-    fee: 50000,
-    req: 300,
-    desc: "Mở khóa việc phiên dịch",
-    questions: [
-      QUIZ_BANK[80],
-      QUIZ_BANK[82],
-      QUIZ_BANK[96],
-    ],
-  },
-  {
-    id: "cert_mos",
-    name: "MOS Tin học",
-    icon: "💻",
-    fee: 45000,
-    req: 500,
-    desc: "Mở khóa việc Excel",
-    questions: [
-      q(
-        "Tin học",
-        "Phím tắt sao chép thường dùng là?",
-        ["Ctrl+C", "Ctrl+V", "Ctrl+X", "Ctrl+Z"],
-        0
-      ),
-      q(
-        "Tin học",
-        "Hàm SUM trong bảng tính dùng để?",
-        ["Tính tổng", "Đếm chữ", "Đổi màu", "Xóa ô"],
-        0
-      ),
-      q(
-        "Tin học",
-        "Excel là phần mềm chủ yếu để?",
-        ["Xử lý bảng tính", "Chỉnh video", "Vẽ 3D", "Nghe nhạc"],
-        0
-      ),
-    ],
-  },
-  {
-    id: "cert_finance",
-    name: "Chứng chỉ tài chính",
-    icon: "📈",
-    fee: 80000,
-    req: 700,
-    desc: "Mở khóa việc tài chính",
-    questions: [
-      q(
-        "Tài chính",
-        "Đa dạng hóa danh mục nhằm?",
-        ["Phân tán rủi ro", "Tăng rủi ro chắc chắn", "Không cần nghiên cứu", "Đảm bảo lợi nhuận"],
-        0
-      ),
-      q(
-        "Tài chính",
-        "Cổ phiếu đại diện cho?",
-        [
-          "Quyền sở hữu một phần doanh nghiệp",
-          "Một khoản vay bắt buộc",
-          "Tiền mặt",
-          "Hợp đồng thuê nhà",
-        ],
-        0
-      ),
-      q(
-        "Tài chính",
-        "Quản trị rủi ro thường bắt đầu bằng?",
-        [
-          "Nhận diện và đánh giá rủi ro",
-          "Bỏ qua rủi ro",
-          "Mua mọi tài sản",
-          "Vay tối đa",
-        ],
-        0
-      ),
-    ],
-  },
-];
-
-/* =========================================================
-   CÔNG VIỆC
-   ========================================================= */
-
-const JOBS = [
-  {
-    id: "canteenJob",
-    name: "Phụ bếp căn tin",
-    icon: "🍳",
-    money: 25000,
-    energy: 8,
-    desc: "+35k, -8 năng lượng",
-    ok: () => true,
-    comp: 2,
-  },
-  {
-    id: "flyer",
-    name: "Phát tờ rơi",
-    icon: "📄",
-    money: 30000,
-    energy: 12,
-    desc: "+50k, -12 năng lượng",
-    ok: () => true,
-    comp: 2,
-  },
-  {
-    id: "excel",
-    name: "Nhập Excel",
-    icon: "🖥️",
-    money: 90000,
-    energy: 10,
-    desc: "+90k, cần kỹ năng 300",
-    ok: (g) =>
-      g.stats.skill >= 300 && g.certificates.includes("cert_mos"),
-    comp: 4,
-  },
-  {
-    id: "driver",
-    name: "Lái xe VIP",
-    icon: "🚘",
-    money: 150000,
-    energy: 18,
-    desc: "+150k, cần bằng lái + xe",
-    ok: (g) =>
-      g.certificates.includes("cert_driver") &&
-      g.assets.some((a) => ["sedan", "supercar"].includes(a)),
-    comp: 6,
-  },
-  {
-    id: "interpreter",
-    name: "Phiên dịch",
-    icon: "🗣️",
-    money: 180000,
-    energy: 15,
-    desc: "+180k, cần Anh + kỹ năng 500",
-    ok: (g) =>
-      g.certificates.includes("cert_toeic") && g.stats.skill >= 500,
-    comp: 7,
-  },
-  {
-    id: "broker",
-    name: "Trợ lý tài chính",
-    icon: "📊",
-    money: 250000,
-    energy: 20,
-    desc: "+250k, cần tài chính + kỹ năng 700",
-    ok: (g) =>
-      g.certificates.includes("cert_finance") && g.stats.skill >= 700,
-    comp: 8,
-  },
+    id:"phong",
+    name:"Phong",
+    icon:"🏃",
+    desc:"Bạn mê thể thao.",
+    action:"🏃 Chạy sân trường",
+    apply:g=>{
+      addStat(g,"hp",5);
+      addStat(g,"energy",-5);
+      addStat(g,"friends",3);
+      addRelationship(g,"phong",4);
+      addCompetition(g,3);
+    }
+  }
 ];
 
 /* =========================================================
    SỰ KIỆN NGẪU NHIÊN
-   ========================================================= */
+========================================================= */
 
 const DAILY_EVENTS = [
   {
-    id: "praise",
-    icon: "👏",
-    title: "Được giáo viên khen",
-    text: "Bạn trả lời tốt trước lớp.",
-    result: "+3 kiến thức, +5 danh tiếng, +4 thi đua",
-    apply: (g) => {
-      g.stats.study += 3;
-      g.stats.reputation += 5;
-      g.competitionPoints += 4;
-    },
+    id:"teacher",
+    icon:"🧑‍🏫",
+    title:"Được giáo viên khen",
+    text:"Bạn phát biểu rất tốt trong lớp.",
+    result:"Kiến thức +3 • Danh tiếng +5 • Thi đua +4",
+    apply:g=>{
+      addStat(g,"study",3);
+      addStat(g,"reputation",5);
+      addCompetition(g,4);
+    }
   },
   {
-    id: "snack",
-    icon: "🍪",
-    title: "Bạn rủ ăn vặt",
-    text: "Một người bạn bất ngờ chia đồ ăn.",
-    result: "+6 tâm trạng, +5 năng lượng, +3 bạn bè",
-    apply: (g) => {
-      g.stats.mood += 6;
-      g.stats.energy += 5;
-      g.stats.friends += 3;
-    },
+    id:"festival",
+    icon:"🎉",
+    title:"Trường tổ chức ngày hội",
+    text:"Cả trường náo nhiệt với nhiều hoạt động.",
+    result:"Tâm trạng +8 • Bạn bè +5 • Thi đua +3",
+    apply:g=>{
+      addStat(g,"mood",8);
+      addStat(g,"friends",5);
+      addCompetition(g,3);
+    }
   },
   {
-    id: "library",
-    icon: "📚",
-    title: "Góc sách bất ngờ",
-    text: "Bạn tìm được tài liệu học cực hữu ích.",
-    result: "+5 kiến thức, +2 kỹ năng",
-    apply: (g) => {
-      g.stats.study += 5;
-      g.stats.skill += 2;
-    },
+    id:"test",
+    icon:"📄",
+    title:"Kiểm tra bất ngờ",
+    text:"Giáo viên bất ngờ phát đề.",
+    result:"Kiến thức -4 • Danh tiếng +2 • Thi đua +2",
+    apply:g=>{
+      addStat(g,"study",-4);
+      addStat(g,"reputation",2);
+      addCompetition(g,2);
+    }
   },
   {
-    id: "rain",
-    icon: "🌧️",
-    title: "Mưa bất chợt",
-    text: "Đường về trường hôm nay hơi mệt.",
-    result: "-5 năng lượng, -3 tâm trạng",
-    apply: (g) => {
-      g.stats.energy -= 5;
-      g.stats.mood -= 3;
-    },
+    id:"wallet",
+    icon:"💸",
+    title:"Làm rơi ví",
+    text:"Một khoản tiền nhỏ bị thất lạc.",
+    result:"Tiền -30.000đ • Tâm trạng -4",
+    apply:g=>{
+      addMoney(g,-30000);
+      addStat(g,"mood",-4);
+    }
   },
   {
-    id: "contest",
-    icon: "🏅",
-    title: "Cuộc thi nhỏ của lớp",
-    text: "Lớp tổ chức một cuộc thi nhanh.",
-    result: "+4 kỹ năng, +5 thi đua",
-    apply: (g) => {
-      g.stats.skill += 4;
-      g.competitionPoints += 5;
-    },
+    id:"snack",
+    icon:"🍪",
+    title:"Bạn cho đồ ăn",
+    text:"Một người bạn bất ngờ chia đồ ăn cho bạn.",
+    result:"Năng lượng +5 • Tâm trạng +5",
+    apply:g=>{
+      addStat(g,"energy",5);
+      addStat(g,"mood",5);
+    }
   },
   {
-    id: "club",
-    icon: "🎨",
-    title: "CLB tuyển thành viên",
-    text: "Một CLB thú vị mời bạn tham gia.",
-    result: "+4 bạn bè, +4 kỹ năng",
-    apply: (g) => {
-      g.stats.friends += 4;
-      g.stats.skill += 4;
-    },
+    id:"rain",
+    icon:"🌧️",
+    title:"Trời mưa",
+    text:"Mưa lớn khiến việc di chuyển khó khăn.",
+    result:"Năng lượng -5 • Tâm trạng -3",
+    apply:g=>{
+      addStat(g,"energy",-5);
+      addStat(g,"mood",-3);
+    }
   },
   {
-    id: "coupon",
-    icon: "🎟️",
-    title: "Phiếu giảm giá",
-    text: "Bạn nhận được một voucher nhỏ.",
-    result: "+20.000đ",
-    apply: (g) => {
-      g.stats.money += 20000;
-    },
+    id:"club",
+    icon:"🎯",
+    title:"CLB tuyển thành viên",
+    text:"Bạn được mời tham gia một CLB mới.",
+    result:"Kỹ năng +4 • Bạn bè +3",
+    apply:g=>{
+      addStat(g,"skill",4);
+      addStat(g,"friends",3);
+    }
   },
   {
-    id: "wallet",
-    icon: "👛",
-    title: "Quên ví một chút",
-    text: "Bạn sơ ý làm mất một khoản tiền nhỏ.",
-    result: "-20.000đ, -2 tâm trạng",
-    apply: (g) => {
-      g.stats.money -= 20000;
-      g.stats.mood -= 2;
-    },
+    id:"lunch",
+    icon:"🍱",
+    title:"Được mời ăn trưa",
+    text:"Một người bạn mời bạn ăn trưa.",
+    result:"Tiền +20.000đ • Tâm trạng +4",
+    apply:g=>{
+      addMoney(g,20000);
+      addStat(g,"mood",4);
+    }
   },
   {
-    id: "sports",
-    icon: "⚽",
-    title: "Tiết thể thao vui",
-    text: "Cả lớp có một trận đấu vui vẻ.",
-    result: "+5 HP, +4 bạn bè, -4 năng lượng",
-    apply: (g) => {
-      g.stats.hp += 5;
-      g.stats.friends += 4;
-      g.stats.energy -= 4;
-    },
+    id:"library",
+    icon:"📚",
+    title:"Tìm được tài liệu hay",
+    text:"Bạn tình cờ tìm thấy một cuốn sách hữu ích.",
+    result:"Kiến thức +5",
+    apply:g=>{
+      addStat(g,"study",5);
+      g.studyActions++;
+    }
   },
   {
-    id: "teacherTest",
-    icon: "📝",
-    title: "Bài kiểm tra đột xuất",
-    text: "Giáo viên cho một câu hỏi thử thách.",
-    result: "+2 danh tiếng, +2 thi đua",
-    apply: (g) => {
-      g.stats.reputation += 2;
-      g.competitionPoints += 2;
-    },
+    id:"sport",
+    icon:"🏅",
+    title:"Ngày hội thể thao",
+    text:"Bạn tham gia một trận đấu vui vẻ.",
+    result:"HP +3 • Bạn bè +4 • Năng lượng -5",
+    apply:g=>{
+      addStat(g,"hp",3);
+      addStat(g,"friends",4);
+      addStat(g,"energy",-5);
+    }
   },
   {
-    id: "message",
-    icon: "💬",
-    title: "Tin nhắn từ bạn cũ",
-    text: "Một người bạn cũ nhắn hỏi thăm.",
-    result: "+5 bạn bè, +4 tâm trạng",
-    apply: (g) => {
-      g.stats.friends += 5;
-      g.stats.mood += 4;
-    },
+    id:"contest",
+    icon:"💻",
+    title:"Cuộc thi online",
+    text:"Bạn được rủ tham gia một cuộc thi kiến thức.",
+    result:"Kỹ năng +3 • Thi đua +5",
+    apply:g=>{
+      addStat(g,"skill",3);
+      addCompetition(g,5);
+    }
   },
   {
-    id: "clean",
-    icon: "🧹",
-    title: "Dọn lớp cuối buổi",
-    text: "Bạn cùng lớp cùng nhau dọn phòng.",
-    result: "+3 danh tiếng, +2 bạn bè",
-    apply: (g) => {
-      g.stats.reputation += 3;
-      g.stats.friends += 2;
-    },
+    id:"bus",
+    icon:"🚌",
+    title:"Trễ xe buýt",
+    text:"Bạn phải chờ xe lâu hơn bình thường.",
+    result:"Năng lượng -8 • Tâm trạng -3",
+    apply:g=>{
+      addStat(g,"energy",-8);
+      addStat(g,"mood",-3);
+    }
   },
+  {
+    id:"message",
+    icon:"📱",
+    title:"Bạn cũ nhắn tin",
+    text:"Một người bạn cũ bất ngờ liên lạc.",
+    result:"Bạn bè +5 • Tâm trạng +4",
+    apply:g=>{
+      addStat(g,"friends",5);
+      addStat(g,"mood",4);
+    }
+  },
+  {
+    id:"coupon",
+    icon:"🎟️",
+    title:"Nhận voucher",
+    text:"Bạn nhận được voucher từ một cửa hàng.",
+    result:"Tiền +15.000đ",
+    apply:g=>addMoney(g,15000)
+  },
+  {
+    id:"clean",
+    icon:"🧹",
+    title:"Dọn lớp",
+    text:"Bạn ở lại giúp lớp dọn dẹp.",
+    result:"Danh tiếng +3 • Bạn bè +2 • Thi đua +2",
+    apply:g=>{
+      addStat(g,"reputation",3);
+      addStat(g,"friends",2);
+      addCompetition(g,2);
+    }
+  }
 ];
 
-const eventData = (e) => ({
-  id: e.id,
-  icon: e.icon,
-  title: e.title,
-  text: e.text,
-  result: e.result,
-});
-
-const pickEvent = (last) => {
-  const available = DAILY_EVENTS.filter((e) => e.id !== last);
-  return (
-    available[Math.floor(Math.random() * available.length)] ||
-    DAILY_EVENTS[0]
-  );
-};
-
-/* =========================================================
-   STATE
-   ========================================================= */
-
-function snapshot(g) {
+function eventData(ev){
   return {
-    study: g.stats.study,
-    energy: g.stats.energy,
-    mood: g.stats.mood,
-    friends: g.stats.friends,
-    love: g.stats.love,
-    reputation: g.stats.reputation,
-    skill: g.stats.skill,
-    money: g.stats.money,
-    competitionPoints: g.competitionPoints,
+    id:ev.id,
+    icon:ev.icon,
+    title:ev.title,
+    text:ev.text,
+    result:ev.result
   };
 }
 
-function createBase(withEvent = true) {
-  const g = {
-    isGameOver: false,
-    day: 1,
-    totalDays: 45,
-    timeIndex: 0,
-    location: "class",
+function pickDailyEvent(lastId){
+  const available = DAILY_EVENTS.filter(e=>e.id !== lastId);
+  return pick(available.length ? available : DAILY_EVENTS);
+}
 
-    stats: {
-      hp: 85,
-      energy: 100,
-      mood: 75,
-      study: 50,
-      friends: 40,
-      love: 20,
-      reputation: 30,
-      skill: 15,
-      money: 100000,
+/* =========================================================
+   NGHỀ
+========================================================= */
+
+const JOBS = [
+  {
+    id:"canteen",
+    name:"Phục vụ căn tin",
+    icon:"🍱",
+    pay:25000,
+    energy:8,
+    desc:"Ca nhẹ, phù hợp người mới.",
+    can:()=>true,
+    apply:g=>{
+      addMoney(g,25000);
+      addStat(g,"energy",-8);
+      addCompetition(g,2);
+    }
+  },
+  {
+    id:"flyer",
+    name:"Phát tờ rơi",
+    icon:"📄",
+    pay:30000,
+    energy:12,
+    desc:"Việc đơn giản nhưng khá mệt.",
+    can:()=>true,
+    apply:g=>{
+      addMoney(g,30000);
+      addStat(g,"energy",-12);
+      addStat(g,"mood",-2);
+      addCompetition(g,2);
+    }
+  },
+  {
+    id:"excel",
+    name:"Nhập dữ liệu Excel",
+    icon:"💻",
+    pay:50000,
+    energy:10,
+    desc:"Cần kỹ năng từ 100.",
+    can:g=>g.stats.skill>=35,
+    apply:g=>{
+      addMoney(g,50000);
+      addStat(g,"energy",-10);
+      addStat(g,"skill",2);
+      addCompetition(g,4);
+    }
+  },
+  {
+    id:"driver",
+    name:"Lái xe VIP",
+    icon:"🚗",
+    pay:100000,
+    energy:20,
+    desc:"Cần chứng chỉ lái xe.",
+    can:g=>g.certificates.includes("cert_driver"),
+    apply:g=>{
+      addMoney(g,100000);
+      addStat(g,"energy",-20);
+      addStat(g,"reputation",3);
+      addCompetition(g,6);
+    }
+  },
+  {
+    id:"interpreter",
+    name:"Trợ lý tiếng Anh",
+    icon:"🌎",
+    pay:150000,
+    energy:15,
+    desc:"Cần TOEIC và kỹ năng ≥ 300.",
+    can:g=>g.certificates.includes("cert_toeic") && g.stats.skill>=300,
+    apply:g=>{
+      addMoney(g,150000);
+      addStat(g,"energy",-10);
+      addStat(g,"skill",3);
+      addCompetition(g,7);
+    }
+  },
+  {
+    id:"broker",
+    name:"Cộng tác viên chứng khoán",
+    icon:"📈",
+    pay:200000,
+    energy:10,
+    desc:"Cần chứng chỉ tài chính và kỹ năng ≥ 500.",
+    can:g=>g.certificates.includes("cert_finance") && g.stats.skill>=500,
+    apply:g=>{
+      addMoney(g,200000);
+      addStat(g,"energy",-10);
+      addStat(g,"reputation",4);
+      addCompetition(g,8);
+    }
+  }
+];
+
+/* =========================================================
+   CHỨNG CHỈ
+========================================================= */
+
+const CERTS = [
+  {
+    id:"cert_driver",
+    name:"Chứng chỉ lái xe",
+    icon:"🚗",
+    fee:80000,
+    req:100,
+    desc:"Mở khóa công việc lái xe VIP.",
+    questions:[
+      {
+        q:"Khi đèn đỏ, người lái xe phải làm gì?",
+        choices:["Dừng lại","Tăng tốc","Đi ngược chiều","Bấm còi"],
+        answer:0,
+        explanation:"Đèn đỏ yêu cầu phương tiện dừng lại."
+      },
+      {
+        q:"Dây an toàn có tác dụng chính là?",
+        choices:["Giảm nguy cơ chấn thương","Tăng tốc xe","Tiết kiệm xăng","Tăng âm thanh"],
+        answer:0,
+        explanation:"Dây an toàn giúp giảm nguy cơ chấn thương khi va chạm."
+      },
+      {
+        q:"Khi lái xe cần ưu tiên điều gì?",
+        choices:["An toàn giao thông","Tốc độ tối đa","Bấm còi","Vượt mọi xe"],
+        answer:0,
+        explanation:"An toàn là ưu tiên hàng đầu."
+      }
+    ]
+  },
+  {
+    id:"cert_toeic",
+    name:"Chứng chỉ TOEIC",
+    icon:"🇬🇧",
+    fee:120000,
+    req:150,
+    desc:"Mở khóa việc trợ lý tiếng Anh.",
+    questions:[
+      {
+        q:"Choose the correct answer: She ___ to school every day.",
+        choices:["goes","go","going","gone"],
+        answer:0,
+        explanation:"She là ngôi thứ ba số ít nên dùng goes."
+      },
+      {
+        q:"What is the opposite of 'cheap'?",
+        choices:["expensive","small","easy","short"],
+        answer:0,
+        explanation:"Cheap = rẻ, opposite = expensive."
+      },
+      {
+        q:"I am interested ___ English.",
+        choices:["in","on","at","for"],
+        answer:0,
+        explanation:"Cấu trúc: be interested in."
+      }
+    ]
+  },
+  {
+    id:"cert_mos",
+    name:"Chứng chỉ MOS",
+    icon:"💻",
+    fee:100000,
+    req:300,
+    desc:"Chứng minh kỹ năng văn phòng.",
+    questions:[
+      {
+        q:"Excel dùng chủ yếu để làm gì?",
+        choices:["Bảng tính và dữ liệu","Chỉnh ảnh","Dựng phim","Nghe nhạc"],
+        answer:0,
+        explanation:"Excel là phần mềm bảng tính."
+      },
+      {
+        q:"Trong Excel, SUM dùng để?",
+        choices:["Tính tổng","Đếm ký tự","Đổi màu","Xóa file"],
+        answer:0,
+        explanation:"SUM dùng để tính tổng."
+      },
+      {
+        q:"Ctrl + C thường dùng để?",
+        choices:["Copy","Paste","Save","Close"],
+        answer:0,
+        explanation:"Ctrl + C là sao chép."
+      }
+    ]
+  },
+  {
+    id:"cert_finance",
+    name:"Chứng chỉ tài chính",
+    icon:"📈",
+    fee:180000,
+    req:500,
+    desc:"Mở khóa công việc chứng khoán.",
+    questions:[
+      {
+        q:"Đầu tư đa dạng hóa nhằm mục đích gì?",
+        choices:["Phân tán rủi ro","Tăng chắc chắn lợi nhuận","Không có rủi ro","Không cần nghiên cứu"],
+        answer:0,
+        explanation:"Đa dạng hóa giúp phân tán rủi ro."
+      },
+      {
+        q:"Cổ phiếu đại diện cho điều gì?",
+        choices:["Quyền sở hữu một phần doanh nghiệp","Khoản vay ngân hàng","Tiền mặt","Hợp đồng lao động"],
+        answer:0,
+        explanation:"Cổ phiếu đại diện cho quyền sở hữu vốn trong doanh nghiệp."
+      },
+      {
+        q:"Nguyên tắc quan trọng khi đầu tư là?",
+        choices:["Quản trị rủi ro","Luôn mua theo tin đồn","Vay tối đa","Không cần kế hoạch"],
+        answer:0,
+        explanation:"Quản trị rủi ro là nguyên tắc quan trọng trong đầu tư."
+      }
+    ]
+  }
+];
+
+/* =========================================================
+   TÀI SẢN
+========================================================= */
+
+const ASSETS = [
+  {id:"bike",name:"Xe đạp",icon:"🚲",price:120000,desc:"Đi học nhanh hơn",bonus:{energy:3}},
+  {id:"scooter",name:"Xe máy",icon:"🛵",price:800000,desc:"Di chuyển tiện lợi",bonus:{energy:5,reputation:3}},
+  {id:"sedan",name:"Sedan",icon:"🚗",price:1800000,desc:"Tài sản đầu tiên",bonus:{reputation:6,mood:4}},
+  {id:"supercar",name:"Siêu xe",icon:"🏎️",price:5000000,desc:"Cực kỳ nổi bật",bonus:{reputation:12,mood:8}},
+  {id:"condo",name:"Căn hộ",icon:"🏢",price:20000000,desc:"Không gian riêng",bonus:{mood:12,energy:5}},
+  {id:"villa",name:"Biệt thự",icon:"🏡",price:60000000,desc:"Tài sản mơ ước",bonus:{mood:18,reputation:15}},
+];
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+const TITLES = [
+  {id:"starter",name:"Tân Binh Thanh Xuân",icon:"🌱",desc:"Bắt đầu hành trình",condition:()=>true},
+  {id:"diligent",name:"Người Chăm Chỉ",icon:"📚",desc:"8 lần học",condition:g=>g.studyActions>=8},
+  {id:"scholar",name:"Học Bá",icon:"🏆",desc:"Kiến thức ≥ 85",condition:g=>g.stats.study>=85},
+  {id:"social",name:"Tâm Điểm Lớp",icon:"🤝",desc:"Bạn bè ≥ 85",condition:g=>g.stats.friends>=85},
+  {id:"skill",name:"Đa Năng",icon:"⚡",desc:"Kỹ năng ≥ 80",condition:g=>g.stats.skill>=80},
+  {id:"love",name:"Thanh Xuân Có Đôi",icon:"💗",desc:"Tình cảm ≥ 80",condition:g=>g.stats.love>=80},
+  {id:"certificate",name:"Bộ Sưu Tập Chứng Chỉ",icon:"🎓",desc:"Có ≥ 3 chứng chỉ",condition:g=>g.certificates.length>=3},
+  {id:"fashion",name:"Fashionista Học Đường",icon:"👗",desc:"Có ≥ 15 món thời trang",condition:g=>g.wardrobe.length>=15},
+  {id:"asset",name:"Tay Chơi Tài Sản",icon:"🏠",desc:"Sở hữu ≥ 2 tài sản",condition:g=>g.assets.length>=2},
+  {id:"future",name:"Nhà Đầu Tư Tương Lai",icon:"📈",desc:"Có chứng chỉ tài chính",condition:g=>g.certificates.includes("cert_finance")},
+  {id:"competition",name:"Ngôi Sao Thi Đua",icon:"🌟",desc:"≥ 100 điểm thi đua",condition:g=>g.competitionPoints>=100},
+  {id:"legend",name:"Thanh Xuân Rực Rỡ",icon:"✨",desc:"Hoàn thành hành trình",condition:g=>g.isGameOver},
+];
+
+/* =========================================================
+   SAVE / LOAD
+========================================================= */
+
+function encodeSaveCode(data){
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let binary = "";
+  const chunk = 0x8000;
+
+  for(let i=0;i<bytes.length;i+=chunk){
+    binary += String.fromCharCode(...bytes.subarray(i,i+chunk));
+  }
+
+  return btoa(binary)
+    .replace(/\+/g,"-")
+    .replace(/\//g,"_")
+    .replace(/=+$/,"");
+}
+
+function decodeSaveCode(code){
+  let b64 = code.trim().replace(/-/g,"+").replace(/_/g,"/");
+  while(b64.length % 4) b64 += "=";
+
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+
+  for(let i=0;i<binary.length;i++){
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function snapshotDay(g){
+  return {
+    stats:{
+      study:g.stats.study,
+      money:g.stats.money,
+      friends:g.stats.friends,
+      energy:g.stats.energy,
+      mood:g.stats.mood,
+      reputation:g.stats.reputation,
+      skill:g.stats.skill,
+      love:g.stats.love,
+    },
+    competitionPoints:g.competitionPoints
+  };
+}
+
+function emptyDailyCompetition(){
+  return {
+    player:0,
+    lan:0,
+    trieuMan:0,
+    tuan:0,
+    minh:0,
+    linh:0,
+    phong:0
+  };
+}
+
+/* =========================================================
+   STATE
+========================================================= */
+
+function createInitialState(){
+  const g = {
+    version:6,
+    isGameOver:false,
+    day:1,
+    totalDays:45,
+    timeIndex:0,
+    location:"class",
+
+    stats:{
+      hp:85,
+      energy:100,
+      mood:75,
+      study:50,
+      friends:40,
+      love:20,
+      reputation:30,
+      skill:25,
+      money:150000
     },
 
-    certificates: [],
-    assets: [],
+    certificates:[],
+    assets:[],
+    wardrobe:["shirt_white","pants_black","shoes_school","bag_school","hair_black"],
 
-    bag: [
+    outfit:{
+      shirt:"shirt_white",
+      pants:"pants_black",
+      shoes:"shoes_school",
+      bag:"bag_school",
+      accessory:null,
+      hair:"hair_black"
+    },
+
+    bag:[
       {
-        id: "candy",
-        name: "Kẹo dâu",
-        icon: "🍬",
-        count: 2,
-        desc: "+8 tình cảm Triệu Mẫn",
+        id:"math_note",
+        name:"Sổ Công Thức",
+        icon:"📘",
+        count:1,
+        desc:"+8 kiến thức"
       },
+      {
+        id:"gift_strawberry",
+        name:"Kẹo Dâu Tây",
+        icon:"🍬",
+        count:2,
+        desc:"+tình cảm"
+      }
     ],
 
-    diaryEntries: [],
+    diaryEntries:[],
 
-    competitionPoints: 0,
+    competitionPoints:0,
 
-    npcCompetition: Object.fromEntries(
-      NPCS.map((n) => [n.id, n.base])
-    ),
-
-    relationships: {
-      lan: 45,
-      trieuMan: 15,
-      tuan: 40,
-      minh: 34,
-      linh: 32,
-      phong: 38,
+    npcCompetition:{
+      lan:42,
+      trieuMan:50,
+      tuan:36,
+      minh:31,
+      linh:28,
+      phong:34
     },
 
-    dailyCompetition: {
-      player: 0,
-      ...Object.fromEntries(NPCS.map((n) => [n.id, 0])),
+    dailyCompetition:emptyDailyCompetition(),
+
+    relationships:{
+      lan:45,
+      trieuMan:30,
+      tuan:40,
+      minh:35,
+      linh:32,
+      phong:38
     },
 
-    dailyEvent: null,
-    lastEventId: null,
+    studyActions:0,
+    jobActions:0,
+    oralChecksDone:0,
+    dailyOralCheckDone:false,
 
-    dayStart: null,
+    dailyEvent:null,
+    lastEventId:null,
+    dayStart:null,
 
-    slotActionUsed: false,
-    dailyActionCount: 0,
-
-    studyActions: 0,
-    jobActions: 0,
-    oralChecksDone: 0,
-    dailyOralCheckDone: false,
-
-    selectedTitle: "starter",
+    selectedTitle:"starter"
   };
 
-  g.dayStart = snapshot(g);
+  const ev = pickDailyEvent(null);
 
-  if (withEvent) {
-    const e = pickEvent(null);
-
-    g.lastEventId = e.id;
-    g.dailyEvent = eventData(e);
-
-    e.apply(g);
-
-    [
-      "hp",
-      "energy",
-      "mood",
-      "study",
-      "friends",
-      "love",
-      "reputation",
-      "skill",
-    ].forEach((key) => {
-      g.stats[key] = clamp(g.stats[key]);
-    });
-
-    g.stats.money = Math.max(0, g.stats.money);
-  }
+  g.dayStart = snapshotDay(g);
+  g.dailyEvent = eventData(ev);
+  g.lastEventId = ev.id;
+  ev.apply(g);
 
   return g;
 }
 
-function createInitialState() {
-  return createBase(true);
-}
-
-function normalizeState(raw) {
-  const base = createBase(false);
-  const r = raw && typeof raw === "object" ? raw : {};
+function normalizeState(raw){
+  const base = createInitialState();
 
   const g = {
     ...base,
-    ...r,
-
-    stats: {
+    ...raw,
+    stats:{
       ...base.stats,
-      ...(r.stats || {}),
+      ...(raw?.stats || {})
     },
-
-    npcCompetition: {
+    certificates:Array.isArray(raw?.certificates) ? raw.certificates : base.certificates,
+    assets:Array.isArray(raw?.assets) ? raw.assets : base.assets,
+    wardrobe:Array.isArray(raw?.wardrobe) ? raw.wardrobe : base.wardrobe,
+    bag:Array.isArray(raw?.bag) ? raw.bag : base.bag,
+    diaryEntries:Array.isArray(raw?.diaryEntries) ? raw.diaryEntries : [],
+    npcCompetition:{
       ...base.npcCompetition,
-      ...(r.npcCompetition || {}),
+      ...(raw?.npcCompetition || {})
     },
-
-    relationships: {
-      ...base.relationships,
-      ...(r.relationships || {}),
-    },
-
-    dailyCompetition: {
+    dailyCompetition:{
       ...base.dailyCompetition,
-      ...(r.dailyCompetition || {}),
+      ...(raw?.dailyCompetition || {})
     },
-
-    dayStart: {
-      ...base.dayStart,
-      ...(r.dayStart || {}),
+    relationships:{
+      ...base.relationships,
+      ...(raw?.relationships || {})
     },
+    outfit:{
+      ...base.outfit,
+      ...(raw?.outfit || {})
+    }
   };
 
-  g.day = Math.max(
-    1,
-    Math.min(g.totalDays, Number(g.day) || 1)
-  );
+  g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
+  g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
 
-  g.timeIndex = Math.max(
-    0,
-    Math.min(5, Number(g.timeIndex) || 0)
-  );
-
-  [
+  for(const key of [
     "hp",
     "energy",
     "mood",
@@ -2194,2448 +1167,2303 @@ function normalizeState(raw) {
     "friends",
     "love",
     "reputation",
-    "skill",
-  ].forEach((key) => {
+    "skill"
+  ]){
     g.stats[key] = clamp(g.stats[key]);
-  });
+  }
 
   g.stats.money = Math.max(0, Number(g.stats.money) || 0);
 
-  g.certificates = Array.isArray(g.certificates)
-    ? g.certificates
-    : [];
-
-  g.assets = Array.isArray(g.assets) ? g.assets : [];
-
-  g.diaryEntries = Array.isArray(g.diaryEntries)
-    ? g.diaryEntries
-    : [];
-
-  g.bag = Array.isArray(g.bag)
-    ? g.bag
-    : base.bag;
-
-  if (!g.dailyEvent) {
-    g.dailyEvent = eventData(DAILY_EVENTS[0]);
+  if(!g.dayStart){
+    g.dayStart = snapshotDay(g);
   }
 
   return g;
 }
 
-function makeDiary(g, day) {
-  const d = g.dayStart || snapshot(g);
-
-  const diff = (key) =>
-    Math.round((g.stats[key] || 0) - (d[key] || 0));
-
-  return {
-    day,
-    event: g.dailyEvent?.title || "Không có",
-
-    summary:
-      `Kiến thức ${g.stats.study}/100 • ` +
-      `Năng lượng ${g.stats.energy}/100 • ` +
-      `Bạn bè ${g.stats.friends}/100 • ` +
-      `Tiền ${money(g.stats.money)}`,
-
-    deltas: {
-      study: diff("study"),
-      energy: diff("energy"),
-      mood: diff("mood"),
-      friends: diff("friends"),
-      love: diff("love"),
-      reputation: diff("reputation"),
-      skill: diff("skill"),
-      money: Math.round(g.stats.money - (d.money || 0)),
-      competition: Math.round(
-        g.competitionPoints - (d.competitionPoints || 0)
-      ),
-    },
-  };
-}
-
 /* =========================================================
-   SAVE CODE
-   ========================================================= */
+   UI COMPONENTS
+========================================================= */
 
-function encodeSaveCode(data) {
-  const bytes = new TextEncoder().encode(JSON.stringify(data));
-
-  let binary = "";
-
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(
-      ...bytes.subarray(i, i + 0x8000)
-    );
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
+function Modal({title,onClose,children,wide=false}){
+  return (
+    <div className="modal-backdrop">
+      <div className={`modal ${wide ? "modal-wide" : ""}`}>
+        <div className="modal-head">
+          <div className="modal-title">{title}</div>
+          {onClose && (
+            <button className="icon-btn" onClick={onClose}>✕</button>
+          )}
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
 }
 
-function decodeSaveCode(code) {
-  let b64 = code.trim()
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+function StatBar({icon,label,value}){
+  return (
+    <div className="stat">
+      <div className="stat-top">
+        <span>{icon} {label}</span>
+        <b>{Math.round(value)}</b>
+      </div>
+      <div className="bar">
+        <div
+          className="bar-fill"
+          style={{width:`${clamp(value)}%`}}
+        />
+      </div>
+    </div>
+  );
+}
 
-  while (b64.length % 4) b64 += "=";
-
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return JSON.parse(
-    new TextDecoder().decode(bytes)
+function Button({children,onClick,disabled=false,className=""}){
+  return (
+    <button
+      className={`game-btn ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
   );
 }
 
 /* =========================================================
    APP
-   ========================================================= */
+========================================================= */
 
-export default function App() {
-  const [game, setGame] = useState(createInitialState);
+export default function App(){
 
-  const [secondsLeft, setSecondsLeft] =
-    useState(SLOT_SECONDS);
+  const [game,setGame] = useState(()=>{
+    try{
+      const saved = localStorage.getItem(SAVE_KEY);
+      if(saved) return normalizeState(JSON.parse(saved));
+    }catch{}
+    return createInitialState();
+  });
 
-  const [autoTime, setAutoTime] =
-    useState(true);
+  const [secondsLeft,setSecondsLeft] = useState(SLOT_SECONDS);
+  const [autoTime,setAutoTime] = useState(true);
 
-  const [overlay, setOverlay] =
-    useState(null);
+  const [overlay,setOverlay] = useState(null);
+  const [toast,setToast] = useState("");
 
-  const [toast, setToast] =
-    useState("");
+  const [quiz,setQuiz] = useState(null);
+  const [quizFeedback,setQuizFeedback] = useState(null);
 
-  const [audioOn, setAudioOn] =
-    useState(false);
+  const [saveCode,setSaveCode] = useState("");
+  const [fashionCategory,setFashionCategory] = useState("Áo");
 
-  const [saveCode, setSaveCode] =
-    useState("");
+  const [audioOn,setAudioOn] = useState(false);
 
-  const [quiz, setQuiz] =
-    useState(null);
+  const advancingRef = useRef(false);
 
-  const [oral, setOral] =
-    useState(null);
+  const blockingOverlay = Boolean(overlay);
 
-  const [quizLock, setQuizLock] =
-    useState(false);
+  const currentTime = TIME_SLOTS[game.timeIndex];
+  const nextTime =
+    TIME_SLOTS[Math.min(game.timeIndex + 1,TIME_SLOTS.length - 1)];
 
-  const fileRef = useRef(null);
+  const currentTitle =
+    TITLES.find(t=>t.id===game.selectedTitle) || TITLES[0];
 
-  const prevDay = useRef(game.day);
-  const first = useRef(true);
+  const leaderboard = useMemo(()=>{
+    const rows = [
+      {
+        id:"player",
+        name:"Bạn",
+        icon:currentTitle.icon,
+        points:game.competitionPoints,
+        today:game.dailyCompetition.player
+      },
+      ...NPCS.map(n=>({
+        id:n.id,
+        name:n.name,
+        icon:n.icon,
+        points:game.npcCompetition[n.id] || 0,
+        today:game.dailyCompetition[n.id] || 0
+      }))
+    ];
 
-  /* ---------------- AUDIO ---------------- */
+    return rows.sort((a,b)=>b.points-a.points);
+  },[game,currentTitle]);
 
-  const beep = useCallback(
-    (freq = 520, duration = 0.07) => {
-      if (!audioOn) return;
-
-      try {
-        const AudioContext =
-          window.AudioContext ||
-          window.webkitAudioContext;
-
-        if (!AudioContext) return;
-
-        const ctx = new AudioContext();
-
-        const oscillator =
-          ctx.createOscillator();
-
-        const gain =
-          ctx.createGain();
-
-        oscillator.frequency.value = freq;
-        gain.gain.value = 0.035;
-
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-
-        oscillator.start();
-
-        oscillator.stop(
-          ctx.currentTime + duration
-        );
-      } catch {}
-    },
-    [audioOn]
+  const ownedFashion = useMemo(
+    ()=>FASHION.filter(item=>game.wardrobe.includes(item.id)),
+    [game.wardrobe]
   );
 
-  const notify = useCallback(
-    (message) => {
-      setToast(message);
-      beep();
-    },
-    [beep]
+  const visibleFashion = useMemo(
+    ()=>FASHION.filter(item=>item.category===fashionCategory),
+    [fashionCategory]
   );
 
-  /* ---------------- AUTOSAVE ---------------- */
+  /* -----------------------------------------
+     SAVE
+  ----------------------------------------- */
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        SAVE_KEY,
-        JSON.stringify(game)
-      );
-    } catch {}
-  }, [game]);
+  useEffect(()=>{
+    try{
+      localStorage.setItem(SAVE_KEY,JSON.stringify(game));
+    }catch{}
+  },[game]);
 
-  /* ---------------- TOAST ---------------- */
+  /* -----------------------------------------
+     TOAST
+  ----------------------------------------- */
 
-  useEffect(() => {
-    if (!toast) return;
+  useEffect(()=>{
+    if(!toast) return;
 
-    const timer = setTimeout(
-      () => setToast(""),
-      2600
-    );
+    const id = setTimeout(()=>setToast(""),2400);
 
-    return () => clearTimeout(timer);
-  }, [toast]);
+    return ()=>clearTimeout(id);
+  },[toast]);
 
-  /* ---------------- DAY CHANGE ---------------- */
+  /* -----------------------------------------
+     SOUND
+  ----------------------------------------- */
 
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
+  const beep = useCallback((freq=440,duration=.08)=>{
+    if(!audioOn) return;
 
-      setTimeout(() => {
-        notify(
-          `🎲 Ngày 1: ${game.dailyEvent?.title}`
-        );
-      }, 300);
+    try{
+      const AudioContext =
+        window.AudioContext || window.webkitAudioContext;
 
-      return;
-    }
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    if (game.day !== prevDay.current) {
-      const oldDay = prevDay.current;
+      osc.frequency.value = freq;
 
-      prevDay.current = game.day;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
 
-      notify(
-        `📔 Nhật ký ngày ${oldDay} đã chốt! • 🎲 ${game.dailyEvent?.title}`
-      );
-    }
-  }, [
-    game.day,
-    game.dailyEvent,
-    notify,
-  ]);
+      gain.gain.setValueAtTime(.04,ctx.currentTime);
 
-  const blocking = !!overlay;
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    }catch{}
+  },[audioOn]);
 
-  /* =========================================================
-     CHUYỂN MỐC THỜI GIAN
-     ========================================================= */
+  /* -----------------------------------------
+     UPDATE GAME
+  ----------------------------------------- */
 
-  const advanceTime = useCallback(() => {
-    setSecondsLeft(SLOT_SECONDS);
+  const updateGame = useCallback((mutator)=>{
+    setGame(prev=>{
+      const next = clone(prev);
+      mutator(next);
+      return normalizeState(next);
+    });
+  },[]);
 
-    setGame((prev) => {
-      if (prev.isGameOver) return prev;
+  /* -----------------------------------------
+     NEXT DAY
+  ----------------------------------------- */
 
+  const finishDay = useCallback(()=>{
+    setGame(prev=>{
       const next = clone(prev);
 
-      /* Chưa hết ngày */
-
-      if (next.timeIndex < 5) {
-        next.timeIndex += 1;
-        next.slotActionUsed = false;
-
-        return normalizeState(next);
-      }
-
-      /* ---------------- KẾT THÚC NGÀY ---------------- */
-
       const finishedDay = next.day;
-
-      next.diaryEntries = [
-        makeDiary(next, finishedDay),
-        ...(next.diaryEntries || []),
-      ];
-
-      /* Điểm người chơi cuối ngày */
+      const before = next.dayStart || snapshotDay(next);
 
       const playerGain = Math.max(
-        2,
+        1,
         Math.min(
           10,
           Math.floor(
-            (
-              next.stats.study +
-              next.stats.skill +
-              next.stats.reputation
-            ) / 55
+            (next.stats.study + next.stats.skill + next.stats.reputation) / 35
           )
         )
       );
 
       next.competitionPoints += playerGain;
+      next.dailyCompetition.player += playerGain;
 
-      const gains = {
-        player: playerGain,
+      const npcGain = {
+        lan:2 + (finishedDay % 3),
+        trieuMan:1 + (finishedDay % 4),
+        tuan:2 + (finishedDay % 2),
+        minh:1 + (finishedDay % 3),
+        linh:2 + (finishedDay % 2),
+        phong:2 + ((finishedDay + 1) % 3)
       };
 
-      /* NPC tự tăng điểm */
+      Object.entries(npcGain).forEach(([id,gain])=>{
+        next.npcCompetition[id] =
+          (next.npcCompetition[id] || 0) + gain;
 
-      NPCS.forEach((npc, index) => {
-        const gain =
-          2 + ((finishedDay + index) % 3);
-
-        next.npcCompetition[npc.id] =
-          (next.npcCompetition[npc.id] || 0) +
-          gain;
-
-        gains[npc.id] = gain;
+        next.dailyCompetition[id] = gain;
       });
 
-      next.dailyCompetition = gains;
+      const deltas = {
+        study:next.stats.study-before.stats.study,
+        money:next.stats.money-before.stats.money,
+        friends:next.stats.friends-before.stats.friends,
+        energy:next.stats.energy-before.stats.energy,
+        mood:next.stats.mood-before.stats.mood,
+        skill:next.stats.skill-before.stats.skill,
+        competition:
+          next.competitionPoints-before.competitionPoints
+      };
 
-      /* ---------------- GAME OVER ---------------- */
+      const diary = {
+        id:`day-${finishedDay}-${Date.now()}`,
+        day:finishedDay,
+        event:next.dailyEvent?.title || "Không có sự kiện",
+        summary:
+          `Kiến thức ${signed(deltas.study)} • ` +
+          `Tiền ${signed(deltas.money)}đ • ` +
+          `Bạn bè ${signed(deltas.friends)} • ` +
+          `Thi đua ${signed(deltas.competition)}`,
+        deltas
+      };
 
-      if (finishedDay >= next.totalDays) {
+      next.diaryEntries = [
+        diary,
+        ...next.diaryEntries
+      ].slice(0,60);
+
+      if(finishedDay >= next.totalDays){
         next.isGameOver = true;
-        next.selectedTitle = "legend";
-
         return normalizeState(next);
       }
 
-      /* ---------------- NGÀY MỚI ---------------- */
-
-      next.day += 1;
+      next.day = finishedDay + 1;
       next.timeIndex = 0;
-      next.slotActionUsed = false;
-      next.dailyActionCount = 0;
+
       next.dailyOralCheckDone = false;
 
-      const event = pickEvent(
-        next.lastEventId
-      );
+      next.dailyCompetition = emptyDailyCompetition();
 
-      next.lastEventId = event.id;
-      next.dailyEvent = eventData(event);
+      const ev = pickDailyEvent(next.lastEventId);
 
-      /*
-        dayStart được lưu TRƯỚC khi áp dụng event
-        để event cũng được tính vào nhật ký ngày đó.
-      */
+      next.dayStart = snapshotDay(next);
+      next.dailyEvent = eventData(ev);
+      next.lastEventId = ev.id;
 
-      next.dayStart = snapshot(next);
-
-      event.apply(next);
+      ev.apply(next);
 
       return normalizeState(next);
     });
-  }, []);
 
-  /* =========================================================
-     ĐỒNG HỒ 45 GIÂY
-     ========================================================= */
+    setSecondsLeft(SLOT_SECONDS);
+    beep(880,.14);
+  },[beep]);
 
-  useEffect(() => {
-    if (
-      !autoTime ||
-      blocking ||
-      game.isGameOver
-    ) {
-      return;
-    }
+  /* -----------------------------------------
+     ADVANCE TIME
+  ----------------------------------------- */
 
-    const id = setInterval(() => {
-      setSecondsLeft((seconds) => {
-        if (seconds <= 1) {
-          advanceTime();
-          return SLOT_SECONDS;
+  const advanceTime = useCallback(()=>{
+    if(advancingRef.current) return;
+
+    advancingRef.current = true;
+
+    setGame(prev=>{
+      if(prev.isGameOver) return prev;
+
+      if(prev.timeIndex < TIME_SLOTS.length - 1){
+        const next = clone(prev);
+        next.timeIndex += 1;
+        return normalizeState(next);
+      }
+
+      return prev;
+    });
+
+    setTimeout(()=>{
+      setGame(prev=>{
+        if(prev.isGameOver) return prev;
+
+        if(prev.timeIndex >= TIME_SLOTS.length - 1){
+          return prev;
         }
 
-        return seconds - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(id);
-  }, [
-    autoTime,
-    blocking,
-    game.isGameOver,
-    advanceTime,
-  ]);
-
-  /* =========================================================
-     DANH HIỆU
-     ========================================================= */
-
-  const titles = useMemo(
-    () => TITLES.filter((title) => title.ok(game)),
-    [game]
-  );
-
-  /* =========================================================
-     BẢNG THI ĐUA
-     ========================================================= */
-
-  const leaderboard = useMemo(() => {
-    return [
-      {
-        id: "player",
-        name: "Bạn",
-        icon: "⭐",
-        points: game.competitionPoints,
-        today: game.dailyCompetition.player || 0,
-      },
-
-      ...NPCS.map((npc) => ({
-        id: npc.id,
-        name: npc.name,
-        icon: npc.icon,
-        points:
-          game.npcCompetition[npc.id] || 0,
-        today:
-          game.dailyCompetition[npc.id] || 0,
-      })),
-    ].sort(
-      (a, b) => b.points - a.points
-    );
-  }, [game]);
-
-  /* =========================================================
-     DÙNG HOẠT ĐỘNG CHÍNH
-     ========================================================= */
-
-  const useSlot = useCallback(
-    (label) => {
-      if (game.slotActionUsed) {
-        notify(
-          `⏳ Mốc ${TIME_SLOTS[game.timeIndex]} đã dùng hoạt động chính rồi.`
-        );
-
-        return false;
-      }
-
-      setGame((g) => ({
-        ...g,
-        slotActionUsed: true,
-        dailyActionCount:
-          g.dailyActionCount + 1,
-      }));
-
-      notify(`🎯 ${label}`);
-
-      return true;
-    },
-    [
-      game.slotActionUsed,
-      game.timeIndex,
-      notify,
-    ]
-  );
-
-  /* =========================================================
-     QUIZ
-     ========================================================= */
-
-  const startQuiz = useCallback(
-    (kind = "quiz", questions = null) => {
-      if (
-        kind === "oral" &&
-        game.dailyOralCheckDone
-      ) {
-        notify(
-          "🧑‍🏫 Hôm nay bạn đã kiểm tra miệng rồi."
-        );
-
-        return;
-      }
-
-      if (
-        !useSlot(
-          kind === "oral"
-            ? "Kiểm tra miệng 15 phút"
-            : "Quiz nhanh"
-        )
-      ) {
-        return;
-      }
-
-      const selected =
-        questions ||
-        [...QUIZ_BANK]
-          .sort(() => Math.random() - 0.5)
-          .slice(
-            0,
-            kind === "oral" ? 3 : 5
-          );
-
-      const data = {
-        questions: selected,
-        index: 0,
-        score: 0,
-        wrong: 0,
-        feedback: "",
-      };
-
-      if (kind === "oral") {
-        setOral(data);
-      } else {
-        setQuiz(data);
-      }
-
-      setOverlay(kind);
-    },
-    [
-      game.dailyOralCheckDone,
-      notify,
-      useSlot,
-    ]
-  );
-
-  const answerQuiz = useCallback(
-    (index, isOral = false) => {
-      if (quizLock) return;
-
-      setQuizLock(true);
-
-      const currentData =
-        isOral ? oral : quiz;
-
-      if (!currentData) return;
-
-      const currentQuestion =
-        currentData.questions[
-          currentData.index
-        ];
-
-      const correct =
-        index === currentQuestion.answer;
-
-      const next = clone(currentData);
-
-      next.score += correct ? 1 : 0;
-      next.wrong += correct ? 0 : 1;
-
-      next.feedback = correct
-        ? `✅ Đúng! ${
-            currentQuestion.explanation || ""
-          }`
-        : `❌ Sai! Kiến thức -2. ${
-            currentQuestion.explanation || ""
-          }`;
-
-      /* Sai = -2 kiến thức */
-
-      setGame((g) => {
-        const n = clone(g);
-
-        if (!correct) {
-          n.stats.study =
-            clamp(n.stats.study - 2);
-        } else {
-          n.stats.mood =
-            clamp(n.stats.mood + 1);
-        }
-
-        return normalizeState(n);
+        return prev;
       });
 
-      beep(correct ? 720 : 180);
+      setTimeout(()=>{
+        setGame(prev=>{
+          if(prev.isGameOver) return prev;
 
-      if (isOral) {
-        setOral(next);
-      } else {
-        setQuiz(next);
-      }
-
-      setTimeout(() => {
-        if (
-          next.index >=
-          next.questions.length - 1
-        ) {
-          const score = next.score;
-
-          setGame((g) => {
-            const n = clone(g);
-
-            if (isOral) {
-              n.dailyOralCheckDone = true;
-              n.oralChecksDone =
-                (n.oralChecksDone || 0) + 1;
-
-              if (score === 3) {
-                n.stats.study += 5;
-                n.stats.reputation += 4;
-                n.competitionPoints += 6;
-              } else if (score === 2) {
-                n.stats.study += 2;
-                n.stats.reputation += 2;
-                n.competitionPoints += 4;
-              } else if (score === 0) {
-                n.stats.mood -= 4;
-                n.stats.reputation -= 2;
-              }
-            } else {
-              n.studyActions += 1;
-
-              if (score >= 4) {
-                n.stats.study += 4;
-                n.stats.skill += 2;
-                n.competitionPoints += 4;
-              } else if (score === 3) {
-                n.stats.study += 2;
-                n.competitionPoints += 2;
-              }
-            }
-
-            return normalizeState(n);
-          });
-
-          setOverlay(null);
-
-          if (isOral) {
-            setOral(null);
-          } else {
-            setQuiz(null);
+          if(prev.timeIndex === TIME_SLOTS.length - 1){
+            return prev;
           }
 
-          notify(
-            isOral
-              ? `🧑‍🏫 Kiểm tra miệng: ${score}/3.`
-              : `📚 Quiz: ${score}/${next.questions.length}.`
-          );
-        } else {
-          next.index += 1;
-          next.feedback = "";
-
-          if (isOral) {
-            setOral(next);
-          } else {
-            setQuiz(next);
-          }
-        }
-
-        setQuizLock(false);
-      }, 700);
-    },
-    [
-      quizLock,
-      oral,
-      quiz,
-      beep,
-      notify,
-    ]
-  );
-
-  /* =========================================================
-     BẠN BÈ
-     ========================================================= */
-
-  const interact = useCallback(
-    (id) => {
-      if (!useSlot(NPC_MAP[id].act)) {
-        return;
-      }
-
-      setGame((g) => {
-        const n = clone(g);
-
-        n.relationships[id] = clamp(
-          (n.relationships[id] || 30) + 4
-        );
-
-        n.stats.friends +=
-          id === "linh" ? 5 : 3;
-
-        if (
-          id === "lan" ||
-          id === "minh"
-        ) {
-          n.stats.study += 4;
-        }
-
-        if (id === "tuan") {
-          n.stats.skill += 4;
-          n.stats.reputation += 2;
-        }
-
-        if (id === "linh") {
-          n.stats.skill += 2;
-          n.stats.mood += 5;
-        }
-
-        if (id === "phong") {
-          n.stats.hp += 5;
-          n.stats.energy -= 5;
-        }
-
-        if (id === "trieuMan") {
-          const candy = n.bag.find(
-            (x) =>
-              x.id === "candy" &&
-              x.count > 0
-          );
-
-          if (candy) {
-            candy.count--;
-
-            n.stats.love += 8;
-            n.relationships[id] += 2;
-          } else {
-            n.stats.love += 3;
-          }
-        }
-
-        n.competitionPoints += 3;
-
-        return normalizeState(n);
-      });
-
-      notify(
-        `🤝 Đã tương tác với ${NPC_MAP[id].name}`
-      );
-    },
-    [useSlot, notify]
-  );
-
-  /* =========================================================
-     CĂN TIN
-     ========================================================= */
-
-  const buyFood = (id) => {
-    const item = CANTEEN_ITEMS.find(
-      (x) => x.id === id
-    );
-
-    if (!item) return;
-
-    if (game.stats.money < item.price) {
-      notify("💸 Không đủ tiền.");
-      return;
-    }
-
-    if (!useSlot("Mua đồ căn tin")) return;
-
-    setGame((g) => {
-      const n = clone(g);
-
-      n.stats.money -= item.price;
-
-      item.effect(n);
-
-      return normalizeState(n);
-    });
-  };
-
-  /* =========================================================
-     VIỆC LÀM
-     ========================================================= */
-
-  const doJob = (id) => {
-    const job = JOBS.find(
-      (x) => x.id === id
-    );
-
-    if (!job) return;
-
-    if (!job.ok(game)) {
-      notify(
-        "🔒 Chưa đủ điều kiện cho công việc này."
-      );
-      return;
-    }
-
-    if (!useSlot(job.name)) return;
-
-    setGame((g) => {
-      const n = clone(g);
-
-      n.stats.money += job.money;
-      n.stats.energy -= job.energy;
-
-      if (job.energy > 15) {
-        n.stats.mood -= 2;
-      }
-
-      n.jobActions++;
-      n.competitionPoints += job.comp;
-
-      return normalizeState(n);
-    });
-
-    notify(
-      `💼 Hoàn thành việc: +${money(job.money)}`
-    );
-  };
-
-  /* =========================================================
-     TÀI SẢN
-     ========================================================= */
-
-  const buyProperty = (id) => {
-    const property = PROPERTIES.find(
-      (x) => x.id === id
-    );
-
-    if (!property) return;
-
-    if (game.assets.includes(id)) {
-      notify(
-        "🏠 Bạn đã sở hữu tài sản này."
-      );
-      return;
-    }
-
-    if (game.stats.money < property.price) {
-      notify("💸 Chưa đủ tiền.");
-      return;
-    }
-
-    setGame((g) => {
-      const n = clone(g);
-
-      n.stats.money -= property.price;
-      n.assets.push(id);
-
-      property.effect(n);
-
-      return normalizeState(n);
-    });
-
-    notify(`🏠 Mua ${property.name}`);
-  };
-
-  /* =========================================================
-     CHỨNG CHỈ
-     ========================================================= */
-
-  const startCert = (id) => {
-    const cert = CERTS.find(
-      (x) => x.id === id
-    );
-
-    if (!cert) return;
-
-    if (game.certificates.includes(id)) {
-      notify("🎓 Bạn đã có chứng chỉ này.");
-      return;
-    }
-
-    if (
-      game.stats.money < cert.fee ||
-      game.stats.skill < cert.req
-    ) {
-      notify(
-        "🔒 Chưa đủ tiền hoặc kỹ năng."
-      );
-      return;
-    }
-
-    if (!useSlot("Thi chứng chỉ")) {
-      return;
-    }
-
-    setQuiz({
-      questions: cert.questions,
-      index: 0,
-      score: 0,
-      wrong: 0,
-      certId: id,
-      cert,
-      feedback: "",
-    });
-
-    setOverlay("cert");
-  };
-
-  const answerCert = (index) => {
-    if (quizLock || !quiz) return;
-
-    const cert = quiz.cert;
-
-    const currentQuestion =
-      quiz.questions[quiz.index];
-
-    const correct =
-      index === currentQuestion.answer;
-
-    const next = clone(quiz);
-
-    next.score += correct ? 1 : 0;
-    next.wrong += correct ? 0 : 1;
-
-    next.feedback = correct
-      ? "✅ Chính xác!"
-      : "❌ Sai! Kiến thức -2.";
-
-    setGame((g) => {
-      const n = clone(g);
-
-      if (!correct) {
-        n.stats.study -= 2;
-      }
-
-      return normalizeState(n);
-    });
-
-    setQuiz(next);
-    setQuizLock(true);
-
-    setTimeout(() => {
-      if (
-        next.index >=
-        next.questions.length - 1
-      ) {
-        const pass = next.score >= 2;
-
-        setGame((g) => {
-          const n = clone(g);
-
-          if (pass) {
-            n.stats.money -= cert.fee;
-
-            n.certificates.push(
-              cert.id
-            );
-
-            n.stats.skill += 3;
-            n.competitionPoints += 10;
-          } else {
-            n.stats.mood -= 2;
-          }
-
-          return normalizeState(n);
+          return prev;
         });
 
-        setOverlay(null);
-        setQuiz(null);
+        advancingRef.current = false;
+      },40);
+    },40);
 
-        notify(
-          pass
-            ? `🎓 Đậu ${cert.name}!`
-            : `📕 Chưa đạt ${cert.name}.`
-        );
-      } else {
-        next.index += 1;
-        next.feedback = "";
+    /*
+      finishDay cần được gọi riêng nếu đang ở mốc cuối.
+      Kiểm tra game hiện tại bằng state effect bên dưới.
+    */
+  },[]);
 
-        setQuiz(next);
-      }
+  /* -----------------------------------------
+     TIMER
+  ----------------------------------------- */
 
-      setQuizLock(false);
-    }, 700);
-  };
-
-  /* =========================================================
-     NGHỈ
-     ========================================================= */
-
-  const rest = () => {
-    if (!useSlot("Nghỉ ngơi")) {
+  useEffect(()=>{
+    if(
+      !autoTime ||
+      blockingOverlay ||
+      game.isGameOver
+    ){
       return;
     }
 
-    setGame((g) => {
-      const n = clone(g);
+    const timer = setInterval(()=>{
+      setSecondsLeft(prev=>{
+        if(prev > 1){
+          return prev - 1;
+        }
 
-      n.stats.energy += 25;
-      n.stats.mood += 3;
-      n.stats.hp += 2;
+        if(game.timeIndex >= TIME_SLOTS.length - 1){
+          finishDay();
+        }else{
+          setGame(old=>{
+            const next = clone(old);
+            next.timeIndex = Math.min(
+              TIME_SLOTS.length - 1,
+              next.timeIndex + 1
+            );
+            return normalizeState(next);
+          });
 
-      return normalizeState(n);
-    });
-  };
+          beep(700,.07);
+        }
+
+        return SLOT_SECONDS;
+      });
+    },1000);
+
+    return ()=>clearInterval(timer);
+  },[
+    autoTime,
+    blockingOverlay,
+    game.isGameOver,
+    game.timeIndex,
+    finishDay,
+    beep
+  ]);
+
+  /* -----------------------------------------
+     DAY CHANGE TOAST
+  ----------------------------------------- */
+
+  const previousDay = useRef(game.day);
+
+  useEffect(()=>{
+    if(game.day !== previousDay.current){
+      if(game.day > 1){
+        setToast(
+          `📔 Nhật ký ngày ${game.day-1} đã chốt • ` +
+          `${game.dailyEvent?.icon || "🎲"} ${game.dailyEvent?.title || "Ngày mới"}`
+        );
+      }
+      previousDay.current = game.day;
+    }
+  },[game.day,game.dailyEvent]);
+
+  /* -----------------------------------------
+     GAME OVER
+  ----------------------------------------- */
+
+  useEffect(()=>{
+    if(game.isGameOver){
+      setOverlay("ending");
+      setAutoTime(false);
+    }
+  },[game.isGameOver]);
 
   /* =========================================================
-     SAVE
-     ========================================================= */
+     ACTIONS
+  ========================================================= */
 
-  const saveNow = () => {
-    setSaveCode(
-      encodeSaveCode(game)
+  const startQuiz = useCallback((mode="quick",cert=null)=>{
+    if(mode==="oral" && game.dailyOralCheckDone){
+      setToast("🧑‍🏫 Bạn đã kiểm tra miệng hôm nay rồi.");
+      return;
+    }
+
+    if(mode==="oral"){
+      updateGame(g=>{
+        g.dailyOralCheckDone = true;
+        g.oralChecksDone++;
+      });
+    }
+
+    if(mode==="quick"){
+      updateGame(g=>{
+        g.studyActions++;
+        addStat(g,"energy",-3);
+      });
+    }
+
+    const questions =
+      mode==="cert"
+        ? cert.questions.map((q,i)=>({
+            ...q,
+            id:`${cert.id}-${i}`
+          }))
+        : shuffle(QUIZ_BANK).slice(0,mode==="oral" ? 3 : 5);
+
+    setQuiz({
+      mode,
+      certId:cert?.id || null,
+      certName:cert?.name || null,
+      questions,
+      index:0,
+      correct:0,
+      wrong:0
+    });
+
+    setQuizFeedback(null);
+    setOverlay(mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
+  },[game.dailyOralCheckDone,updateGame]);
+
+  const answerQuiz = useCallback((choiceIndex)=>{
+    if(!quiz || quizFeedback) return;
+
+    const question = quiz.questions[quiz.index];
+    const correct = choiceIndex === question.answer;
+
+    if(correct){
+      beep(760,.08);
+    }else{
+      beep(180,.13);
+
+      updateGame(g=>{
+        addStat(
+          g,
+          "study",
+          quiz.mode==="cert" ? -1 : -2
+        );
+      });
+    }
+
+    setQuizFeedback({
+      correct,
+      selected:choiceIndex,
+      explanation:question.explanation
+    });
+
+    setQuiz(q=>({
+      ...q,
+      correct:q.correct + (correct ? 1 : 0),
+      wrong:q.wrong + (correct ? 0 : 1)
+    }));
+  },[quiz,quizFeedback,beep,updateGame]);
+
+  const nextQuizQuestion = useCallback(()=>{
+    if(!quiz) return;
+
+    const finalCorrect = quiz.correct;
+
+    if(quiz.index >= quiz.questions.length - 1){
+
+      if(quiz.mode==="quick"){
+        updateGame(g=>{
+          if(finalCorrect===5){
+            addStat(g,"study",5);
+            addStat(g,"skill",2);
+            addCompetition(g,5);
+          }else if(finalCorrect===4){
+            addStat(g,"study",3);
+            addCompetition(g,3);
+          }else if(finalCorrect===3){
+            addStat(g,"study",1);
+            addCompetition(g,2);
+          }
+        });
+
+        setToast(
+          `📚 Hoàn thành quiz: ${finalCorrect}/5 câu đúng`
+        );
+      }
+
+      if(quiz.mode==="oral"){
+        updateGame(g=>{
+          if(finalCorrect===3){
+            addStat(g,"study",5);
+            addStat(g,"reputation",4);
+            addCompetition(g,6);
+          }else if(finalCorrect===2){
+            addStat(g,"study",2);
+            addStat(g,"reputation",2);
+            addCompetition(g,4);
+          }else if(finalCorrect===0){
+            addStat(g,"mood",-4);
+            addStat(g,"reputation",-2);
+          }
+        });
+
+        setToast(
+          `🧑‍🏫 Kiểm tra miệng: ${finalCorrect}/3 câu đúng`
+        );
+      }
+
+      if(quiz.mode==="cert"){
+        const cert = CERTS.find(c=>c.id===quiz.certId);
+
+        if(cert){
+          if(finalCorrect>=2){
+            updateGame(g=>{
+              if(!g.certificates.includes(cert.id)){
+                g.certificates.push(cert.id);
+              }
+
+              addStat(g,"skill",3);
+              addCompetition(g,10);
+            });
+
+            setToast(`🎓 Đậu ${cert.name}!`);
+          }else{
+            setToast(`❌ Chưa đạt ${cert.name}. Cần ít nhất 2/3.`);
+          }
+        }
+      }
+
+      setQuiz(null);
+      setQuizFeedback(null);
+      setOverlay(null);
+      return;
+    }
+
+    setQuiz(q=>({
+      ...q,
+      index:q.index+1
+    }));
+
+    setQuizFeedback(null);
+  },[quiz,updateGame]);
+
+  const buyFashion = useCallback((item)=>{
+    if(game.wardrobe.includes(item.id)){
+      setToast("👕 Bạn đã sở hữu món này.");
+      return;
+    }
+
+    if(game.stats.money < item.price){
+      setToast("💸 Không đủ tiền.");
+      return;
+    }
+
+    updateGame(g=>{
+      g.wardrobe.push(item.id);
+      addMoney(g,-item.price);
+
+      Object.entries(item.bonus || {}).forEach(([key,val])=>{
+        if(key==="energy"){
+          addStat(g,"energy",val);
+        }else if(key==="mood"){
+          addStat(g,"mood",val);
+        }else if(key==="study"){
+          addStat(g,"study",val);
+        }else if(key==="friends"){
+          addStat(g,"friends",val);
+        }else if(key==="love"){
+          addStat(g,"love",val);
+        }else if(key==="reputation"){
+          addStat(g,"reputation",val);
+        }else if(key==="skill"){
+          addStat(g,"skill",val);
+        }
+      });
+    });
+
+    setToast(`🛍️ Đã mua ${item.name}!`);
+  },[game,updateGame]);
+
+  const equipFashion = useCallback((item)=>{
+    updateGame(g=>{
+      const map = {
+        "Áo":"shirt",
+        "Quần":"pants",
+        "Giày":"shoes",
+        "Balo":"bag",
+        "Phụ kiện":"accessory",
+        "Tóc":"hair"
+      };
+
+      const slot = map[item.category];
+
+      if(slot){
+        g.outfit[slot] = item.id;
+      }
+    });
+
+    setToast(`✨ Đã mặc ${item.name}`);
+  },[updateGame]);
+
+  const unequipAccessory = useCallback(()=>{
+    updateGame(g=>{
+      g.outfit.accessory = null;
+    });
+
+    setToast("✨ Đã tháo phụ kiện.");
+  },[updateGame]);
+
+  const buyAsset = useCallback((asset)=>{
+    if(game.assets.includes(asset.id)){
+      setToast("🏠 Bạn đã sở hữu tài sản này.");
+      return;
+    }
+
+    if(game.stats.money < asset.price){
+      setToast("💸 Không đủ tiền mua.");
+      return;
+    }
+
+    updateGame(g=>{
+      g.assets.push(asset.id);
+      addMoney(g,-asset.price);
+
+      Object.entries(asset.bonus || {}).forEach(([key,val])=>{
+        addStat(g,key,val);
+      });
+
+      addCompetition(g,5);
+    });
+
+    setToast(`🏠 Đã mua ${asset.name}!`);
+  },[game,updateGame]);
+
+  const buyFood = useCallback((item)=>{
+    if(game.stats.money < item.price){
+      setToast("💸 Không đủ tiền.");
+      return;
+    }
+
+    updateGame(g=>{
+      addMoney(g,-item.price);
+
+      if(item.effect){
+        Object.entries(item.effect).forEach(([key,val])=>{
+          addStat(g,key,val);
+        });
+      }
+    });
+
+    setToast(`🍱 Đã mua ${item.name}.`);
+  },[game.stats.money,updateGame]);
+
+  const doJob = useCallback((job)=>{
+    if(!job.can(game)){
+      setToast("🔒 Chưa đủ điều kiện.");
+      return;
+    }
+
+    if(game.stats.energy < job.energy){
+      setToast("⚡ Không đủ năng lượng.");
+      return;
+    }
+
+    updateGame(g=>{
+      job.apply(g);
+      g.jobActions++;
+    });
+
+    setToast(
+      `💼 ${job.name}: +${money(job.pay)}`
     );
+  },[game,updateGame]);
 
-    notify("💾 Đã tạo mã lưu game.");
+  const interactNPC = useCallback((npc)=>{
+    if(game.stats.energy < 3){
+      setToast("⚡ Bạn đang quá mệt.");
+      return;
+    }
+
+    updateGame(g=>{
+      addStat(g,"energy",-3);
+      npc.apply(g);
+    });
+
+    setToast(`${npc.icon} ${npc.name}: ${npc.action}`);
+  },[game.stats.energy,updateGame]);
+
+  const restAtHome = useCallback(()=>{
+    updateGame(g=>{
+      addStat(g,"energy",25);
+      addStat(g,"hp",5);
+      addStat(g,"mood",5);
+    });
+
+    setToast("🛏️ Nghỉ ngơi giúp bạn hồi phục.");
+  },[updateGame]);
+
+  const useItem = useCallback((id)=>{
+    updateGame(g=>{
+      const item = g.bag.find(x=>x.id===id);
+
+      if(!item || item.count<=0) return;
+
+      if(id==="math_note"){
+        addStat(g,"study",8);
+        item.count--;
+      }
+
+      if(item.count<=0){
+        g.bag = g.bag.filter(x=>x.id!==id);
+      }
+    });
+
+    setToast("🎒 Đã sử dụng vật phẩm.");
+  },[updateGame]);
+
+  const startCertificate = useCallback((cert)=>{
+    if(game.certificates.includes(cert.id)){
+      setToast("🎓 Bạn đã có chứng chỉ này.");
+      return;
+    }
+
+    if(game.stats.skill < cert.req){
+      setToast(`🔒 Cần kỹ năng ≥ ${cert.req}.`);
+      return;
+    }
+
+    if(game.stats.money < cert.fee){
+      setToast("💸 Không đủ lệ phí.");
+      return;
+    }
+
+    updateGame(g=>{
+      addMoney(g,-cert.fee);
+    });
+
+    startQuiz("cert",cert);
+  },[game,updateGame,startQuiz]);
+
+  /* =========================================================
+     SAVE FUNCTIONS
+  ========================================================= */
+
+  const createSaveCode = ()=>{
+    const code = encodeSaveCode(game);
+    setSaveCode(code);
+    setToast("💾 Đã tạo mã lưu game.");
   };
 
-  const loadCode = () => {
-    try {
-      const loaded =
-        normalizeState(
-          decodeSaveCode(saveCode)
-        );
+  const loadSaveCode = ()=>{
+    try{
+      const loaded = normalizeState(decodeSaveCode(saveCode));
 
       setGame(loaded);
       setSecondsLeft(SLOT_SECONDS);
       setOverlay(null);
-
-      notify("📥 Đã nạp game.");
-    } catch {
-      notify(
-        "❌ Mã lưu không hợp lệ."
-      );
+      setToast("✅ Đã nạp game thành công.");
+    }catch{
+      setToast("❌ Mã lưu không hợp lệ.");
     }
   };
 
-  const exportJson = () => {
+  const exportJSON = ()=>{
     const blob = new Blob(
-      [JSON.stringify(game, null, 2)],
-      {
-        type: "application/json",
-      }
+      [JSON.stringify(game,null,2)],
+      {type:"application/json"}
     );
 
-    const url =
-      URL.createObjectURL(blob);
-
-    const a =
-      document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
 
     a.href = url;
-    a.download =
-      "thanh-xuan-save.json";
-
+    a.download = "thanh-xuan-ruc-ro-save.json";
     a.click();
 
     URL.revokeObjectURL(url);
   };
 
-  const importJson = async (file) => {
-    try {
-      const raw =
-        await file.text();
+  const importJSON = (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
 
-      setGame(
-        normalizeState(
-          JSON.parse(raw)
-        )
-      );
+    const reader = new FileReader();
 
-      setSecondsLeft(
-        SLOT_SECONDS
-      );
+    reader.onload = ()=>{
+      try{
+        const loaded = normalizeState(
+          JSON.parse(reader.result)
+        );
 
-      notify(
-        "📥 Đã nhập file lưu game."
-      );
-    } catch {
-      notify(
-        "❌ File lưu không hợp lệ."
-      );
-    }
+        setGame(loaded);
+        setSecondsLeft(SLOT_SECONDS);
+        setOverlay(null);
+        setToast("✅ Đã nhập file save.");
+      }catch{
+        setToast("❌ File save không hợp lệ.");
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
-  const reset = () => {
-    const fresh =
-      createInitialState();
+  const restart = ()=>{
+    localStorage.removeItem(SAVE_KEY);
+
+    const fresh = createInitialState();
 
     setGame(fresh);
-    setSecondsLeft(
-      SLOT_SECONDS
-    );
+    setSecondsLeft(SLOT_SECONDS);
+    setAutoTime(true);
     setOverlay(null);
+    setQuiz(null);
+    setQuizFeedback(null);
+    setSaveCode("");
 
-    notify(
-      "🌱 Bắt đầu lại hành trình!"
-    );
+    setToast("🌱 Hành trình mới bắt đầu!");
   };
 
   /* =========================================================
-     CÂU HỎI HIỆN TẠI
-     ========================================================= */
+     QUICK ACTIVITIES
+  ========================================================= */
 
-  const currentQuestion =
-    quiz?.questions?.[quiz.index];
-
-  const currentOralQuestion =
-    oral?.questions?.[oral.index];
-
-  /* =========================================================
-     DI CHUYỂN LOCATION
-     ========================================================= */
-
-  const navLocations = [
-    "class",
-    "canteen",
-    "job",
-    "friends",
-    "home",
-    "cert",
-    "property",
-  ];
-
-  const navLoc = (direction) => {
-    let index =
-      navLocations.indexOf(
-        game.location
-      );
-
-    index =
-      (index +
-        direction +
-        navLocations.length) %
-      navLocations.length;
-
-    setGame((g) => ({
-      ...g,
-      location:
-        navLocations[index],
-    }));
-  };
-
-  const locationTitle = {
-    class: "🏫 Lớp học",
-    canteen: "🍱 Căn tin",
-    job: "💼 Việc làm",
-    friends: "👥 Bạn bè",
-    home: "🏠 Nhà",
-    cert: "🎓 Chứng chỉ",
-    property: "🏠 Tài sản",
-  };
-
-  /* =========================================================
-     STATS
-     ========================================================= */
-
-  const statItems = [
-    ["❤️", "HP", "hp"],
-    ["⚡", "NL", "energy"],
-    ["🧠", "KT", "study"],
-    ["😊", "Mood", "mood"],
-    ["🤝", "Bạn", "friends"],
-    ["💗", "Tình", "love"],
-    ["⭐", "Danh", "reputation"],
-    ["🛠️", "Kỹ năng", "skill"],
+  const quickActivities = [
+    {
+      icon:"📚",
+      title:"Quiz 5 câu",
+      desc:"Ôn tập 180 câu",
+      action:()=>startQuiz("quick")
+    },
+    {
+      icon:"🧑‍🏫",
+      title:"Kiểm tra miệng",
+      desc:"3 câu / ngày",
+      action:()=>startQuiz("oral"),
+      disabled:game.dailyOralCheckDone
+    },
+    {
+      icon:"🍱",
+      title:"Căn tin",
+      desc:"Mua đồ ăn",
+      action:()=>setOverlay("canteen")
+    },
+    {
+      icon:"💼",
+      title:"Việc làm",
+      desc:"Kiếm tiền",
+      action:()=>setOverlay("jobs")
+    },
+    {
+      icon:"🎓",
+      title:"Chứng chỉ",
+      desc:"Mở nghề mới",
+      action:()=>setOverlay("certs")
+    },
+    {
+      icon:"👕",
+      title:"Tủ đồ",
+      desc:`${game.wardrobe.length} món`,
+      action:()=>setOverlay("fashion")
+    },
+    {
+      icon:"🏠",
+      title:"Tài sản",
+      desc:`${game.assets.length} tài sản`,
+      action:()=>setOverlay("assets")
+    },
+    {
+      icon:"🛏️",
+      title:"Nghỉ ngơi",
+      desc:"+25 năng lượng",
+      action:restAtHome
+    },
   ];
 
   /* =========================================================
-     LOCATION RENDER
-     ========================================================= */
+     RENDER CHARACTER
+  ========================================================= */
 
-  const renderLocation = () => {
-    switch (game.location) {
-      case "class":
-        return (
-          <Section title="📚 Lớp học">
-            <div className="event">
-              <b>
-                {game.dailyEvent?.icon}{" "}
-                {game.dailyEvent?.title}
-              </b>
+  const getFashion = (id)=>FASHION.find(x=>x.id===id);
 
-              <span>
-                {game.dailyEvent?.text}
-              </span>
+  const characterParts = [
+    getFashion(game.outfit.hair),
+    getFashion(game.outfit.shirt),
+    getFashion(game.outfit.pants),
+    getFashion(game.outfit.shoes),
+    getFashion(game.outfit.bag),
+    getFashion(game.outfit.accessory)
+  ].filter(Boolean);
 
-              <small>
-                {game.dailyEvent?.result}
-              </small>
-            </div>
+  /* =========================================================
+     SCENES
+  ========================================================= */
 
-            <div className="actions">
-              <button
-                onClick={() =>
-                  startQuiz("quiz")
-                }
-              >
-                📖 Quiz nhanh · 5 câu
-              </button>
+  const renderClass = ()=>(
+    <>
+      <div className="event-card">
+        <div className="event-icon">
+          {game.dailyEvent?.icon || "🎲"}
+        </div>
 
-              <button
-                disabled={
-                  game.dailyOralCheckDone
-                }
-                onClick={() =>
-                  startQuiz("oral")
-                }
-              >
-                🧑‍🏫 Kiểm tra miệng · 15'
-              </button>
-            </div>
+        <div>
+          <div className="event-title">
+            {game.dailyEvent?.title || "Ngày mới"}
+          </div>
 
-            <div className="hint">
-              ❌ Trả lời sai:
-              <b> -2 Kiến thức</b>.
-              <br />
-              🧑‍🏫 Kiểm tra miệng chỉ thực
-              hiện 1 lần mỗi ngày.
-            </div>
-          </Section>
-        );
+          <div className="muted">
+            {game.dailyEvent?.text}
+          </div>
 
-      case "canteen":
-        return (
-          <Section title="🍱 Căn tin">
-            <div className="grid">
-              {CANTEEN_ITEMS.map((item) => (
-                <Card key={item.id}>
-                  <div className="big">
-                    {item.icon}
-                  </div>
+          <div className="event-result">
+            {game.dailyEvent?.result}
+          </div>
+        </div>
+      </div>
 
-                  <b>{item.name}</b>
+      <div className="section-title">🏫 Hoạt động lớp học</div>
 
-                  <small>
-                    {item.desc}
-                  </small>
+      <div className="activity-grid">
+        {quickActivities.slice(0,4).map((a,i)=>(
+          <button
+            key={i}
+            className="activity-card"
+            onClick={a.action}
+            disabled={a.disabled}
+          >
+            <span className="activity-icon">{a.icon}</span>
+            <b>{a.title}</b>
+            <small>{a.desc}</small>
+          </button>
+        ))}
+      </div>
 
-                  <button
-                    onClick={() =>
-                      buyFood(item.id)
-                    }
-                  >
-                    {money(item.price)}
-                  </button>
-                </Card>
-              ))}
-            </div>
-          </Section>
-        );
+      <div className="section-title">👥 Bạn bè</div>
 
-      case "job":
-        return (
-          <Section title="💼 Việc làm">
-            <div className="grid">
-              {JOBS.map((job) => (
-                <Card key={job.id}>
-                  <div className="big">
-                    {job.icon}
-                  </div>
+      <div className="npc-grid">
+        {NPCS.map(npc=>(
+          <div className="npc-card" key={npc.id}>
+            <div className="npc-avatar">{npc.icon}</div>
 
-                  <b>{job.name}</b>
+            <div className="npc-info">
+              <b>{npc.name}</b>
+              <small>{npc.desc}</small>
 
-                  <small>
-                    {job.desc}
-                  </small>
-
-                  <button
-                    disabled={!job.ok(game)}
-                    onClick={() =>
-                      doJob(job.id)
-                    }
-                  >
-                    Nhận việc · +
-                    {money(job.money)}
-                  </button>
-                </Card>
-              ))}
-            </div>
-          </Section>
-        );
-
-      case "friends":
-        return (
-          <Section title="👥 Bạn bè">
-            <div className="grid">
-              {NPCS.map((npc) => (
-                <Card key={npc.id}>
-                  <div className="person">
-                    {npc.icon}
-                  </div>
-
-                  <b>{npc.name}</b>
-
-                  <small>
-                    {npc.desc}
-                  </small>
-
-                  <span>
-                    Quan hệ:{" "}
-                    {game.relationships[
-                      npc.id
-                    ] || 0}
-                    /100
-                  </span>
-
-                  <button
-                    onClick={() =>
-                      interact(npc.id)
-                    }
-                  >
-                    {npc.act}
-                  </button>
-                </Card>
-              ))}
-            </div>
-          </Section>
-        );
-
-      case "home":
-        return (
-          <Section title="🏠 Nhà">
-            <div className="homeBox">
-              <div className="big">
-                🛏️
+              <div className="relationship">
+                Quan hệ {game.relationships[npc.id] || 0}/100
               </div>
 
-              <h3>
-                Nghỉ một chút
-              </h3>
-
-              <p>
-                +25 năng lượng • +3 tâm trạng
-                • +2 HP
-              </p>
-
-              <button onClick={rest}>
-                😴 Nghỉ ngơi
-              </button>
+              <Button onClick={()=>interactNPC(npc)}>
+                {npc.action}
+              </Button>
             </div>
-          </Section>
-        );
+          </div>
+        ))}
+      </div>
+    </>
+  );
 
-      case "cert":
-        return (
-          <Section title="🎓 Phòng chứng chỉ">
-            <div className="grid">
-              {CERTS.map((cert) => (
-                <Card key={cert.id}>
-                  <div className="big">
-                    {cert.icon}
-                  </div>
+  const renderCanteen = ()=> {
+    const foods = [
+      {
+        name:"Nước suối",
+        icon:"💧",
+        price:5000,
+        effect:{energy:8}
+      },
+      {
+        name:"Sữa",
+        icon:"🥛",
+        price:12000,
+        effect:{energy:12,study:2}
+      },
+      {
+        name:"Cơm",
+        icon:"🍚",
+        price:25000,
+        effect:{energy:20,mood:5}
+      },
+      {
+        name:"Bánh ngọt",
+        icon:"🍰",
+        price:18000,
+        effect:{mood:8}
+      },
+      {
+        name:"Trà sữa",
+        icon:"🧋",
+        price:30000,
+        effect:{mood:10,energy:5}
+      },
+      {
+        name:"Hamburger",
+        icon:"🍔",
+        price:35000,
+        effect:{energy:25,mood:5}
+      }
+    ];
 
-                  <b>{cert.name}</b>
+    return (
+      <div className="card">
+        <div className="section-title">🍱 Căn tin trường</div>
 
-                  <small>
-                    {cert.desc}
-                  </small>
+        <div className="shop-grid">
+          {foods.map(item=>(
+            <div className="shop-card" key={item.name}>
+              <div className="shop-icon">{item.icon}</div>
+              <b>{item.name}</b>
+              <small>{money(item.price)}</small>
 
-                  <span>
-                    Phí: {money(cert.fee)}
-                    <br />
-                    Kỹ năng ≥ {cert.req}
-                  </span>
-
-                  <button
-                    disabled={game.certificates.includes(
-                      cert.id
-                    )}
-                    onClick={() =>
-                      startCert(cert.id)
-                    }
-                  >
-                    {game.certificates.includes(
-                      cert.id
-                    )
-                      ? "Đã có"
-                      : "Thi · 3 câu"}
-                  </button>
-                </Card>
-              ))}
+              <Button onClick={()=>buyFood(item)}>
+                Mua
+              </Button>
             </div>
-          </Section>
-        );
-
-      default:
-        return (
-          <Section title="🏠 Cửa hàng tài sản">
-            <div className="grid">
-              {PROPERTIES.map(
-                (property) => (
-                  <Card key={property.id}>
-                    <div className="big">
-                      {property.icon}
-                    </div>
-
-                    <b>
-                      {property.name}
-                    </b>
-
-                    <small>
-                      {property.desc}
-                    </small>
-
-                    <span>
-                      {money(
-                        property.price
-                      )}
-                    </span>
-
-                    <button
-                      disabled={game.assets.includes(
-                        property.id
-                      )}
-                      onClick={() =>
-                        buyProperty(
-                          property.id
-                        )
-                      }
-                    >
-                      {game.assets.includes(
-                        property.id
-                      )
-                        ? "Đã sở hữu"
-                        : "Mua"}
-                    </button>
-                  </Card>
-                )
-              )}
-            </div>
-          </Section>
-        );
-    }
-  };
-
-  /* =========================================================
-     MODAL
-     ========================================================= */
-
-  const modal =
-    overlay && (
-      <div
-        className="modalBack"
-        onMouseDown={(event) => {
-          if (
-            event.target ===
-            event.currentTarget
-          ) {
-            if (
-              ![
-                "quiz",
-                "oral",
-                "cert",
-                "ending",
-              ].includes(overlay)
-            ) {
-              setOverlay(null);
-            }
-          }
-        }}
-      >
-        <div className="modal">
-          {[
-            "quiz",
-            "oral",
-            "cert",
-          ].includes(overlay) && (
-            <QuizModal
-              type={overlay}
-              data={
-                overlay === "oral"
-                  ? oral
-                  : quiz
-              }
-              question={
-                overlay === "oral"
-                  ? currentOralQuestion
-                  : currentQuestion
-              }
-              onAnswer={
-                overlay === "cert"
-                  ? answerCert
-                  : (index) =>
-                      answerQuiz(
-                        index,
-                        overlay === "oral"
-                      )
-              }
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "save" && (
-            <SaveModal
-              code={saveCode}
-              setCode={setSaveCode}
-              onCreate={saveNow}
-              onLoad={loadCode}
-              onExport={exportJson}
-              onImport={() =>
-                fileRef.current?.click()
-              }
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "diary" && (
-            <DiaryModal
-              entries={
-                game.diaryEntries
-              }
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "titles" && (
-            <TitlesModal
-              titles={TITLES}
-              unlocked={titles}
-              selected={
-                game.selectedTitle
-              }
-              setSelected={(id) =>
-                setGame((g) => ({
-                  ...g,
-                  selectedTitle: id,
-                }))
-              }
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "leader" && (
-            <LeaderModal
-              board={leaderboard}
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "profile" && (
-            <ProfileModal
-              game={game}
-              onClose={() =>
-                setOverlay(null)
-              }
-            />
-          )}
-
-          {overlay === "ending" && (
-            <Ending
-              game={game}
-              board={leaderboard}
-              titles={titles}
-              onReset={reset}
-            />
-          )}
+          ))}
         </div>
       </div>
     );
+  };
 
-  /* =========================================================
-     GAME UI
-     ========================================================= */
+  const renderJobs = ()=>(
+    <div className="card">
+      <div className="section-title">💼 Việc làm thêm</div>
 
-  return (
-    <div className="root">
-      <div className="shell">
+      <div className="job-grid">
+        {JOBS.map(job=>{
+          const available = job.can(game);
+          const enoughEnergy = game.stats.energy >= job.energy;
 
-        {/* HEADER */}
+          return (
+            <div className={`job-card ${!available ? "locked" : ""}`} key={job.id}>
+              <div className="job-icon">{job.icon}</div>
 
-        <header>
+              <div className="job-content">
+                <b>{job.name}</b>
+                <small>{job.desc}</small>
+
+                <div className="job-meta">
+                  💰 {money(job.pay)}
+                  &nbsp; ⚡ -{job.energy}
+                </div>
+
+                <Button
+                  disabled={!available || !enoughEnergy}
+                  onClick={()=>doJob(job)}
+                >
+                  {!available ? "🔒 Chưa đủ điều kiện" :
+                   !enoughEnergy ? "⚡ Thiếu năng lượng" :
+                   "Nhận việc"}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderCerts = ()=>(
+    <div className="card">
+      <div className="section-title">🎓 Trung tâm chứng chỉ</div>
+
+      <div className="cert-grid">
+        {CERTS.map(cert=>{
+          const owned = game.certificates.includes(cert.id);
+          const enoughSkill = game.stats.skill >= cert.req;
+          const enoughMoney = game.stats.money >= cert.fee;
+
+          return (
+            <div className={`cert-card ${owned ? "owned" : ""}`} key={cert.id}>
+              <div className="cert-icon">{cert.icon}</div>
+              <b>{cert.name}</b>
+              <small>{cert.desc}</small>
+
+              <div>
+                Kỹ năng: <b>{cert.req}</b>
+              </div>
+
+              <div>
+                Lệ phí: <b>{money(cert.fee)}</b>
+              </div>
+
+              <Button
+                disabled={owned || !enoughSkill || !enoughMoney}
+                onClick={()=>startCertificate(cert)}
+              >
+                {owned ? "✅ Đã có" :
+                 !enoughSkill ? "🔒 Thiếu kỹ năng" :
+                 !enoughMoney ? "💸 Thiếu tiền" :
+                 "📝 Thi"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderAssets = ()=>(
+    <div className="card">
+      <div className="section-title">🏠 Cửa hàng tài sản</div>
+
+      <div className="asset-grid">
+        {ASSETS.map(asset=>{
+          const owned = game.assets.includes(asset.id);
+
+          return (
+            <div className={`asset-card ${owned ? "owned" : ""}`} key={asset.id}>
+              <div className="asset-icon">{asset.icon}</div>
+              <b>{asset.name}</b>
+              <small>{asset.desc}</small>
+              <strong>{money(asset.price)}</strong>
+
+              <Button
+                disabled={owned || game.stats.money < asset.price}
+                onClick={()=>buyAsset(asset)}
+              >
+                {owned ? "✅ Đã sở hữu" :
+                 game.stats.money < asset.price ? "💸 Thiếu tiền" :
+                 "Mua"}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderFashion = ()=>(
+    <div className="fashion-page">
+
+      <div className="fashion-preview">
+        <div className="section-title">👕 Nhân vật của bạn</div>
+
+        <div className="character">
+          <div className="character-head">
+            {getFashion(game.outfit.hair)?.icon || "💇"}
+          </div>
+
+          <div className="character-body">
+            {getFashion(game.outfit.shirt)?.icon || "👕"}
+          </div>
+
+          <div className="character-legs">
+            {getFashion(game.outfit.pants)?.icon || "👖"}
+          </div>
+
+          <div className="character-shoes">
+            {getFashion(game.outfit.shoes)?.icon || "👟"}
+          </div>
+
+          <div className="character-accessories">
+            {getFashion(game.outfit.accessory)?.icon || ""}
+          </div>
+        </div>
+
+        <div className="outfit-list">
+          {[
+            ["Áo",game.outfit.shirt],
+            ["Quần",game.outfit.pants],
+            ["Giày",game.outfit.shoes],
+            ["Balo",game.outfit.bag],
+            ["Tóc",game.outfit.hair],
+            ["Phụ kiện",game.outfit.accessory]
+          ].map(([label,id])=>(
+            <div className="outfit-row" key={label}>
+              <span>{label}</span>
+              <b>
+                {id
+                  ? getFashion(id)?.name || "Không có"
+                  : "Không mặc"}
+              </b>
+            </div>
+          ))}
+
+          {game.outfit.accessory && (
+            <Button onClick={unequipAccessory}>
+              Tháo phụ kiện
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="fashion-shop">
+
+        <div className="fashion-head">
           <div>
-            <strong>
-              ✨ Thanh Xuân Rực Rỡ
-            </strong>
-
+            <div className="section-title">🛍️ Cửa hàng thời trang</div>
             <small>
-              Deluxe Career & Assets
-              Edition
+              Đã sở hữu {game.wardrobe.length}/{FASHION.length} món
             </small>
           </div>
 
-          <div className="headBtns">
+          <div className="money-pill">
+            💰 {money(game.stats.money)}
+          </div>
+        </div>
+
+        <div className="category-tabs">
+          {FASHION_CATEGORIES.map(cat=>(
             <button
-              onClick={() =>
-                setAutoTime(
-                  (value) => !value
-                )
-              }
+              key={cat}
+              className={fashionCategory===cat ? "active" : ""}
+              onClick={()=>setFashionCategory(cat)}
             >
-              {autoTime
-                ? "⏱️ Tự chạy"
-                : "⏸️ Tạm dừng"}
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="fashion-grid">
+          {visibleFashion.map(item=>{
+            const owned = game.wardrobe.includes(item.id);
+
+            const slotMap = {
+              "Áo":"shirt",
+              "Quần":"pants",
+              "Giày":"shoes",
+              "Balo":"bag",
+              "Phụ kiện":"accessory",
+              "Tóc":"hair"
+            };
+
+            const equipped =
+              game.outfit[slotMap[item.category]] === item.id;
+
+            return (
+              <div
+                className={`fashion-card ${
+                  owned ? "owned" : ""
+                } ${equipped ? "equipped" : ""}`}
+                key={item.id}
+              >
+                <div className="fashion-icon">
+                  {item.icon}
+                </div>
+
+                <b>{item.name}</b>
+                <small>{item.desc}</small>
+
+                <div className="fashion-bonus">
+                  {Object.entries(item.bonus || {}).map(([k,v])=>(
+                    <span key={k}>
+                      +{v} {k}
+                    </span>
+                  ))}
+                </div>
+
+                <strong>
+                  {item.price===0 ? "Miễn phí" : money(item.price)}
+                </strong>
+
+                {!owned ? (
+                  <Button
+                    disabled={game.stats.money < item.price}
+                    onClick={()=>buyFashion(item)}
+                  >
+                    🛍️ Mua
+                  </Button>
+                ) : (
+                  <Button
+                    className={equipped ? "success" : ""}
+                    onClick={()=>equipFashion(item)}
+                  >
+                    {equipped ? "✅ Đang mặc" : "👕 Mặc"}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderHome = ()=>(
+    <div className="home-grid">
+      <div className="card home-card">
+        <div className="big-icon">🛏️</div>
+        <h2>Phòng ngủ</h2>
+        <p>
+          Nghỉ ngơi sau một ngày học tập và làm việc.
+        </p>
+
+        <Button onClick={restAtHome}>
+          🛏️ Nghỉ ngơi +25 năng lượng
+        </Button>
+
+        <Button onClick={()=>setOverlay("diary")}>
+          📔 Xem nhật ký
+        </Button>
+      </div>
+
+      <div className="card">
+        <div className="section-title">🏆 Thành tích hôm nay</div>
+
+        <div className="mini-stat">
+          📚 Lần học: <b>{game.studyActions}</b>
+        </div>
+
+        <div className="mini-stat">
+          💼 Lần làm việc: <b>{game.jobActions}</b>
+        </div>
+
+        <div className="mini-stat">
+          👕 Thời trang: <b>{game.wardrobe.length}</b>
+        </div>
+
+        <div className="mini-stat">
+          🏠 Tài sản: <b>{game.assets.length}</b>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* =========================================================
+     MAIN SCENE
+  ========================================================= */
+
+  const renderLocation = ()=>{
+    if(game.location==="class") return renderClass();
+    if(game.location==="canteen") return renderCanteen();
+    if(game.location==="jobs") return renderJobs();
+    if(game.location==="cert") return renderCerts();
+    if(game.location==="property") return renderAssets();
+    if(game.location==="home") return renderHome();
+
+    return renderClass();
+  };
+
+  /* =========================================================
+     OVERLAYS
+  ========================================================= */
+
+  const renderQuizOverlay = ()=>{
+    if(!quiz) return null;
+
+    const q = quiz.questions[quiz.index];
+
+    return (
+      <Modal
+        title={
+          quiz.mode==="oral"
+            ? "🧑‍🏫 Kiểm tra miệng — 15 phút"
+            : quiz.mode==="cert"
+            ? `🎓 Thi ${quiz.certName}`
+            : "📚 Quiz nhanh"
+        }
+        onClose={()=>{
+          if(!quizFeedback) return;
+          setQuiz(null);
+          setQuizFeedback(null);
+          setOverlay(null);
+        }}
+      >
+        <div className="quiz-top">
+          <span>
+            Câu {quiz.index+1}/{quiz.questions.length}
+          </span>
+
+          <span>
+            ✅ {quiz.correct} &nbsp; ❌ {quiz.wrong}
+          </span>
+        </div>
+
+        <div className="quiz-question">
+          <div className="quiz-subject">
+            {q.subject || q.topic || "Kiến thức"}
+          </div>
+
+          <h2>{q.q}</h2>
+        </div>
+
+        <div className="choices">
+          {q.choices.map((choice,index)=>{
+            const isCorrect =
+              quizFeedback &&
+              index===q.answer;
+
+            const isWrong =
+              quizFeedback &&
+              index===quizFeedback.selected &&
+              !quizFeedback.correct;
+
+            return (
+              <button
+                key={index}
+                className={`choice ${
+                  isCorrect ? "correct" : ""
+                } ${isWrong ? "wrong" : ""}`}
+                disabled={Boolean(quizFeedback)}
+                onClick={()=>answerQuiz(index)}
+              >
+                <span>
+                  {String.fromCharCode(65+index)}.
+                </span>
+                {choice}
+              </button>
+            );
+          })}
+        </div>
+
+        {quizFeedback && (
+          <div className={`feedback ${
+            quizFeedback.correct ? "good" : "bad"
+          }`}>
+            <b>
+              {quizFeedback.correct
+                ? "✅ Chính xác!"
+                : "❌ Sai! Kiến thức -2"}
+            </b>
+
+            <p>{quizFeedback.explanation}</p>
+
+            <Button onClick={nextQuizQuestion}>
+              {quiz.index >= quiz.questions.length-1
+                ? "🏁 Hoàn thành"
+                : "➡️ Câu tiếp theo"}
+            </Button>
+          </div>
+        )}
+      </Modal>
+    );
+  };
+
+  const renderSaveModal = ()=>(
+    <Modal
+      title="💾 Lưu / Nạp game"
+      onClose={()=>setOverlay(null)}
+    >
+      <div className="save-actions">
+        <Button onClick={createSaveCode}>
+          🔐 Tạo mã lưu
+        </Button>
+
+        <Button onClick={exportJSON}>
+          📥 Xuất file JSON
+        </Button>
+      </div>
+
+      <textarea
+        className="save-text"
+        value={saveCode}
+        onChange={e=>setSaveCode(e.target.value)}
+        placeholder="Mã lưu game sẽ xuất hiện ở đây..."
+      />
+
+      <div className="save-actions">
+        <Button
+          onClick={()=>{
+            if(navigator.clipboard && saveCode){
+              navigator.clipboard.writeText(saveCode);
+              setToast("📋 Đã sao chép mã.");
+            }
+          }}
+        >
+          📋 Sao chép
+        </Button>
+
+        <Button onClick={loadSaveCode}>
+          📤 Nạp mã
+        </Button>
+
+        <label className="game-btn file-btn">
+          📁 Nhập JSON
+          <input
+            type="file"
+            accept=".json"
+            onChange={importJSON}
+            hidden
+          />
+        </label>
+      </div>
+
+      <div className="save-tip">
+        💡 Game cũng tự động lưu vào trình duyệt.
+      </div>
+    </Modal>
+  );
+
+  const renderBagModal = ()=>(
+    <Modal
+      title="🎒 Túi đồ"
+      onClose={()=>setOverlay(null)}
+    >
+      {game.bag.length===0 ? (
+        <div className="empty">
+          🎒 Túi đang trống.
+        </div>
+      ) : (
+        <div className="bag-grid">
+          {game.bag.map(item=>(
+            <div className="bag-card" key={item.id}>
+              <div className="bag-icon">{item.icon}</div>
+              <b>{item.name}</b>
+              <small>{item.desc}</small>
+              <span>x{item.count}</span>
+
+              <Button onClick={()=>useItem(item.id)}>
+                Dùng
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+
+  const renderCompetitionModal = ()=>(
+    <Modal
+      title="🏆 Bảng thi đua"
+      onClose={()=>setOverlay(null)}
+    >
+      <div className="leaderboard">
+        {leaderboard.map((row,index)=>(
+          <div
+            className={`rank-row ${
+              row.id==="player" ? "player-rank" : ""
+            }`}
+            key={row.id}
+          >
+            <div className="rank-number">
+              #{index+1}
+            </div>
+
+            <div className="rank-name">
+              {row.icon} {row.name}
+            </div>
+
+            <div className="rank-points">
+              <b>{row.points}</b>
+              <small>+{row.today} hôm nay</small>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+
+  const renderTitlesModal = ()=>(
+    <Modal
+      title="🏅 Danh hiệu"
+      onClose={()=>setOverlay(null)}
+    >
+      <div className="title-grid">
+        {TITLES.map(title=>{
+          const unlocked = title.condition(game);
+          const selected = game.selectedTitle===title.id;
+
+          return (
+            <button
+              key={title.id}
+              disabled={!unlocked}
+              className={`title-card ${
+                unlocked ? "unlocked" : "locked"
+              } ${selected ? "selected" : ""}`}
+              onClick={()=>{
+                if(!unlocked) return;
+
+                updateGame(g=>{
+                  g.selectedTitle=title.id;
+                });
+
+                setToast(`🏅 Danh hiệu: ${title.name}`);
+              }}
+            >
+              <span>{title.icon}</span>
+              <b>{title.name}</b>
+              <small>{title.desc}</small>
+
+              {selected && <em>Đang dùng</em>}
+            </button>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+
+  const renderDiaryModal = ()=>(
+    <Modal
+      title="📔 Nhật ký thanh xuân"
+      onClose={()=>setOverlay(null)}
+      wide
+    >
+      {game.diaryEntries.length===0 ? (
+        <div className="empty">
+          Chưa có ngày nào kết thúc.
+        </div>
+      ) : (
+        <div className="diary-list">
+          {game.diaryEntries.map(entry=>(
+            <div className="diary-card" key={entry.id}>
+              <div className="diary-head">
+                <b>📅 Ngày {entry.day}</b>
+                <span>{entry.event}</span>
+              </div>
+
+              <p>{entry.summary}</p>
+
+              <div className="delta-grid">
+                <span>📚 {signed(entry.deltas.study)}</span>
+                <span>💰 {signed(entry.deltas.money)}đ</span>
+                <span>🤝 {signed(entry.deltas.friends)}</span>
+                <span>⚡ {signed(entry.deltas.energy)}</span>
+                <span>😊 {signed(entry.deltas.mood)}</span>
+                <span>🏆 {signed(entry.deltas.competition)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+
+  const renderProfileModal = ()=>(
+    <Modal
+      title="👤 Hồ sơ nhân vật"
+      onClose={()=>setOverlay(null)}
+      wide
+    >
+      <div className="profile-layout">
+        <div className="profile-character">
+          <div className="big-character">
+            <div>{getFashion(game.outfit.hair)?.icon}</div>
+            <div>{getFashion(game.outfit.shirt)?.icon}</div>
+            <div>{getFashion(game.outfit.pants)?.icon}</div>
+            <div>{getFashion(game.outfit.shoes)?.icon}</div>
+          </div>
+
+          <h2>
+            {currentTitle.icon} {currentTitle.name}
+          </h2>
+        </div>
+
+        <div className="profile-stats">
+          <StatBar icon="❤️" label="HP" value={game.stats.hp}/>
+          <StatBar icon="⚡" label="Năng lượng" value={game.stats.energy}/>
+          <StatBar icon="😊" label="Tâm trạng" value={game.stats.mood}/>
+          <StatBar icon="📚" label="Kiến thức" value={game.stats.study}/>
+          <StatBar icon="🤝" label="Bạn bè" value={game.stats.friends}/>
+          <StatBar icon="💗" label="Tình cảm" value={game.stats.love}/>
+          <StatBar icon="⭐" label="Danh tiếng" value={game.stats.reputation}/>
+          <StatBar icon="🛠️" label="Kỹ năng" value={game.stats.skill}/>
+        </div>
+      </div>
+    </Modal>
+  );
+
+  /* =========================================================
+     RETURN
+  ========================================================= */
+
+  return (
+    <div className="game-root">
+       <style>{CSS}</style>
+
+      <div className="game-shell">
+
+        {/* HEADER */}
+        <header className="header">
+
+          <div className="brand">
+            <div className="brand-icon">🌸</div>
+
+            <div>
+              <h1>Thanh Xuân Rực Rỡ</h1>
+              <small>
+                Deluxe Career & Fashion Edition
+              </small>
+            </div>
+          </div>
+
+          <div className="header-actions">
+
+            <button
+              className="top-btn"
+              onClick={()=>setOverlay("profile")}
+            >
+              👤
             </button>
 
             <button
-              onClick={() =>
-                setAudioOn(
-                  (value) => !value
-                )
-              }
+              className="top-btn"
+              onClick={()=>setOverlay("fashion")}
             >
-              {audioOn ? "🔊" : "🔇"}
+              👕
             </button>
 
             <button
-              onClick={() =>
-                setOverlay("save")
-              }
+              className="top-btn"
+              onClick={()=>setOverlay("bag")}
+            >
+              🎒
+            </button>
+
+            <button
+              className="top-btn"
+              onClick={()=>setOverlay("save")}
             >
               💾
             </button>
+
           </div>
+
         </header>
 
-        {/* TIME */}
+        {/* TIME BAR */}
+        <div className="time-panel">
 
-        <div className="top">
-          <div>
-            <b>
-              Ngày {game.day}/
-              {game.totalDays}
-            </b>
+          <div className="time-main">
+            <div>
+              <span className="day-label">
+                NGÀY {game.day}/{game.totalDays}
+              </span>
 
-            {" · "}
+              <strong>
+                🕒 {currentTime}
+              </strong>
 
-            <b>
-              {TIME_SLOTS[
-                game.timeIndex
-              ]}
-            </b>
+              <small>
+                {PERIOD_NAMES[game.timeIndex]}
+              </small>
+            </div>
 
-            <span className="pill">
-              {game.slotActionUsed
-                ? "🎯 Đã dùng"
-                : "🎯 Chưa dùng"}
-            </span>
-          </div>
-
-          <div className="clock">
-            <b>
-              {autoTime && !blocking
-                ? `00:${String(
-                    secondsLeft
-                  ).padStart(2, "0")}`
-                : "⏸"}
-            </b>
-
-            <div className="bar">
-              <i
-                style={{
-                  width: `${
-                    autoTime && !blocking
-                      ? (secondsLeft /
-                          SLOT_SECONDS) *
-                        100
-                      : 0
-                  }%`,
-                }}
-              />
+            <div className="countdown">
+              <span>Còn</span>
+              <b>
+                00:{String(secondsLeft).padStart(2,"0")}
+              </b>
             </div>
           </div>
-        </div>
 
-        {/* STATS */}
-
-        <div className="stats">
-          {statItems.map(
-            ([icon, name, key]) => (
-              <div key={key}>
-                <span>{icon}</span>
-
-                <b>{name}</b>
-
-                <em>
-                  {game.stats[key]}
-                </em>
-              </div>
-            )
-          )}
-
-          <div>
-            <span>💰</span>
-            <b>Tiền</b>
-
-            <em>
-              {money(game.stats.money)}
-            </em>
+          <div className="time-progress">
+            <div
+              style={{
+                width:`${(secondsLeft/SLOT_SECONDS)*100}%`
+              }}
+            />
           </div>
+
+          <div className="schedule-row">
+            {TIME_SLOTS.map((time,index)=>(
+              <div
+                key={time}
+                className={`schedule-dot ${
+                  index===game.timeIndex ? "current" : ""
+                } ${
+                  index<game.timeIndex ? "passed" : ""
+                }`}
+                title={time}
+              >
+                <span>{time}</span>
+              </div>
+            ))}
+          </div>
+
         </div>
 
-        {/* MAIN */}
+        {/* HUD */}
+        <div className="hud">
 
-        <main>
+          <div className="hud-stat">
+            ❤️ <b>{Math.round(game.stats.hp)}</b>
+          </div>
+
+          <div className="hud-stat">
+            ⚡ <b>{Math.round(game.stats.energy)}</b>
+          </div>
+
+          <div className="hud-stat">
+            😊 <b>{Math.round(game.stats.mood)}</b>
+          </div>
+
+          <div className="hud-stat">
+            📚 <b>{Math.round(game.stats.study)}</b>
+          </div>
+
+          <div className="hud-stat">
+            🤝 <b>{Math.round(game.stats.friends)}</b>
+          </div>
+
+          <div className="hud-stat">
+            ⭐ <b>{Math.round(game.stats.reputation)}</b>
+          </div>
+
+          <div className="hud-money">
+            💰 {money(game.stats.money)}
+          </div>
+
+          <button
+            className="auto-btn"
+            onClick={()=>setAutoTime(v=>!v)}
+            disabled={game.isGameOver}
+          >
+            {autoTime ? "⏱ Tự chạy" : "⏸ Tạm dừng"}
+          </button>
+
+        </div>
+
+        {/* CONTENT */}
+        <main className="content">
+
           <section className="scene">
 
-            <div className="locNav">
+            <div className="scene-top">
+
+              <div>
+                <div className="location-title">
+                  {game.location==="class" && "🏫 Lớp học"}
+                  {game.location==="canteen" && "🍱 Căn tin"}
+                  {game.location==="jobs" && "💼 Việc làm"}
+                  {game.location==="cert" && "🎓 Chứng chỉ"}
+                  {game.location==="property" && "🏠 Tài sản"}
+                  {game.location==="home" && "🏠 Nhà"}
+                </div>
+
+                <small>
+                  {currentTitle.icon} {currentTitle.name}
+                </small>
+              </div>
+
               <button
-                onClick={() =>
-                  navLoc(-1)
-                }
+                className="activity-launch"
+                onClick={()=>setOverlay("activities")}
               >
-                ◀
+                ⚡ Hoạt động
               </button>
 
-              <h2>
-                {
-                  locationTitle[
-                    game.location
-                  ]
-                }
-              </h2>
-
-              <button
-                onClick={() =>
-                  navLoc(1)
-                }
-              >
-                ▶
-              </button>
             </div>
 
             {renderLocation()}
 
-            <div className="bottom">
-              <button
-                onClick={() =>
-                  setOverlay("profile")
-                }
-              >
-                👤 Hồ sơ
-              </button>
-
-              <button
-                onClick={() =>
-                  setOverlay("leader")
-                }
-              >
-                🏆 Thi đua
-              </button>
-
-              <button
-                onClick={() =>
-                  setOverlay("diary")
-                }
-              >
-                📔 Nhật ký
-              </button>
-
-              <button
-                onClick={() =>
-                  setOverlay("titles")
-                }
-              >
-                🏷️ Danh hiệu
-              </button>
-            </div>
           </section>
 
-          {/* SIDEBAR */}
-
+          {/* SIDE */}
           <aside className="side">
 
-            <div className="sideCard">
-              <b>📊 Thi đua</b>
+            <div className="character-card">
 
-              {leaderboard
-                .slice(0, 4)
-                .map((item, index) => (
-                  <div
-                    className="rank"
-                    key={item.id}
-                  >
-                    <span>
-                      #{index + 1}{" "}
-                      {item.icon}{" "}
-                      {item.name}
-                    </span>
+              <div className="mini-character">
 
-                    <strong>
-                      {item.points}
-                    </strong>
-                  </div>
-                ))}
+                <div>
+                  {getFashion(game.outfit.hair)?.icon}
+                </div>
 
-              <button
-                onClick={() =>
-                  setOverlay("leader")
-                }
-              >
-                Xem bảng đầy đủ
-              </button>
-            </div>
+                <div>
+                  {getFashion(game.outfit.shirt)?.icon}
+                </div>
 
-            <div className="sideCard">
-              <b>🎒 Túi đồ</b>
+                <div>
+                  {getFashion(game.outfit.pants)?.icon}
+                </div>
 
-              {game.bag
-                .filter(
-                  (item) =>
-                    item.count > 0
-                )
-                .map((item) => (
-                  <div
-                    className="bag"
-                    key={item.id}
-                  >
-                    {item.icon}{" "}
-                    {item.name} ×
-                    {item.count}
-                  </div>
-                ))}
+                <div>
+                  {getFashion(game.outfit.shoes)?.icon}
+                </div>
 
-              {game.bag.every(
-                (item) =>
-                  !item.count
-              ) && (
-                <small>
-                  Túi đang trống.
-                </small>
-              )}
-            </div>
+                <div className="mini-accessory">
+                  {getFashion(game.outfit.accessory)?.icon}
+                </div>
 
-            <div className="sideCard">
-              <b>🏆 Danh hiệu</b>
-
-              <div className="currentTitle">
-                {
-                  (
-                    TITLES.find(
-                      (t) =>
-                        t.id ===
-                        game.selectedTitle
-                    ) || TITLES[0]
-                  ).icon
-                }{" "}
-                {
-                  (
-                    TITLES.find(
-                      (t) =>
-                        t.id ===
-                        game.selectedTitle
-                    ) || TITLES[0]
-                  ).name
-                }
               </div>
 
+              <b>
+                {currentTitle.icon} {currentTitle.name}
+              </b>
+
               <small>
-                Đã mở:{" "}
-                {titles.length}/
-                {TITLES.length}
+                👕 {ownedFashion.length} món thời trang
               </small>
+
             </div>
+
+            <div className="side-card">
+
+              <div className="side-title">
+                ⚡ Truy cập nhanh
+              </div>
+
+              <div className="quick-buttons">
+
+                <button onClick={()=>setOverlay("activities")}>
+                  ⚡ Hoạt động
+                </button>
+
+                <button onClick={()=>setOverlay("fashion")}>
+                  👕 Tủ đồ
+                </button>
+
+                <button onClick={()=>setOverlay("bag")}>
+                  🎒 Túi
+                </button>
+
+                <button onClick={()=>setOverlay("diary")}>
+                  📔 Nhật ký
+                </button>
+
+                <button onClick={()=>setOverlay("competition")}>
+                  🏆 Thi đua
+                </button>
+
+                <button onClick={()=>setOverlay("titles")}>
+                  🏅 Danh hiệu
+                </button>
+
+                <button onClick={()=>setOverlay("save")}>
+                  💾 Lưu game
+                </button>
+
+                <button onClick={()=>setOverlay("profile")}>
+                  👤 Nhân vật
+                </button>
+
+              </div>
+
+            </div>
+
+            <div className="side-card">
+
+              <div className="side-title">
+                🗺️ Khu vực
+              </div>
+
+              <div className="location-buttons">
+
+                <button
+                  className={game.location==="class" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"class"}))}
+                >
+                  🏫 Lớp
+                </button>
+
+                <button
+                  className={game.location==="canteen" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"canteen"}))}
+                >
+                  🍱 Căn tin
+                </button>
+
+                <button
+                  className={game.location==="jobs" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"jobs"}))}
+                >
+                  💼 Việc
+                </button>
+
+                <button
+                  className={game.location==="cert" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"cert"}))}
+                >
+                  🎓 Thi
+                </button>
+
+                <button
+                  className={game.location==="property" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"property"}))}
+                >
+                  🏠 Tài sản
+                </button>
+
+                <button
+                  className={game.location==="home" ? "active":""}
+                  onClick={()=>setGame(g=>({...g,location:"home"}))}
+                >
+                  🛏️ Nhà
+                </button>
+
+              </div>
+
+            </div>
+
+            <div className="side-card">
+
+              <div className="side-title">
+                🏆 Thi đua
+              </div>
+
+              <div className="competition-score">
+                <strong>{game.competitionPoints}</strong>
+                <span>điểm</span>
+              </div>
+
+              <Button onClick={()=>setOverlay("competition")}>
+                Xem bảng xếp hạng
+              </Button>
+
+            </div>
+
           </aside>
+
         </main>
 
-        {/* FOOTER */}
+        {/* FOOTER NAV */}
+        <footer className="footer-nav">
 
-        <footer>
-          <span>
-            ⏱️ 45 giây = 1 mốc • 6 mốc = 1 ngày
-          </span>
+          <button
+            className={game.location==="class" ? "active":""}
+            onClick={()=>setGame(g=>({...g,location:"class"}))}
+          >
+            🏫
+            <span>Lớp</span>
+          </button>
 
-          <span>
-            📔 Nhật ký tự chốt lúc 20:30
-          </span>
+          <button
+            onClick={()=>setOverlay("activities")}
+          >
+            ⚡
+            <span>Hoạt động</span>
+          </button>
+
+          <button
+            onClick={()=>setOverlay("fashion")}
+          >
+            👕
+            <span>Tủ đồ</span>
+          </button>
+
+          <button
+            onClick={()=>setOverlay("bag")}
+          >
+            🎒
+            <span>Túi</span>
+          </button>
+
+          <button
+            onClick={()=>setOverlay("competition")}
+          >
+            🏆
+            <span>Thi đua</span>
+          </button>
+
+          <button
+            onClick={()=>setOverlay("save")}
+          >
+            💾
+            <span>Lưu</span>
+          </button>
+
         </footer>
+
       </div>
 
+      {/* TOAST */}
       {toast && (
         <div className="toast">
           {toast}
         </div>
       )}
 
-      {modal}
+      {/* =====================================================
+          QUICK ACTIVITY MODAL
+      ===================================================== */}
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json"
-        hidden
-        onChange={(event) => {
-          const file =
-            event.target.files?.[0];
-
-          if (file) {
-            importJson(file);
-          }
-        }}
-      />
-
-      {game.isGameOver &&
-        overlay !== "ending" && (
-          <div
-            className="modalBack"
-            style={{ zIndex: 100 }}
-          >
-            <div className="modal">
-              <Ending
-                game={game}
-                board={leaderboard}
-                titles={titles}
-                onReset={reset}
-              />
-            </div>
-          </div>
-        )}
-    </div>
-  );
-}
-
-/* =========================================================
-   COMPONENTS
-   ========================================================= */
-
-function Section({ title, children }) {
-  return (
-    <div className="section">
-      <h3>{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function Card({ children }) {
-  return (
-    <div className="card">
-      {children}
-    </div>
-  );
-}
-
-/* =========================================================
-   QUIZ MODAL
-   ========================================================= */
-
-function QuizModal({
-  type,
-  data,
-  question,
-  onAnswer,
-  onClose,
-}) {
-  if (!data || !question) {
-    return null;
-  }
-
-  const total =
-    data.questions.length;
-
-  return (
-    <div>
-      <div className="modalHead">
-        <b>
-          {type === "oral"
-            ? "🧑‍🏫 Kiểm tra miệng · 15 phút"
-            : type === "cert"
-            ? `🎓 ${
-                data.cert?.name ||
-                "Thi chứng chỉ"
-              }`
-            : "📖 Quiz nhanh"}
-        </b>
-
-        {![
-          "oral",
-          "cert",
-        ].includes(type) && (
-          <button onClick={onClose}>
-            ✕
-          </button>
-        )}
-      </div>
-
-      <div className="qmeta">
-        Câu {data.index + 1}/
-        {total}
-        {" · "}
-        Đúng {data.score}
-        {" · "}
-        Sai {data.wrong}
-      </div>
-
-      <div className="subject">
-        {question.subject}
-      </div>
-
-      <h2 className="question">
-        {question.q}
-      </h2>
-
-      <div className="choices">
-        {question.choices.map(
-          (choice, index) => (
-            <button
-              key={choice}
-              disabled={
-                !!data.feedback
-              }
-              onClick={() =>
-                onAnswer(index)
-              }
-            >
-              <b>
-                {String.fromCharCode(
-                  65 + index
-                )}
-              </b>
-
-              {choice}
-            </button>
-          )
-        )}
-      </div>
-
-      {data.feedback && (
-        <div
-          className={
-            data.feedback.startsWith(
-              "✅"
-            )
-              ? "feedback ok"
-              : "feedback bad"
-          }
+      {overlay==="activities" && (
+        <Modal
+          title="⚡ Tất cả hoạt động"
+          onClose={()=>setOverlay(null)}
+          wide
         >
-          {data.feedback}
-        </div>
+          <div className="activity-grid large">
+
+            {quickActivities.map((a,i)=>(
+              <button
+                key={i}
+                className="activity-card"
+                disabled={a.disabled}
+                onClick={()=>{
+                  a.action();
+
+                  if(
+                    ![
+                      "fashion",
+                      "assets",
+                      "canteen",
+                      "jobs",
+                      "certs"
+                    ].includes(
+                      a.title==="Tủ đồ"
+                        ? "fashion"
+                        : a.title==="Tài sản"
+                        ? "assets"
+                        : a.title==="Căn tin"
+                        ? "canteen"
+                        : a.title==="Việc làm"
+                        ? "jobs"
+                        : a.title==="Chứng chỉ"
+                        ? "certs"
+                        : ""
+                    )
+                  ){
+                    setOverlay(null);
+                  }
+                }}
+              >
+                <span className="activity-icon">
+                  {a.icon}
+                </span>
+
+                <b>{a.title}</b>
+
+                <small>{a.desc}</small>
+              </button>
+            ))}
+
+          </div>
+        </Modal>
       )}
 
-      <div className="hint">
-        Mỗi câu sai:
-        <b> -2 Kiến thức</b>.
-      </div>
-    </div>
-  );
-}
+      {overlay==="fashion" && (
+        <Modal
+          title="👕 Tủ đồ thời trang"
+          onClose={()=>setOverlay(null)}
+          wide
+        >
+          {renderFashion()}
+        </Modal>
+      )}
 
-/* =========================================================
-   SAVE MODAL
-   ========================================================= */
+      {overlay==="bag" && renderBagModal()}
 
-function SaveModal({
-  code,
-  setCode,
-  onCreate,
-  onLoad,
-  onExport,
-  onImport,
-  onClose,
-}) {
-  return (
-    <div>
-      <div className="modalHead">
-        <b>
-          💾 Lưu / Nạp game
-        </b>
+      {overlay==="profile" && renderProfileModal()}
 
-        <button onClick={onClose}>
-          ✕
-        </button>
-      </div>
+      {overlay==="save" && renderSaveModal()}
 
-      <div className="actions">
-        <button onClick={onCreate}>
-          🔐 Tạo mã lưu
-        </button>
+      {overlay==="competition" && renderCompetitionModal()}
 
-        <button onClick={onExport}>
-          📄 Xuất JSON
-        </button>
+      {overlay==="titles" && renderTitlesModal()}
 
-        <button onClick={onImport}>
-          📥 Nhập JSON
-        </button>
-      </div>
+      {overlay==="diary" && renderDiaryModal()}
 
-      <textarea
-        value={code}
-        onChange={(event) =>
-          setCode(event.target.value)
-        }
-        placeholder="Mã lưu game sẽ xuất hiện ở đây..."
-      />
+      {overlay==="canteen" && (
+        <Modal
+          title="🍱 Căn tin"
+          onClose={()=>setOverlay(null)}
+          wide
+        >
+          {renderCanteen()}
+        </Modal>
+      )}
 
-      <button
-        className="primary"
-        onClick={onLoad}
-      >
-        📥 Nạp từ mã
-      </button>
-    </div>
-  );
-}
+      {overlay==="jobs" && (
+        <Modal
+          title="💼 Việc làm"
+          onClose={()=>setOverlay(null)}
+          wide
+        >
+          {renderJobs()}
+        </Modal>
+      )}
 
-/* =========================================================
-   DIARY
-   ========================================================= */
+      {overlay==="certs" && (
+        <Modal
+          title="🎓 Chứng chỉ"
+          onClose={()=>setOverlay(null)}
+          wide
+        >
+          {renderCerts()}
+        </Modal>
+      )}
 
-function DiaryModal({
-  entries,
-  onClose,
-}) {
-  return (
-    <div>
-      <div className="modalHead">
-        <b>
-          📔 Nhật ký cuối ngày
-        </b>
+      {overlay==="assets" && (
+        <Modal
+          title="🏠 Tài sản"
+          onClose={()=>setOverlay(null)}
+          wide
+        >
+          {renderAssets()}
+        </Modal>
+      )}
 
-        <button onClick={onClose}>
-          ✕
-        </button>
-      </div>
+      {(overlay==="quiz" ||
+        overlay==="oral" ||
+        overlay==="certExam") &&
+        renderQuizOverlay()
+      }
 
-      {entries.length ? (
-        entries.map((entry) => (
-          <div
-            className="diary"
-            key={entry.day}
-          >
-            <b>
-              Ngày {entry.day} ·{" "}
-              {entry.event}
-            </b>
+      {/* =====================================================
+          GAME OVER
+      ===================================================== */}
+
+      {overlay==="ending" && (
+        <Modal
+          title="✨ Thanh xuân đã hoàn thành!"
+          onClose={null}
+          wide
+        >
+          <div className="ending">
+
+            <div className="ending-icon">
+              🌸
+            </div>
+
+            <h1>
+              Hành trình 45 ngày đã kết thúc
+            </h1>
 
             <p>
-              {entry.summary}
+              Bạn đã đi qua một hành trình học tập,
+              tình bạn, công việc và những lựa chọn
+              rất riêng của tuổi học trò.
             </p>
 
-            <div className="deltas">
-              🧠{" "}
-              {entry.deltas.study >= 0
-                ? "+"
-                : ""}
-              {entry.deltas.study}
+            <div className="ending-stats">
 
-              {" · "}
-
-              ⚡{" "}
-              {entry.deltas.energy >= 0
-                ? "+"
-                : ""}
-              {entry.deltas.energy}
-
-              {" · "}
-
-              🤝{" "}
-              {entry.deltas.friends >= 0
-                ? "+"
-                : ""}
-              {entry.deltas.friends}
-
-              {" · "}
-
-              💰{" "}
-              {entry.deltas.money >= 0
-                ? "+"
-                : ""}
-              {money(
-                entry.deltas.money
-              )}
-
-              {" · "}
-
-              🏆{" "}
-              {entry.deltas.competition >=
-              0
-                ? "+"
-                : ""}
-              {
-                entry.deltas
-                  .competition
-              }
-            </div>
-          </div>
-        ))
-      ) : (
-        <p>
-          Chưa có ngày nào kết thúc.
-          Nhật ký sẽ chốt lúc 20:30.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   TITLES
-   ========================================================= */
-
-function TitlesModal({
-  titles,
-  unlocked,
-  selected,
-  setSelected,
-  onClose,
-}) {
-  return (
-    <div>
-      <div className="modalHead">
-        <b>🏷️ Danh hiệu</b>
-
-        <button onClick={onClose}>
-          ✕
-        </button>
-      </div>
-
-      <div className="grid">
-        {titles.map((title) => {
-          const isUnlocked =
-            unlocked.some(
-              (x) =>
-                x.id === title.id
-            );
-
-          return (
-            <Card key={title.id}>
-              <div className="big">
-                {title.icon}
+              <div>
+                <b>{Math.round(game.stats.study)}</b>
+                <span>📚 Kiến thức</span>
               </div>
 
-              <b>
-                {title.name}
-              </b>
+              <div>
+                <b>{Math.round(game.stats.skill)}</b>
+                <span>🛠️ Kỹ năng</span>
+              </div>
 
-              <small>
-                {title.desc}
-              </small>
+              <div>
+                <b>{game.competitionPoints}</b>
+                <span>🏆 Thi đua</span>
+              </div>
 
-              <button
-                disabled={!isUnlocked}
-                onClick={() =>
-                  setSelected(
-                    title.id
-                  )
-                }
-              >
-                {selected ===
-                title.id
-                  ? "Đang đeo"
-                  : isUnlocked
-                  ? "Đeo danh hiệu"
-                  : "Chưa mở"}
-              </button>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+              <div>
+                <b>{game.wardrobe.length}</b>
+                <span>👕 Thời trang</span>
+              </div>
 
-/* =========================================================
-   LEADERBOARD
-   ========================================================= */
+              <div>
+                <b>{game.assets.length}</b>
+                <span>🏠 Tài sản</span>
+              </div>
 
-function LeaderModal({
-  board,
-  onClose,
-}) {
-  return (
-    <div>
-      <div className="modalHead">
-        <b>
-          🏆 Bảng thi đua
-        </b>
+              <div>
+                <b>{game.certificates.length}</b>
+                <span>🎓 Chứng chỉ</span>
+              </div>
 
-        <button onClick={onClose}>
-          ✕
-        </button>
-      </div>
+            </div>
 
-      {board.map(
-        (item, index) => (
-          <div
-            className="leader"
-            key={item.id}
-          >
-            <b>
-              #{index + 1}
-            </b>
+            <div className="final-title">
+              {currentTitle.icon} {currentTitle.name}
+            </div>
 
-            <span>
-              {item.icon}{" "}
-              {item.name}
-            </span>
+            <Button onClick={restart}>
+              🌱 Chơi lại từ đầu
+            </Button>
 
-            <strong>
-              {item.points}
-            </strong>
+            <Button onClick={()=>setOverlay("diary")}>
+              📔 Xem lại nhật ký
+            </Button>
 
-            <small>
-              +{item.today} hôm nay
-            </small>
           </div>
-        )
+        </Modal>
       )}
-    </div>
-  );
-}
 
-/* =========================================================
-   PROFILE
-   ========================================================= */
-
-function ProfileModal({
-  game,
-  onClose,
-}) {
-  const title =
-    TITLES.find(
-      (item) =>
-        item.id ===
-        game.selectedTitle
-    ) || TITLES[0];
-
-  return (
-    <div>
-      <div className="modalHead">
-        <b>
-          👤 Hồ sơ nhân vật
-        </b>
-
-        <button onClick={onClose}>
-          ✕
-        </button>
-      </div>
-
-      <div className="profile">
-        <div className="avatar">
-          🧑🏻‍🎓
-        </div>
-
-        <h2>
-          Nhân vật chính
-        </h2>
-
-        <p>
-          {title.icon}{" "}
-          {title.name}
-        </p>
-
-        <div className="profileGrid">
-          <span>
-            📚 Học:{" "}
-            {game.studyActions}
-          </span>
-
-          <span>
-            💼 Việc:{" "}
-            {game.jobActions}
-          </span>
-
-          <span>
-            🧑‍🏫 Kiểm tra:{" "}
-            {game.oralChecksDone}
-          </span>
-
-          <span>
-            🎓 Chứng chỉ:{" "}
-            {game.certificates.length}
-          </span>
-
-          <span>
-            🏠 Tài sản:{" "}
-            {game.assets.length}
-          </span>
-
-          <span>
-            🏆 Thi đua:{" "}
-            {game.competitionPoints}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   ENDING
-   ========================================================= */
-
-function Ending({
-  game,
-  board,
-  titles,
-  onReset,
-}) {
-  return (
-    <div className="ending">
-      <div className="big">
-        ✨
-      </div>
-
-      <h1>
-        Thanh Xuân Rực Rỡ!
-      </h1>
-
-      <p>
-        Bạn đã hoàn thành{" "}
-        {game.totalDays} ngày
-        của hành trình cấp 3.
-      </p>
-
-      <div className="finalStats">
-        <b>
-          🧠 Kiến thức{" "}
-          {game.stats.study}
-        </b>
-
-        <b>
-          🤝 Bạn bè{" "}
-          {game.stats.friends}
-        </b>
-
-        <b>
-          🛠️ Kỹ năng{" "}
-          {game.stats.skill}
-        </b>
-
-        <b>
-          🏆 Thi đua{" "}
-          {game.competitionPoints}
-        </b>
-
-        <b>
-          💰{" "}
-          {money(
-            game.stats.money
-          )}
-        </b>
-      </div>
-
-      <h3>
-        🏅 Bảng thi đua cuối hành trình
-      </h3>
-
-      {board
-        .slice(0, 5)
-        .map((item, index) => (
-          <div
-            className="leader"
-            key={item.id}
-          >
-            <b>
-              #{index + 1}
-            </b>
-
-            <span>
-              {item.icon}{" "}
-              {item.name}
-            </span>
-
-            <strong>
-              {item.points}
-            </strong>
-          </div>
-        ))}
-
-      <p>
-        Danh hiệu đã mở:{" "}
-        {titles.length}/
-        {TITLES.length}
-      </p>
-
-      <button
-        className="primary"
-        onClick={onReset}
-      >
-        🌱 Chơi lại
-      </button>
     </div>
   );
 }
 
 /* =========================================================
    CSS
-   ========================================================= */
+========================================================= */
 
 const CSS = `
 *{
@@ -4655,12 +3483,11 @@ body,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color:#211a35;
 }
 
 body{
   overflow:hidden;
-  background:#120c24;
+  background:#f2eaff;
 }
 
 button,
@@ -4673,1019 +3500,1541 @@ button{
   cursor:pointer;
 }
 
-.root{
-  height:100dvh;
-  min-height:100dvh;
-  padding:8px;
+button:disabled{
+  cursor:not-allowed;
+  opacity:.48;
+}
 
+.game-root{
+  width:100%;
+  height:100dvh;
+  padding:8px;
   display:flex;
   justify-content:center;
   align-items:center;
-
   background:
-    radial-gradient(
-      circle at 20% 10%,
-      #5b2b78 0,
-      #24103d 35%,
-      #100a1d 100%
-    );
+    radial-gradient(circle at 10% 10%,#f8ddff 0,transparent 32%),
+    radial-gradient(circle at 90% 80%,#dce9ff 0,transparent 35%),
+    linear-gradient(135deg,#f5edff,#edf5ff);
 }
 
-.shell{
+.game-shell{
   width:min(1100px,100%);
   height:calc(100dvh - 16px);
-
   min-height:0;
-
   display:flex;
   flex-direction:column;
-
   overflow:hidden;
-
-  border:1px solid #6d4a88;
-  border-radius:18px;
-
-  background:#f7f4fb;
-
-  box-shadow:
-    0 20px 70px #0008;
+  background:rgba(255,255,255,.92);
+  border:1px solid rgba(130,90,180,.15);
+  border-radius:20px;
+  box-shadow:0 20px 70px rgba(71,38,110,.16);
 }
 
 /* HEADER */
 
-header{
-  height:52px;
+.header{
   flex:none;
-
-  padding:7px 12px;
-
-  background:
-    linear-gradient(
-      100deg,
-      #51257b,
-      #7a3ca3
-    );
-
-  color:white;
-
+  min-height:62px;
   display:flex;
   align-items:center;
   justify-content:space-between;
+  padding:9px 13px;
+  background:linear-gradient(110deg,#6f42c1,#9c5de8,#ef75b9);
+  color:white;
 }
 
-header strong{
-  display:block;
-  font-size:16px;
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
 }
 
-header small{
-  display:block;
-  opacity:.78;
+.brand-icon{
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:rgba(255,255,255,.18);
+  font-size:23px;
+}
+
+.brand h1{
+  margin:0;
+  font-size:17px;
+  line-height:1.1;
+}
+
+.brand small{
+  opacity:.84;
   font-size:10px;
 }
 
-.headBtns{
+.header-actions{
   display:flex;
   gap:5px;
 }
 
-.headBtns button{
-  border:1px solid #ffffff45;
-  background:#ffffff18;
+.top-btn{
+  width:36px;
+  height:34px;
+  border:0;
+  border-radius:10px;
+  background:rgba(255,255,255,.17);
   color:white;
+  transition:.15s;
+}
 
-  border-radius:9px;
-
-  padding:7px 9px;
-
-  font-size:12px;
-  font-weight:700;
+.top-btn:hover{
+  background:rgba(255,255,255,.3);
+  transform:translateY(-1px);
 }
 
 /* TIME */
 
-.top{
+.time-panel{
   flex:none;
-
-  height:43px;
-
-  padding:5px 10px;
-
+  padding:8px 12px 6px;
   background:#fff;
-
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-
-  border-bottom:1px solid #e4dcea;
-
-  font-size:12px;
+  border-bottom:1px solid #eee7f8;
 }
 
-.pill{
-  margin-left:7px;
+.time-main{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
 
-  padding:3px 7px;
+.day-label{
+  display:block;
+  font-size:9px;
+  color:#8057a8;
+  font-weight:800;
+  letter-spacing:.5px;
+}
 
-  border-radius:20px;
+.time-main strong{
+  display:inline-block;
+  margin-right:7px;
+  font-size:18px;
+  color:#30243d;
+}
 
-  background:#eee5f7;
-  color:#60317b;
-
+.time-main small{
+  color:#8d8197;
   font-size:10px;
 }
 
-.clock{
-  width:145px;
-  text-align:right;
+.countdown{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
 }
 
-.clock b{
-  font-variant-numeric:
-    tabular-nums;
+.countdown span{
+  font-size:9px;
+  color:#9b90a4;
 }
 
-.bar{
-  height:4px;
+.countdown b{
+  font-size:20px;
+  color:#7b3fc2;
+  font-variant-numeric:tabular-nums;
+}
 
-  background:#e8deef;
-
-  border-radius:5px;
-
+.time-progress{
+  height:5px;
+  margin-top:5px;
   overflow:hidden;
-
-  margin-top:2px;
+  background:#eee8f7;
+  border-radius:99px;
 }
 
-.bar i{
-  display:block;
-
+.time-progress div{
   height:100%;
-
-  background:#7a3ca3;
-
-  transition:width .2s;
+  background:linear-gradient(90deg,#7751d8,#e96fb4);
+  transition:width .8s linear;
 }
 
-/* STATS */
-
-.stats{
-  flex:none;
-
-  padding:5px 8px;
-
-  display:grid;
-
-  grid-template-columns:
-    repeat(9,1fr);
-
-  gap:4px;
-
-  background:#eee8f4;
-
-  border-bottom:1px solid #ddd2e7;
-}
-
-.stats > div{
-  min-width:0;
-
-  background:white;
-
-  border:1px solid #e0d6e8;
-
-  border-radius:8px;
-
-  padding:3px 4px;
-
-  text-align:center;
-
-  display:grid;
-
-  grid-template-columns:
-    auto 1fr;
-
-  align-items:center;
-
-  column-gap:3px;
-}
-
-.stats span{
-  font-size:12px;
-}
-
-.stats b{
-  font-size:9px;
-  text-align:left;
-  color:#665872;
-}
-
-.stats em{
-  grid-column:1/3;
-
-  font-style:normal;
-
-  font-size:11px;
-
-  font-weight:800;
-
-  color:#241a32;
-
-  white-space:nowrap;
-
+.schedule-row{
+  display:flex;
+  gap:3px;
+  margin-top:6px;
   overflow:hidden;
-
-  text-overflow:ellipsis;
 }
 
-.stats > div:last-child em{
-  font-size:9px;
-}
-
-/* MAIN */
-
-main{
+.schedule-dot{
   flex:1;
-
-  min-height:0;
-
-  display:grid;
-
-  grid-template-columns:
-    minmax(0,1fr) 250px;
-
-  gap:7px;
-
-  padding:7px;
-
-  overflow:hidden;
+  min-width:28px;
+  height:20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:6px;
+  background:#f4f1f8;
+  color:#a098a7;
+  font-size:7px;
 }
 
-.scene,
-.sideCard{
-  background:#fff;
+.schedule-dot.current{
+  background:#e9dcff;
+  color:#713db3;
+  font-weight:800;
+  box-shadow:inset 0 0 0 1px #b994eb;
+}
 
-  border:1px solid #e2d8e9;
+.schedule-dot.passed{
+  background:#eeeaf3;
+  color:#777;
+}
 
-  border-radius:12px;
+/* HUD */
+
+.hud{
+  flex:none;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:6px 10px;
+  background:#faf8fd;
+  border-bottom:1px solid #eee7f8;
+  overflow-x:auto;
+}
+
+.hud-stat,
+.hud-money,
+.auto-btn{
+  flex:none;
+  height:29px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  padding:0 9px;
+  border-radius:9px;
+  font-size:10px;
+  border:1px solid #e9e1f1;
+  background:white;
+}
+
+.hud-money{
+  color:#8150b5;
+  font-weight:800;
+}
+
+.auto-btn{
+  border:0;
+  color:white;
+  background:#6d49bc;
+  font-weight:700;
+}
+
+/* CONTENT */
+
+.content{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 275px;
+  gap:8px;
+  padding:8px;
+  overflow:hidden;
 }
 
 .scene{
   min-width:0;
   min-height:0;
-
   overflow:auto;
-
-  padding:8px;
+  padding-right:2px;
 }
 
-.sideCard{
-  padding:9px;
-  margin-bottom:7px;
+.side{
+  min-width:0;
+  min-height:0;
+  overflow:auto;
 }
 
-.sideCard > b{
-  font-size:12px;
+/* SCENE */
 
-  display:block;
-
-  margin-bottom:6px;
-}
-
-/* LOCATION */
-
-.locNav{
-  height:35px;
-
-  display:grid;
-
-  grid-template-columns:
-    34px 1fr 34px;
-
-  gap:5px;
-
-  align-items:center;
-
-  margin-bottom:6px;
-}
-
-.locNav h2{
-  text-align:center;
-
-  font-size:15px;
-
-  margin:0;
-}
-
-/* BUTTON */
-
-button{
-  border:1px solid #d8c9e5;
-
-  background:#fff;
-
-  color:#322344;
-
-  border-radius:9px;
-
-  padding:7px 9px;
-
-  font-weight:700;
-
-  font-size:12px;
-}
-
-button:hover:not(:disabled){
-  transform:translateY(-1px);
-  filter:brightness(.98);
-}
-
-button:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-}
-
-/* EVENT */
-
-.event{
-  padding:9px;
-
-  border-radius:10px;
-
-  background:#f5eff9;
-
-  border:1px solid #dfd0eb;
-
-  display:grid;
-
-  gap:3px;
-}
-
-.event b{
-  font-size:13px;
-}
-
-.event span,
-.event small{
-  font-size:11px;
-
-  color:#665872;
-}
-
-/* ACTIONS */
-
-.actions{
+.scene-top{
   display:flex;
-
-  flex-wrap:wrap;
-
-  gap:6px;
-
-  margin-top:7px;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
 }
 
-.actions button{
-  flex:1;
-
-  min-width:180px;
+.location-title{
+  font-size:18px;
+  font-weight:900;
+  color:#3a2a46;
 }
 
-.hint{
+.scene-top small{
+  color:#8d8197;
   font-size:10px;
+}
 
-  color:#776b80;
-
-  margin-top:7px;
-
-  padding:5px 7px;
-
-  background:#faf8fc;
-
-  border-radius:7px;
+.activity-launch{
+  border:0;
+  padding:9px 12px;
+  border-radius:11px;
+  background:linear-gradient(135deg,#7548ca,#e66db2);
+  color:white;
+  font-weight:800;
+  box-shadow:0 6px 15px rgba(120,70,180,.18);
 }
 
 /* CARDS */
 
-.grid{
-  display:grid;
-
-  grid-template-columns:
-    repeat(3,minmax(0,1fr));
-
-  gap:6px;
+.card,
+.side-card,
+.character-card,
+.event-card,
+.home-card{
+  background:white;
+  border:1px solid #eee7f5;
+  border-radius:14px;
+  padding:11px;
+  margin-bottom:8px;
+  box-shadow:0 3px 12px rgba(55,30,80,.035);
 }
 
-.card{
-  border:1px solid #e5ddea;
+.section-title{
+  margin-bottom:8px;
+  color:#4c3561;
+  font-weight:900;
+  font-size:13px;
+}
 
-  border-radius:10px;
+.muted{
+  color:#8d8294;
+  font-size:11px;
+  line-height:1.45;
+}
 
-  padding:8px;
-
+.event-card{
   display:flex;
-
-  flex-direction:column;
-
-  gap:4px;
-
-  min-width:0;
-
-  background:#fcfbfd;
+  gap:10px;
+  background:linear-gradient(135deg,#fff9ff,#f6f0ff);
 }
 
-.card b{
+.event-icon{
+  width:42px;
+  height:42px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:#eadcff;
+  font-size:22px;
+}
+
+.event-title{
+  font-weight:900;
+  color:#5b3a79;
+  margin-bottom:3px;
+}
+
+.event-result{
+  margin-top:5px;
+  color:#7c4cab;
+  font-size:10px;
+  font-weight:700;
+}
+
+/* BUTTON */
+
+.game-btn{
+  width:100%;
+  border:0;
+  padding:7px 9px;
+  border-radius:9px;
+  background:#7650bd;
+  color:white;
+  font-weight:700;
+  font-size:10px;
+  transition:.15s;
+}
+
+.game-btn:hover:not(:disabled){
+  transform:translateY(-1px);
+  filter:brightness(1.04);
+}
+
+.game-btn.success{
+  background:#42a36a;
+}
+
+/* ACTIVITY */
+
+.activity-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+  margin-bottom:10px;
+}
+
+.activity-grid.large{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+
+.activity-card{
+  min-width:0;
+  border:1px solid #eee4f5;
+  border-radius:12px;
+  padding:10px 7px;
+  background:linear-gradient(145deg,#fff,#faf6ff);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:3px;
+  color:#44354e;
+  transition:.15s;
+}
+
+.activity-card:hover:not(:disabled){
+  border-color:#bd9de2;
+  transform:translateY(-2px);
+  box-shadow:0 7px 16px rgba(90,50,130,.08);
+}
+
+.activity-icon{
+  font-size:24px;
+}
+
+.activity-card b{
+  font-size:10px;
+}
+
+.activity-card small{
+  color:#978c9d;
+  font-size:8px;
+}
+
+/* NPC */
+
+.npc-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+}
+
+.npc-card{
+  display:flex;
+  gap:8px;
+  padding:9px;
+  border:1px solid #eee7f4;
+  border-radius:12px;
+  background:#fff;
+}
+
+.npc-avatar{
+  width:38px;
+  height:38px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:#f1e9fb;
+  font-size:20px;
+}
+
+.npc-info{
+  min-width:0;
+  flex:1;
+}
+
+.npc-info b{
+  display:block;
   font-size:11px;
 }
 
-.card small,
-.card span{
-  font-size:9px;
-
-  color:#6e6277;
-
+.npc-info small{
+  display:block;
+  min-height:27px;
+  color:#8e8495;
+  font-size:8px;
   line-height:1.3;
 }
 
-.card button{
-  margin-top:auto;
-
-  padding:6px;
+.relationship{
+  color:#9a61c1;
+  font-size:8px;
+  margin-bottom:5px;
 }
 
-.big{
-  font-size:24px;
+/* SIDE */
 
-  line-height:1.1;
+.character-card{
+  text-align:center;
 }
 
-.person{
+.mini-character{
+  position:relative;
+  width:100px;
+  height:125px;
+  margin:0 auto 7px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-radius:22px;
+  background:linear-gradient(145deg,#f5edff,#fff4fa);
+  font-size:27px;
+}
+
+.mini-character > div{
+  height:25px;
+  line-height:25px;
+}
+
+.mini-accessory{
+  position:absolute;
+  right:12px;
+  top:12px;
+  font-size:19px;
+}
+
+.character-card b{
+  display:block;
+  font-size:11px;
+}
+
+.character-card small{
+  display:block;
+  color:#9a8ea0;
+  margin-top:3px;
+  font-size:9px;
+}
+
+.side-title{
+  font-weight:900;
+  color:#523a66;
+  margin-bottom:7px;
+  font-size:12px;
+}
+
+.quick-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+}
+
+.quick-buttons button,
+.location-buttons button{
+  border:1px solid #eee5f4;
+  border-radius:8px;
+  padding:7px 5px;
+  background:#faf8fc;
+  color:#584965;
+  font-size:9px;
+  font-weight:700;
+}
+
+.quick-buttons button:hover,
+.location-buttons button:hover,
+.location-buttons button.active{
+  background:#eadfff;
+  color:#693e9d;
+  border-color:#cdb0ec;
+}
+
+.location-buttons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+}
+
+.competition-score{
+  display:flex;
+  align-items:baseline;
+  gap:5px;
+  margin-bottom:7px;
+}
+
+.competition-score strong{
+  font-size:28px;
+  color:#7345ae;
+}
+
+.competition-score span{
+  color:#938799;
+  font-size:9px;
+}
+
+/* FOOTER */
+
+.footer-nav{
+  flex:none;
+  height:52px;
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  border-top:1px solid #eee7f5;
+  background:white;
+}
+
+.footer-nav button{
+  min-width:55px;
+  border:0;
+  background:none;
+  color:#8e8295;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  font-size:17px;
+}
+
+.footer-nav span{
+  font-size:8px;
+}
+
+.footer-nav button.active{
+  color:#7545b2;
+  font-weight:900;
+}
+
+/* SHOP */
+
+.shop-grid,
+.asset-grid,
+.cert-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+
+.shop-card,
+.asset-card,
+.cert-card,
+.bag-card{
+  border:1px solid #eee6f4;
+  border-radius:11px;
+  padding:9px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  background:#fff;
+}
+
+.shop-icon,
+.asset-icon,
+.cert-icon,
+.bag-icon{
+  font-size:25px;
+}
+
+.shop-card b,
+.asset-card b,
+.cert-card b,
+.bag-card b{
+  font-size:10px;
+}
+
+.shop-card small,
+.asset-card small,
+.cert-card small,
+.bag-card small{
+  color:#918697;
+  font-size:8px;
+  min-height:23px;
+}
+
+.asset-card strong{
+  color:#7544ad;
+  font-size:10px;
+}
+
+.asset-card.owned,
+.cert-card.owned{
+  background:#f3fff7;
+  border-color:#bde5c9;
+}
+
+/* JOB */
+
+.job-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+
+.job-card{
+  display:flex;
+  gap:9px;
+  padding:10px;
+  border:1px solid #eee6f4;
+  border-radius:12px;
+  background:#fff;
+}
+
+.job-card.locked{
+  opacity:.65;
+}
+
+.job-icon{
+  font-size:28px;
+}
+
+.job-content{
+  min-width:0;
+  flex:1;
+}
+
+.job-content b{
+  display:block;
+  font-size:11px;
+}
+
+.job-content small{
+  display:block;
+  color:#908697;
+  font-size:9px;
+  min-height:25px;
+  margin:3px 0;
+}
+
+.job-meta{
+  color:#8050b5;
+  font-size:9px;
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+/* FASHION */
+
+.fashion-page{
+  display:grid;
+  grid-template-columns:230px minmax(0,1fr);
+  gap:10px;
+}
+
+.fashion-preview{
+  border:1px solid #eee5f4;
+  border-radius:14px;
+  padding:11px;
+  background:linear-gradient(145deg,#fff8ff,#f5f1ff);
+}
+
+.character{
+  position:relative;
+  width:150px;
+  height:230px;
+  margin:10px auto;
+  border-radius:30px;
+  background:rgba(255,255,255,.75);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:45px;
+}
+
+.character > div{
+  height:42px;
+  line-height:42px;
+}
+
+.character-accessories{
+  position:absolute;
+  right:20px;
+  top:35px;
   font-size:30px;
+}
+
+.outfit-list{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.outfit-row{
+  display:flex;
+  justify-content:space-between;
+  gap:5px;
+  padding:5px 7px;
+  border-radius:7px;
+  background:white;
+  font-size:8px;
+}
+
+.outfit-row b{
+  text-align:right;
+}
+
+.fashion-shop{
+  min-width:0;
+}
+
+.fashion-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.money-pill{
+  padding:7px 9px;
+  border-radius:9px;
+  background:#fff3c9;
+  color:#9a7115;
+  font-size:9px;
+  font-weight:800;
+}
+
+.category-tabs{
+  display:flex;
+  gap:4px;
+  overflow-x:auto;
+  padding:7px 0;
+}
+
+.category-tabs button{
+  flex:none;
+  border:1px solid #e9e0f2;
+  border-radius:8px;
+  background:#faf8fc;
+  color:#6e6075;
+  padding:6px 9px;
+  font-size:9px;
+  font-weight:800;
+}
+
+.category-tabs button.active{
+  background:#7548b7;
+  color:white;
+  border-color:#7548b7;
+}
+
+.fashion-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  max-height:500px;
+  overflow:auto;
+  padding-right:2px;
+}
+
+.fashion-card{
+  border:1px solid #eee6f4;
+  border-radius:11px;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  background:white;
+}
+
+.fashion-card.owned{
+  background:#faf7ff;
+}
+
+.fashion-card.equipped{
+  border:2px solid #7b4bb7;
+  background:#f5eeff;
+}
+
+.fashion-icon{
+  width:100%;
+  height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:#f7f1fb;
+  font-size:29px;
+}
+
+.fashion-card b{
+  font-size:9px;
+}
+
+.fashion-card small{
+  color:#938797;
+  font-size:7px;
+  min-height:19px;
+}
+
+.fashion-card strong{
+  color:#7650aa;
+  font-size:9px;
+}
+
+.fashion-bonus{
+  display:flex;
+  flex-wrap:wrap;
+  gap:2px;
+  min-height:18px;
+}
+
+.fashion-bonus span{
+  padding:2px 4px;
+  border-radius:5px;
+  background:#eee5fb;
+  color:#71439e;
+  font-size:6px;
 }
 
 /* HOME */
 
-.homeBox{
+.home-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.home-card{
   text-align:center;
-
-  padding:22px 8px;
-
-  background:#f7f2fa;
-
-  border-radius:12px;
 }
 
-.homeBox h3{
-  margin:5px;
+.big-icon{
+  font-size:48px;
 }
 
-.homeBox p{
-  font-size:11px;
-
-  color:#6e6277;
+.home-card h2{
+  font-size:17px;
+  margin:5px 0;
 }
 
-/* BOTTOM */
-
-.bottom{
-  display:grid;
-
-  grid-template-columns:
-    repeat(4,1fr);
-
-  gap:5px;
-
-  margin-top:7px;
-}
-
-.bottom button{
-  padding:7px 4px;
-
+.home-card p{
+  color:#918595;
   font-size:10px;
-}
-
-/* SIDEBAR */
-
-.rank{
-  display:grid;
-
-  grid-template-columns:
-    1fr auto;
-
-  gap:4px;
-
-  align-items:center;
-
-  padding:5px 0;
-
-  border-bottom:1px solid #eee7f2;
-
-  font-size:10px;
-}
-
-.rank strong{
-  font-size:11px;
-}
-
-.sideCard button{
-  width:100%;
-
-  margin-top:6px;
-}
-
-.bag{
-  font-size:10px;
-
-  padding:4px 0;
-}
-
-.currentTitle{
-  font-size:11px;
-
-  margin-bottom:3px;
-}
-
-.sideCard small{
-  font-size:9px;
-
-  color:#786d82;
 }
 
 /* MODAL */
 
-.modalBack{
+.modal-backdrop{
   position:fixed;
-
   inset:0;
-
-  background:#120a1dbd;
-
-  z-index:50;
-
+  z-index:100;
   display:flex;
-
   align-items:center;
-
   justify-content:center;
-
   padding:12px;
+  background:rgba(32,20,42,.45);
+  backdrop-filter:blur(4px);
 }
 
 .modal{
-  width:min(600px,100%);
-
-  max-height:88dvh;
-
-  overflow:auto;
-
-  background:#fff;
-
-  border-radius:16px;
-
-  border:1px solid #d6c4e2;
-
-  box-shadow:
-    0 25px 80px #0008;
-
-  padding:13px;
-}
-
-.modalHead{
+  width:min(520px,100%);
+  max-height:92dvh;
   display:flex;
-
-  justify-content:space-between;
-
-  align-items:center;
-
-  margin-bottom:8px;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:17px;
+  background:white;
+  box-shadow:0 25px 80px rgba(30,15,45,.3);
 }
 
-.modalHead b{
-  font-size:15px;
+.modal-wide{
+  width:min(920px,100%);
+}
+
+.modal-head{
+  flex:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:11px 13px;
+  background:linear-gradient(110deg,#7144ba,#a25dd9);
+  color:white;
+}
+
+.modal-title{
+  font-size:14px;
+  font-weight:900;
+}
+
+.icon-btn{
+  width:30px;
+  height:30px;
+  border:0;
+  border-radius:8px;
+  background:rgba(255,255,255,.16);
+  color:white;
+}
+
+.modal-body{
+  min-height:0;
+  overflow:auto;
+  padding:12px;
 }
 
 /* QUIZ */
 
-.qmeta{
-  font-size:10px;
-
-  color:#76687d;
-
-  margin-bottom:5px;
+.quiz-top{
+  display:flex;
+  justify-content:space-between;
+  color:#8c8193;
+  font-size:9px;
+  margin-bottom:8px;
 }
 
-.subject{
+.quiz-question{
+  padding:12px;
+  border-radius:13px;
+  background:#f7f2fc;
+  margin-bottom:8px;
+}
+
+.quiz-subject{
   display:inline-block;
-
-  padding:3px 7px;
-
-  border-radius:20px;
-
-  background:#eee3f5;
-
-  color:#66317f;
-
-  font-size:10px;
-
+  padding:3px 6px;
+  border-radius:6px;
+  background:#e5d8f7;
+  color:#72469c;
+  font-size:8px;
   font-weight:800;
 }
 
-.question{
-  font-size:18px;
-
-  line-height:1.3;
-
-  margin:9px 0;
+.quiz-question h2{
+  margin:9px 0 0;
+  font-size:17px;
+  line-height:1.4;
+  color:#34283e;
 }
 
 .choices{
   display:grid;
-
   gap:6px;
 }
 
-.choices button{
-  text-align:left;
-
-  padding:9px;
-
+.choice{
+  width:100%;
   display:flex;
-
-  gap:8px;
-
   align-items:flex-start;
+  gap:7px;
+  text-align:left;
+  padding:10px;
+  border:1px solid #e8dfef;
+  border-radius:10px;
+  background:white;
+  color:#46394f;
+  font-size:10px;
 }
 
-.choices button b{
-  background:#eee4f5;
+.choice:hover:not(:disabled){
+  border-color:#a87bd0;
+  background:#faf6ff;
+}
 
-  border-radius:5px;
+.choice.correct{
+  border-color:#69bb83;
+  background:#e9f9ef;
+  color:#23713d;
+}
 
-  padding:2px 5px;
+.choice.wrong{
+  border-color:#df7777;
+  background:#fff0f0;
+  color:#a43d3d;
 }
 
 .feedback{
-  margin-top:8px;
-
-  padding:8px;
-
-  border-radius:8px;
-
-  font-size:11px;
-
-  font-weight:700;
+  margin-top:9px;
+  padding:10px;
+  border-radius:10px;
+  font-size:10px;
 }
 
-.feedback.ok{
-  background:#eaf8ef;
-
-  color:#20703d;
+.feedback.good{
+  background:#ecfaef;
+  color:#246e3c;
 }
 
 .feedback.bad{
   background:#fff0f0;
-
-  color:#a12a2a;
+  color:#a63c3c;
 }
 
-.modal textarea{
+.feedback p{
+  margin:5px 0 8px;
+  color:#675c68;
+}
+
+/* BAG */
+
+.bag-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+
+/* SAVE */
+
+.save-actions{
+  display:flex;
+  gap:6px;
+  margin-bottom:8px;
+}
+
+.save-actions > *{
+  flex:1;
+}
+
+.save-text{
   width:100%;
-
-  height:150px;
-
-  border:1px solid #ddd0e7;
-
-  border-radius:9px;
-
-  padding:8px;
-
+  min-height:130px;
   resize:vertical;
-
-  margin:8px 0;
-
-  font-size:10px;
+  border:1px solid #ddd1e7;
+  border-radius:10px;
+  padding:9px;
+  font-size:9px;
+  line-height:1.4;
+  margin-bottom:7px;
 }
 
-.primary{
-  width:100%;
+.file-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
-  background:#65328a;
+.save-tip{
+  padding:8px;
+  border-radius:9px;
+  background:#f7f2fb;
+  color:#82758b;
+  font-size:9px;
+}
 
-  color:#fff;
+/* LEADERBOARD */
 
-  border-color:#65328a;
+.leaderboard{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+
+.rank-row{
+  display:grid;
+  grid-template-columns:40px 1fr 75px;
+  align-items:center;
+  padding:8px;
+  border:1px solid #eee6f4;
+  border-radius:9px;
+  background:#fff;
+}
+
+.player-rank{
+  background:#f2eaff;
+  border-color:#cdb4e9;
+}
+
+.rank-number{
+  color:#8d7e96;
+  font-weight:900;
+}
+
+.rank-name{
+  font-size:10px;
+  font-weight:800;
+}
+
+.rank-points{
+  text-align:right;
+}
+
+.rank-points b{
+  display:block;
+  color:#7544ad;
+}
+
+.rank-points small{
+  color:#9b8e9f;
+  font-size:7px;
+}
+
+/* TITLE */
+
+.title-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+
+.title-card{
+  border:1px solid #e7deef;
+  border-radius:11px;
+  padding:10px;
+  background:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+
+.title-card span{
+  font-size:27px;
+}
+
+.title-card b{
+  font-size:9px;
+}
+
+.title-card small{
+  color:#928598;
+  font-size:7px;
+}
+
+.title-card.locked{
+  filter:grayscale(1);
+  opacity:.48;
+}
+
+.title-card.selected{
+  border:2px solid #7547b0;
+  background:#f6efff;
+}
+
+.title-card em{
+  color:#7446ae;
+  font-size:7px;
+  font-style:normal;
+  font-weight:900;
 }
 
 /* DIARY */
 
-.diary{
-  padding:8px;
-
-  border:1px solid #e6dceb;
-
-  border-radius:9px;
-
-  margin-bottom:6px;
-
-  background:#fcfbfd;
+.diary-list{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
 }
 
-.diary > b{
-  font-size:11px;
+.diary-card{
+  padding:10px;
+  border:1px solid #eee5f3;
+  border-radius:11px;
+  background:#fff;
 }
 
-.diary p{
+.diary-head{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.diary-head b{
+  color:#624079;
   font-size:10px;
-
-  margin:4px 0;
-
-  color:#62576b;
 }
 
-.deltas{
+.diary-head span{
+  color:#9a8b9e;
+  font-size:8px;
+}
+
+.diary-card p{
   font-size:9px;
-
-  color:#68417d;
+  color:#65596b;
 }
 
-/* LEADER */
-
-.leader{
-  display:grid;
-
-  grid-template-columns:
-    30px 1fr 50px 65px;
-
+.delta-grid{
+  display:flex;
+  flex-wrap:wrap;
   gap:4px;
-
-  align-items:center;
-
-  padding:7px 0;
-
-  border-bottom:1px solid #eee7f2;
-
-  font-size:11px;
 }
 
-.leader strong{
-  font-size:11px;
-}
-
-.leader small{
-  text-align:right;
-
-  color:#7b6d82;
-
-  font-size:9px;
+.delta-grid span{
+  padding:4px 6px;
+  border-radius:6px;
+  background:#f6f1f9;
+  color:#72587e;
+  font-size:7px;
 }
 
 /* PROFILE */
 
-.profile{
+.profile-layout{
+  display:grid;
+  grid-template-columns:220px 1fr;
+  gap:15px;
+}
+
+.profile-character{
   text-align:center;
 }
 
-.avatar{
-  font-size:55px;
+.big-character{
+  min-height:220px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-radius:18px;
+  background:linear-gradient(145deg,#f4ecff,#fff2f8);
+  font-size:46px;
 }
 
-.profile h2{
-  font-size:17px;
-
-  margin:4px;
+.big-character div{
+  height:43px;
 }
 
-.profile p{
-  font-size:11px;
+.profile-character h2{
+  font-size:13px;
 }
 
-.profileGrid{
+.profile-stats{
   display:grid;
-
-  grid-template-columns:
-    1fr 1fr;
-
-  gap:5px;
-
-  text-align:left;
+  gap:8px;
+  align-content:center;
 }
 
-.profileGrid span{
-  padding:7px;
+.stat-top{
+  display:flex;
+  justify-content:space-between;
+  font-size:9px;
+  color:#6c5d72;
+  margin-bottom:3px;
+}
 
-  background:#f5eff8;
+.bar{
+  height:6px;
+  overflow:hidden;
+  border-radius:99px;
+  background:#eee8f2;
+}
 
-  border-radius:7px;
-
-  font-size:10px;
+.bar-fill{
+  height:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg,#7750bd,#d96cad);
 }
 
 /* ENDING */
 
 .ending{
   text-align:center;
-
   padding:10px;
 }
 
-.ending h1{
-  font-size:24px;
+.ending-icon{
+  font-size:55px;
+}
 
-  margin:5px;
+.ending h1{
+  color:#5e3c79;
+  font-size:21px;
 }
 
 .ending p{
-  font-size:11px;
-
-  color:#665a70;
-}
-
-.finalStats{
-  display:grid;
-
-  grid-template-columns:
-    1fr 1fr;
-
-  gap:5px;
-
-  margin:10px 0;
-}
-
-.finalStats b{
-  padding:7px;
-
-  background:#f5eff8;
-
-  border-radius:7px;
-
+  color:#817586;
   font-size:10px;
+  line-height:1.6;
+}
+
+.ending-stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+  margin:12px 0;
+}
+
+.ending-stats div{
+  padding:9px;
+  border-radius:10px;
+  background:#f8f3fb;
+}
+
+.ending-stats b{
+  display:block;
+  color:#7346aa;
+  font-size:18px;
+}
+
+.ending-stats span{
+  color:#8f8295;
+  font-size:8px;
+}
+
+.final-title{
+  margin:10px 0;
+  padding:10px;
+  border-radius:10px;
+  background:#efe3ff;
+  color:#7041a5;
+  font-weight:900;
 }
 
 /* TOAST */
 
 .toast{
   position:fixed;
-
+  z-index:300;
   left:50%;
-
-  bottom:18px;
-
+  bottom:72px;
   transform:translateX(-50%);
-
-  z-index:80;
-
-  background:#241530;
-
-  color:#fff;
-
-  padding:9px 13px;
-
-  border-radius:10px;
-
-  box-shadow:
-    0 10px 30px #0006;
-
-  font-size:11px;
-
+  max-width:min(90vw,500px);
+  padding:10px 14px;
+  border-radius:12px;
+  background:#302238;
+  color:white;
+  box-shadow:0 10px 30px rgba(20,10,30,.25);
+  font-size:10px;
   font-weight:700;
-
-  max-width:min(90vw,520px);
-
   text-align:center;
 }
 
-/* FOOTER */
+/* EMPTY */
 
-footer{
-  flex:none;
-
-  height:25px;
-
-  padding:3px 10px;
-
-  background:#eee8f4;
-
-  color:#786c80;
-
-  font-size:9px;
-
-  display:flex;
-
-  justify-content:space-between;
+.empty{
+  padding:30px;
+  text-align:center;
+  color:#988b9e;
+  font-size:11px;
 }
 
 /* RESPONSIVE */
 
-@media(max-width:820px){
+@media(max-width:900px){
 
-  .root{
-    padding:0;
-  }
-
-  .shell{
-    height:100dvh;
-
-    border-radius:0;
-  }
-
-  .stats{
-    grid-template-columns:
-      repeat(5,1fr);
-  }
-
-  main{
+  .content{
     grid-template-columns:1fr;
-
     overflow:auto;
-  }
-
-  .scene{
-    overflow:visible;
   }
 
   .side{
     display:grid;
-
-    grid-template-columns:
-      repeat(3,1fr);
-
-    gap:6px;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
   }
 
-  .sideCard{
+  .side > *{
     margin:0;
   }
 
-  .grid{
-    grid-template-columns:
-      repeat(3,1fr);
+  .fashion-page{
+    grid-template-columns:1fr;
+  }
+
+  .fashion-preview{
+    display:grid;
+    grid-template-columns:180px 1fr;
+    gap:10px;
+  }
+
+  .character{
+    width:140px;
+    height:190px;
   }
 }
 
-@media(max-width:560px){
+@media(max-width:650px){
 
-  header strong{
-    font-size:13px;
+  .game-root{
+    padding:0;
   }
 
-  .top{
-    font-size:10px;
+  .game-shell{
+    width:100%;
+    height:100dvh;
+    border-radius:0;
   }
 
-  .clock{
-    width:100px;
+  .header{
+    min-height:55px;
   }
 
-  .stats{
-    grid-template-columns:
-      repeat(5,1fr);
+  .brand h1{
+    font-size:14px;
   }
 
-  .stats > div:nth-child(n+6){
+  .header-actions{
+    gap:3px;
+  }
+
+  .top-btn{
+    width:31px;
+    height:30px;
+  }
+
+  .schedule-row{
+    overflow-x:auto;
+  }
+
+  .schedule-dot{
+    flex:0 0 48px;
+  }
+
+  .hud{
+    padding:5px;
+  }
+
+  .hud-stat{
+    padding:0 7px;
+  }
+
+  .content{
+    padding:6px;
+  }
+
+  .activity-grid,
+  .activity-grid.large{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .npc-grid{
+    grid-template-columns:1fr;
+  }
+
+  .shop-grid,
+  .asset-grid,
+  .cert-grid,
+  .bag-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .job-grid{
+    grid-template-columns:1fr;
+  }
+
+  .fashion-preview{
+    display:block;
+  }
+
+  .fashion-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    max-height:none;
+  }
+
+  .title-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .profile-layout{
+    grid-template-columns:1fr;
+  }
+
+  .ending-stats{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .footer-nav{
+    height:55px;
+  }
+}
+
+@media(max-width:420px){
+
+  .brand small{
     display:none;
   }
 
-  .grid{
-    grid-template-columns:
-      repeat(2,1fr);
+  .location-title{
+    font-size:15px;
   }
 
-  .side{
-    grid-template-columns:1fr;
+  .fashion-grid{
+    grid-template-columns:1fr 1fr;
   }
 
-  .bottom{
-    grid-template-columns:
-      repeat(2,1fr);
-  }
-
-  .question{
-    font-size:16px;
+  .modal-backdrop{
+    padding:5px;
   }
 
   .modal{
-    padding:10px;
-  }
-
-  .finalStats{
-    grid-template-columns:1fr;
+    max-height:96dvh;
   }
 }
 `;
-
-/* =========================================================
-   INJECT CSS
-   ========================================================= */
-
-if (
-  typeof document !== "undefined" &&
-  !document.getElementById(
-    "txrr-style"
-  )
-) {
-  const style =
-    document.createElement("style");
-
-  style.id = "txrr-style";
-  style.textContent = CSS;
-
-  document.head.appendChild(style);
-}
