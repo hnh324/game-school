@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 
 /* =========================================================
    THANH XUÂN RỰC RỠ
@@ -19,10 +18,10 @@ import { createClient } from "@supabase/supabase-js";
    - Thi đua
    - Save code
    - Tên nhân vật + bảng xếp hạng người chơi online real-time
-   - Supabase Auth (anonymous) + Postgres + Realtime Presence
+   - Supabase Auth anonymous + Postgres REST polling (không cần SDK)
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v24";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v25";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -31,19 +30,133 @@ const SLOT_SECONDS = 30;
    VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
    VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 ========================================================= */
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
-const SUPABASE_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  "";
+const SUPABASE_URL = String(
+  import.meta.env?.VITE_SUPABASE_URL || ""
+).replace(/\/$/, "");
+const SUPABASE_KEY = String(
+  import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env?.VITE_SUPABASE_ANON_KEY ||
+  ""
+);
 
-const supabase =
-  SUPABASE_URL && SUPABASE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_KEY)
-    : null;
-
-const ONLINE_CHANNEL = "thanh-xuan-ruc-ro:lobby";
 const ONLINE_TABLE = "player_scores";
+const ONLINE_SESSION_KEY = "thanh_xuan_ruc_ro_supabase_session_v1";
+const ONLINE_HEARTBEAT_MS = 10000;
+const ONLINE_POLL_MS = 5000;
+const hasOnlineConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
+
+async function onlineRequest(path, options = {}) {
+  if (!hasOnlineConfig) {
+    throw new Error("Chưa cấu hình Supabase URL / publishable key.");
+  }
+
+  const headers = {
+    apikey: SUPABASE_KEY,
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  const response = await fetch(`${SUPABASE_URL}${path}`, {
+    ...options,
+    headers
+  });
+
+  const text = await response.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    const message =
+      data?.msg ||
+      data?.message ||
+      data?.error_description ||
+      data?.hint ||
+      `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  return data;
+}
+
+function readOnlineSession() {
+  try {
+    return JSON.parse(localStorage.getItem(ONLINE_SESSION_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function writeOnlineSession(session) {
+  try {
+    localStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify(session));
+  } catch {}
+}
+
+function clearOnlineSession() {
+  try {
+    localStorage.removeItem(ONLINE_SESSION_KEY);
+  } catch {}
+}
+
+const onlineAuthHeaders = (accessToken) =>
+  accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+
+async function createAnonymousSession() {
+  const data = await onlineRequest("/auth/v1/signup", {
+    method: "POST",
+    body: JSON.stringify({ data: { app: "thanh-xuan-ruc-ro" } })
+  });
+
+  if (!data?.access_token || !data?.user?.id) {
+    throw new Error(
+      "Không tạo được tài khoản ẩn danh. Hãy bật Anonymous Sign-Ins trong Supabase."
+    );
+  }
+
+  const session = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || null,
+    user: data.user
+  };
+  writeOnlineSession(session);
+  return session;
+}
+
+async function refreshAnonymousSession(session) {
+  if (!session?.refresh_token) return null;
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: session.refresh_token
+      })
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok || !data?.access_token) return null;
+
+    const next = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || session.refresh_token,
+      user: session.user
+    };
+    writeOnlineSession(next);
+    return next;
+  } catch {
+    return null;
+  }
+}
 
 /* =========================================================
    THỜI GIAN
@@ -1861,175 +1974,149 @@ function App(){
   );
 
   /* -----------------------------------------
-     MULTIPLAYER ONLINE
+     MULTIPLAYER ONLINE — REST / POLLING
+     Không phụ thuộc @supabase/supabase-js.
   ----------------------------------------- */
 
-  const refreshOnlinePlayers = useCallback(async()=>{
-    if(!supabase) return;
+  const loadOnlineLeaderboard = useCallback(async(accessToken)=>{
+    if(!hasOnlineConfig) return [];
 
-    const { data, error } = await supabase
-      .from(ONLINE_TABLE)
-      .select("id,player_name,icon,points,today,day,time_index,updated_at")
-      .order("points", { ascending:false })
-      .order("updated_at", { ascending:false })
-      .limit(100);
+    const rows = await onlineRequest(
+      `/rest/v1/${ONLINE_TABLE}?select=id,player_name,icon,points,today,day,time_index,updated_at&order=points.desc,updated_at.desc&limit=100`,
+      {headers:onlineAuthHeaders(accessToken)}
+    );
 
-    if(error){
-      setOnlineError(error.message || "Không tải được bảng online.");
-      return;
-    }
-
-    setOnlinePlayers(data || []);
-    setOnlineError("");
+    return Array.isArray(rows) ? rows : [];
   },[]);
 
-  useEffect(()=>{
-    if(!supabase){
-      setOnlineReady(false);
-      setOnlineError("Chưa cấu hình Supabase — đang dùng bảng demo cục bộ.");
-      return;
-    }
+  const pushOnlineScore = useCallback(async(session)=>{
+    if(!session?.access_token || !session?.user?.id || !game.playerName) return;
 
-    let cancelled = false;
-    let channel = null;
-
-    const initOnline = async()=>{
-      try{
-        let { data:{ session } } = await supabase.auth.getSession();
-        let user = session?.user || null;
-
-        if(!user){
-          const { data, error } = await supabase.auth.signInAnonymously({
-            options:{
-              data:{ app:"thanh-xuan-ruc-ro" }
-            }
-          });
-
-          if(error) throw error;
-          user = data?.user || null;
-        }
-
-        if(!user) throw new Error("Không tạo được phiên người chơi.");
-        if(cancelled) return;
-
-        setOnlineUser(user);
-        setOnlineReady(true);
-        await refreshOnlinePlayers();
-
-        channel = supabase
-          .channel(ONLINE_CHANNEL, {
-            config:{
-              presence:{ key:user.id }
-            }
-          })
-          .on("postgres_changes",
-            {
-              event:"*",
-              schema:"public",
-              table:ONLINE_TABLE
-            },
-            ()=>{
-              refreshOnlinePlayers();
-            }
-          )
-          .on("presence", {event:"sync"}, ()=>{
-            const state = channel.presenceState();
-            setOnlineCount(Object.keys(state || {}).length);
-          })
-          .subscribe(async status=>{
-            if(status==="SUBSCRIBED"){
-              try{
-                await channel.track({
-                  user_id:user.id,
-                  player_name:game.playerName || "Người chơi",
-                  at:new Date().toISOString()
-                });
-              }catch{}
-            }
-          });
-
-        onlineChannelRef.current = channel;
-      }catch(error){
-        if(cancelled) return;
-        setOnlineReady(false);
-        setOnlineError(
-          error?.message ||
-          "Không kết nối được máy chủ online."
-        );
-      }
+    const payload = {
+      id:session.user.id,
+      player_name:game.playerName.slice(0,20),
+      icon:currentTitle.icon,
+      points:Math.max(0,Math.round(game.competitionPoints)),
+      today:Math.max(0,Math.round(game.dailyCompetition.player)),
+      day:Math.max(1,Math.round(game.day)),
+      time_index:Math.max(0,Math.round(game.timeIndex)),
+      updated_at:new Date().toISOString()
     };
 
-    initOnline();
-
-    const authSubscription = supabase.auth.onAuthStateChange(
-      (_event, session)=>{
-        const user = session?.user || null;
-        if(user) setOnlineUser(user);
+    const doPush = async(s)=>onlineRequest(
+      `/rest/v1/${ONLINE_TABLE}?on_conflict=id`,
+      {
+        method:"POST",
+        headers:{
+          ...onlineAuthHeaders(s.access_token),
+          Prefer:"resolution=merge-duplicates,return=minimal"
+        },
+        body:JSON.stringify(payload)
       }
     );
 
-    return ()=>{
-      cancelled = true;
-      authSubscription.data.subscription.unsubscribe();
-
-      if(channel){
-        channel.untrack().catch(()=>{});
-        supabase.removeChannel(channel);
-      }
-
-      onlineChannelRef.current = null;
-      setOnlineCount(0);
-    };
-  // Online init intentionally runs once. Presence payload is updated separately.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  useEffect(()=>{
-    if(!supabase || !onlineUser || !onlineReady || !game.playerName) return;
-
-    const pushScore = async()=>{
-      const { error } = await supabase
-        .from(ONLINE_TABLE)
-        .upsert({
-          id:onlineUser.id,
-          player_name:game.playerName.slice(0,20),
-          icon:currentTitle.icon,
-          points:Math.max(0,Math.round(game.competitionPoints)),
-          today:Math.max(0,Math.round(game.dailyCompetition.player)),
-          day:Math.max(1,Math.round(game.day)),
-          time_index:Math.max(0,Math.round(game.timeIndex)),
-          updated_at:new Date().toISOString()
-        },{onConflict:"id"});
-
-      if(error){
-        setOnlineError(error.message || "Không đồng bộ được điểm.");
-      }else{
-        setOnlineError("");
-      }
-    };
-
-    pushScore();
+    try{
+      await doPush(session);
+    }catch(error){
+      const refreshed=await refreshAnonymousSession(session);
+      if(!refreshed) throw error;
+      await doPush(refreshed);
+      setOnlineUser(refreshed.user);
+    }
   },[
     game.playerName,
     game.competitionPoints,
     game.dailyCompetition.player,
     game.day,
     game.timeIndex,
-    currentTitle.icon,
-    onlineReady,
-    onlineUser
+    currentTitle.icon
   ]);
 
   useEffect(()=>{
-    const channel = onlineChannelRef.current;
-    if(!channel || !onlineUser || !game.playerName) return;
+    let cancelled=false;
+    let heartbeatTimer=null;
+    let pollTimer=null;
 
-    channel.track({
-      user_id:onlineUser.id,
-      player_name:game.playerName.slice(0,20),
-      at:new Date().toISOString()
-    }).catch(()=>{});
-  },[game.playerName,onlineUser]);
+    const init=async()=>{
+      if(!hasOnlineConfig){
+        setOnlineReady(false);
+        setOnlineError("Chưa cấu hình Supabase. Game vẫn chơi được offline.");
+        return;
+      }
+
+      try{
+        let session=readOnlineSession();
+        if(!session?.access_token || !session?.user?.id){
+          session=await createAnonymousSession();
+        }
+
+        try{
+          await loadOnlineLeaderboard(session.access_token);
+        }catch{
+          const refreshed=await refreshAnonymousSession(session);
+          if(refreshed) session=refreshed;
+          else session=await createAnonymousSession();
+        }
+
+        if(cancelled) return;
+
+        setOnlineUser(session.user);
+        setOnlineReady(true);
+        setOnlineError("");
+
+        const sync=async()=>{
+          if(cancelled) return;
+          const current=readOnlineSession() || session;
+          try{
+            await pushOnlineScore(current);
+            const rows=await loadOnlineLeaderboard(current.access_token);
+            setOnlinePlayers(rows);
+            setOnlineError("");
+          }catch(error){
+            setOnlineError(error?.message || "Không đồng bộ được bảng online.");
+          }
+        };
+
+        await sync();
+        heartbeatTimer=setInterval(sync,ONLINE_HEARTBEAT_MS);
+        pollTimer=setInterval(async()=>{
+          if(cancelled) return;
+          const current=readOnlineSession() || session;
+          try{
+            const rows=await loadOnlineLeaderboard(current?.access_token);
+            setOnlinePlayers(rows);
+          }catch{}
+        },ONLINE_POLL_MS);
+      }catch(error){
+        if(cancelled) return;
+        setOnlineReady(false);
+        setOnlineError(error?.message || "Không kết nối được máy chủ online.");
+      }
+    };
+
+    init();
+
+    return()=>{
+      cancelled=true;
+      if(heartbeatTimer) clearInterval(heartbeatTimer);
+      if(pollTimer) clearInterval(pollTimer);
+    };
+  },[loadOnlineLeaderboard,pushOnlineScore]);
+
+  useEffect(()=>{
+    if(!onlineReady || !onlineUser || !game.playerName) return;
+    pushOnlineScore(readOnlineSession()).catch(()=>{});
+  },[
+    onlineReady,
+    onlineUser,
+    game.playerName,
+    game.competitionPoints,
+    game.dailyCompetition.player,
+    game.day,
+    game.timeIndex,
+    currentTitle.icon,
+    pushOnlineScore
+  ]);
 
   /* -----------------------------------------
      SAVE
@@ -3659,9 +3746,9 @@ function App(){
       onClose={()=>setOverlay(null)}
     >
       <div className="online-status">
-        <span>🟢 {onlineCount || (onlineReady ? 1 : 0)} người đang online</span>
+        <span>🟢 {onlineCount || (onlineReady ? 1 : 0)} người đang online/gần đây</span>
         <small>
-          {onlineReady ? "Bảng điểm đồng bộ trực tiếp" : "Chế độ demo cục bộ"}
+          {onlineReady ? "Bảng điểm online đồng bộ mỗi vài giây" : "Chế độ offline / demo cục bộ"}
         </small>
       </div>
 
