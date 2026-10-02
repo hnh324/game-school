@@ -5,8 +5,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    Deluxe Career & Fashion Edition
    - 1 file App.jsx
    - 23 mốc thời gian / ngày
-   - Mỗi mốc 45 giây
-   - Mỗi mốc chỉ 1 hoạt động chính
+   - Mỗi mốc 30 giây
+   - Mỗi mốc tối đa 2 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
    - 180 câu hỏi
@@ -19,8 +19,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v7";
-const SLOT_SECONDS = 45;
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v8";
+const SLOT_SECONDS = 30;
 
 /* =========================================================
    THỜI GIAN
@@ -1082,6 +1082,8 @@ function createInitialState(){
     dailyOralCheckDone:false,
     mainActivityUsed:false,
     mainActivityLabel:null,
+    mainActivityCount:0,
+    mainActivityLabels:[],
 
     dailyEvent:null,
     lastEventId:null,
@@ -1135,7 +1137,15 @@ function normalizeState(raw){
 
   g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
   g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
-  g.mainActivityUsed = Boolean(g.mainActivityUsed);
+  const legacyCount = g.mainActivityCount == null
+    ? (g.mainActivityUsed ? 1 : 0)
+    : Number(g.mainActivityCount) || 0;
+  g.mainActivityCount = Math.max(0, Math.min(2, legacyCount));
+  g.mainActivityLabels = Array.isArray(g.mainActivityLabels)
+    ? g.mainActivityLabels.filter(Boolean).slice(0,2)
+    : (g.mainActivityLabel ? [g.mainActivityLabel] : []);
+  g.mainActivityUsed = g.mainActivityCount >= 2;
+  g.mainActivityLabel = g.mainActivityLabels.join(" • ");
   g.mainActivityLabel = g.mainActivityLabel || null;
 
   for(const key of [
@@ -1347,10 +1357,9 @@ export default function App(){
 
   const canDoMainActivity = useCallback(()=>{
     if(game.isGameOver) return false;
-    if(game.mainActivityUsed){
+    if((game.mainActivityCount || 0) >= 2){
       setToast(
-        `⏱️ Mốc ${currentTime} đã dùng hoạt động chính` +
-        `${game.mainActivityLabel ? `: ${game.mainActivityLabel}` : ""}. ` +
+        `⏱️ Mốc ${currentTime} đã đủ 2 hoạt động chính. ` +
         `Sang mốc mới để hoạt động tiếp.`
       );
       return false;
@@ -1358,8 +1367,7 @@ export default function App(){
     return true;
   },[
     game.isGameOver,
-    game.mainActivityUsed,
-    game.mainActivityLabel,
+    game.mainActivityCount,
     currentTime
   ]);
 
@@ -1439,6 +1447,8 @@ export default function App(){
       next.dailyOralCheckDone = false;
       next.mainActivityUsed = false;
       next.mainActivityLabel = null;
+      next.mainActivityCount = 0;
+      next.mainActivityLabels = [];
 
       next.dailyCompetition = emptyDailyCompetition();
 
@@ -1566,11 +1576,16 @@ export default function App(){
         : shuffle(QUIZ_BANK).slice(0,mode==="oral" ? 3 : 5);
 
     updateGame(g=>{
-      g.mainActivityUsed = true;
+      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel =
         mode==="oral" ? "Kiểm tra miệng" :
         mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
         "Quiz nhanh";
+      g.mainActivityLabels = [
+        ...(g.mainActivityLabels || []),
+        g.mainActivityLabel
+      ].slice(0,2);
+      g.mainActivityUsed = g.mainActivityCount >= 2;
 
       if(mode==="oral"){
         g.dailyOralCheckDone = true;
@@ -1823,11 +1838,13 @@ export default function App(){
     if(!canDoMainActivity()) return;
 
     updateGame(g=>{
-      if(g.mainActivityUsed) return;
+      if((g.mainActivityCount || 0) >= 2) return;
       job.apply(g);
       g.jobActions++;
-      g.mainActivityUsed = true;
+      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = `Việc làm: ${job.name}`;
+      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
+      g.mainActivityUsed = g.mainActivityCount >= 2;
     });
 
     setOverlay(null);
@@ -1845,11 +1862,13 @@ export default function App(){
     }
 
     updateGame(g=>{
-      if(g.mainActivityUsed) return;
+      if((g.mainActivityCount || 0) >= 2) return;
       addStat(g,"energy",-3);
       npc.apply(g);
-      g.mainActivityUsed = true;
+      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = npc.action;
+      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
+      g.mainActivityUsed = g.mainActivityCount >= 2;
     });
 
     setToast(`${npc.icon} ${npc.name}: ${npc.action}`);
@@ -1859,12 +1878,14 @@ export default function App(){
     if(!canDoMainActivity()) return;
 
     updateGame(g=>{
-      if(g.mainActivityUsed) return;
+      if((g.mainActivityCount || 0) >= 2) return;
       addStat(g,"energy",25);
       addStat(g,"hp",5);
       addStat(g,"mood",5);
-      g.mainActivityUsed = true;
+      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = "Nghỉ ngơi";
+      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
+      g.mainActivityUsed = g.mainActivityCount >= 2;
     });
 
     setToast("🛏️ Nghỉ ngơi giúp bạn hồi phục.");
@@ -2308,25 +2329,21 @@ export default function App(){
       <div className="fashion-preview">
         <div className="section-title">👕 Nhân vật của bạn</div>
 
-        <div className="character">
-          <div className="character-head">
-            {getFashion(game.outfit.hair)?.icon || "💇"}
+        <div className="character female-character">
+          <div className="female-avatar">👩🏻‍🎓</div>
+          <div className="worn-clothes">
+            <span className="worn-shirt">{getFashion(game.outfit.shirt)?.icon || "👕"}</span>
+            <span className="worn-bottom">{getFashion(game.outfit.pants)?.icon || "👖"}</span>
+            <span className="worn-shoes">{getFashion(game.outfit.shoes)?.icon || "👟"}</span>
           </div>
-
-          <div className="character-body">
-            {getFashion(game.outfit.shirt)?.icon || "👕"}
-          </div>
-
-          <div className="character-legs">
-            {getFashion(game.outfit.pants)?.icon || "👖"}
-          </div>
-
-          <div className="character-shoes">
-            {getFashion(game.outfit.shoes)?.icon || "👟"}
-          </div>
-
-          <div className="character-accessories">
-            {getFashion(game.outfit.accessory)?.icon || ""}
+          {game.outfit.bag && (
+            <span className="worn-bag">{getFashion(game.outfit.bag)?.icon || "🎒"}</span>
+          )}
+          {game.outfit.accessory && (
+            <span className="worn-accessory">{getFashion(game.outfit.accessory)?.icon || ""}</span>
+          )}
+          <div className="female-outfit-caption">
+            {getFashion(game.outfit.hair)?.name || "Tóc tự nhiên"}
           </div>
         </div>
 
@@ -2795,11 +2812,11 @@ export default function App(){
     >
       <div className="profile-layout">
         <div className="profile-character">
-          <div className="big-character">
-            <div>{getFashion(game.outfit.hair)?.icon}</div>
-            <div>{getFashion(game.outfit.shirt)?.icon}</div>
-            <div>{getFashion(game.outfit.pants)?.icon}</div>
-            <div>{getFashion(game.outfit.shoes)?.icon}</div>
+          <div className="big-character female-profile-character">
+            <div className="female-avatar">👩🏻‍🎓</div>
+            <div>{getFashion(game.outfit.shirt)?.icon || "👕"}</div>
+            <div>{getFashion(game.outfit.pants)?.icon || "👖"}</div>
+            <div>{getFashion(game.outfit.shoes)?.icon || "👟"}</div>
           </div>
 
           <h2>
@@ -2903,9 +2920,10 @@ export default function App(){
                 00:{String(secondsLeft).padStart(2,"0")}
               </b>
               <small>
-                {game.mainActivityUsed
-                  ? `🔒 Đã dùng: ${game.mainActivityLabel || "hoạt động chính"}`
-                  : "🔓 Còn 1 hoạt động chính"}
+                {`🔓 ${Math.max(0, 2 - (game.mainActivityCount || 0))}/2 hoạt động chính còn lại`}
+                {game.mainActivityLabels?.length
+                  ? ` • ${game.mainActivityLabels.join(" • ")}`
+                  : ""}
               </small>
             </div>
           </div>
@@ -3245,7 +3263,7 @@ export default function App(){
 
               const blocked =
                 Boolean(a.disabled) ||
-                (isMain && game.mainActivityUsed);
+                (isMain && (game.mainActivityCount || 0) >= 2);
 
               return (
                 <button
@@ -3257,8 +3275,8 @@ export default function App(){
                   <span className="activity-icon">{a.icon}</span>
                   <b>{a.title}</b>
                   <small>
-                    {isMain && game.mainActivityUsed
-                      ? `🔒 Đã dùng mốc ${currentTime}`
+                    {isMain && (game.mainActivityCount || 0) >= 2
+                      ? `🔒 Đã đủ 2 việc chính ở mốc ${currentTime}`
                       : a.desc}
                   </small>
                 </button>
@@ -4199,6 +4217,47 @@ button:disabled{
   font-size:30px;
 }
 
+.female-character{
+  overflow:hidden;
+  justify-content:flex-start;
+  padding-top:12px;
+  gap:0;
+}
+
+.female-avatar{
+  position:relative;
+  z-index:3;
+  font-size:58px;
+  line-height:64px;
+  filter:drop-shadow(0 3px 2px rgba(80,40,110,.12));
+}
+
+.worn-clothes{
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  margin-top:-3px;
+}
+
+.worn-shirt{font-size:42px; transform:scale(1.05);}
+.worn-bottom{font-size:39px; margin-left:-7px;}
+.worn-shoes{font-size:32px; margin-left:-4px;}
+.worn-bag{position:absolute; right:12px; top:92px; font-size:28px; z-index:4;}
+.worn-accessory{position:absolute; left:12px; top:42px; font-size:26px; z-index:5;}
+
+.female-outfit-caption{
+  margin-top:2px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#f1e7ff;
+  color:#72509a;
+  font-size:8px;
+  font-weight:700;
+}
+
 .outfit-list{
   display:flex;
   flex-direction:column;
@@ -4725,6 +4784,13 @@ button:disabled{
 .big-character div{
   height:43px;
 }
+
+.female-profile-character .female-avatar{
+  height:auto;
+  font-size:68px;
+  line-height:70px;
+}
+
 
 .profile-character h2{
   font-size:13px;
