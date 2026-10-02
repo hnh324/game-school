@@ -22,7 +22,7 @@ import { createClient } from "@supabase/supabase-js";
    - Supabase Auth (anonymous) + Postgres + Realtime Presence
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v22";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v24";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -1757,7 +1757,7 @@ function Button({children,onClick,disabled=false,className=""}){
    APP
 ========================================================= */
 
-export default function App(){
+function App(){
 
   const [game,setGame] = useState(()=>{
     try{
@@ -3487,8 +3487,8 @@ export default function App(){
             examDismissedRef.current = currentExam
               ? `${currentExam.day}-${currentExam.timeIndex}`
               : null;
-            setAutoTime(true);
           }
+          setAutoTime(true);
           setQuiz(null);
           setQuizFeedback(null);
           setOverlay(null);
@@ -4598,6 +4598,73 @@ export default function App(){
 
     </div>
   );
+}
+
+/* =========================================================
+   ERROR BOUNDARY
+   Nếu có lỗi runtime, hiển thị màn hình lỗi thay vì trắng toàn bộ.
+========================================================= */
+class GameErrorBoundary extends React.Component {
+  constructor(props){
+    super(props);
+    this.state = { error:null };
+  }
+
+  static getDerivedStateFromError(error){
+    return { error };
+  }
+
+  componentDidCatch(error,info){
+    console.error("Thanh Xuân Rực Rỡ runtime error:",error,info);
+  }
+
+  render(){
+    if(this.state.error){
+      return (
+        <div style={{
+          minHeight:"100vh",
+          display:"flex",
+          alignItems:"center",
+          justifyContent:"center",
+          padding:24,
+          background:"#f7f1ff",
+          color:"#34283e",
+          fontFamily:"system-ui, sans-serif"
+        }}>
+          <div style={{
+            maxWidth:720,
+            width:"100%",
+            background:"white",
+            borderRadius:18,
+            padding:24,
+            boxShadow:"0 12px 40px rgba(80,50,120,.14)"
+          }}>
+            <h2 style={{marginTop:0}}>⚠️ Game gặp lỗi runtime</h2>
+            <p>App không còn trắng toàn màn hình. Hãy kiểm tra Console để xem chi tiết.</p>
+            <pre style={{
+              whiteSpace:"pre-wrap",
+              background:"#f6f3fa",
+              padding:12,
+              borderRadius:10,
+              overflow:"auto"
+            }}>{String(this.state.error?.message || this.state.error)}</pre>
+            <button
+              onClick={()=>window.location.reload()}
+              style={{
+                border:0,
+                borderRadius:10,
+                padding:"10px 14px",
+                fontWeight:800,
+                cursor:"pointer"
+              }}
+            >↻ Tải lại game</button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 /* =========================================================
@@ -6690,3 +6757,11 @@ button:disabled{
   }
 }
 `;
+
+export default function AppWithErrorBoundary(){
+  return (
+    <GameErrorBoundary>
+      <App />
+    </GameErrorBoundary>
+  );
+}
