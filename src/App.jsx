@@ -19,7 +19,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v8";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v9";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -1482,8 +1482,15 @@ export default function App(){
       setGame(prev=>{
         const next = clone(prev);
         next.timeIndex += 1;
+
+        // Mốc mới = 2 lượt hoạt động chính mới.
+        // Phải reset cả count + labels, không chỉ cờ boolean,
+        // nếu không normalizeState() sẽ khóa hoạt động ở mốc tiếp theo.
+        next.mainActivityCount = 0;
         next.mainActivityUsed = false;
         next.mainActivityLabel = null;
+        next.mainActivityLabels = [];
+
         return normalizeState(next);
       });
       setSecondsLeft(SLOT_SECONDS);
