@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 /* =========================================================
    THANH XUÂN RỰC RỠ
@@ -4125,6 +4126,7 @@ export default function App(){
           </div>
         </Modal>
       )}
+      <Analytics />
 
     </div>
   );
