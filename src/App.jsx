@@ -4292,7 +4292,7 @@ button:disabled{
 
 .avatar-hair{
   position:absolute;
-  z-index:6;
+  z-index:4;
   left:38px;
   top:10px;
   width:52px;
