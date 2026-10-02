@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 /* =========================================================
    THANH XUÂN RỰC RỠ
@@ -9,7 +10,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Mỗi mốc tối đa 2 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
-   - 280 câu hỏi ôn tập (180 câu cũ + 50 Toán 10-11 + 50 Vật lý 10-11) + 200 câu hỏi thi học kỳ/THPT
+   - 380 câu hỏi ôn tập (180 câu cũ + 50 Toán 10-11 + 50 Vật lý 10-11 + 100 Modal Verbs) + 200 câu hỏi thi học kỳ/THPT
    - NPC
    - Nghề
    - Chứng chỉ
@@ -17,10 +18,32 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Nhật ký
    - Thi đua
    - Save code
+   - Tên nhân vật + bảng xếp hạng người chơi online real-time
+   - Supabase Auth (anonymous) + Postgres + Realtime Presence
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v18";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v22";
 const SLOT_SECONDS = 30;
+
+/* =========================================================
+   MULTIPLAYER ONLINE — SUPABASE
+   Set these in .env.local:
+   VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
+========================================================= */
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  "";
+
+const supabase =
+  SUPABASE_URL && SUPABASE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
+
+const ONLINE_CHANNEL = "thanh-xuan-ruc-ro:lobby";
+const ONLINE_TABLE = "player_scores";
 
 /* =========================================================
    THỜI GIAN
@@ -326,6 +349,109 @@ const toQuestions = (subject, key, rows) =>
     };
   });
 
+const MODAL_VERB_QUESTIONS = [
+  ["Modal Verbs • can","I ___ swim when I was five.",["can","could","may","must"],1,"Use 'could' to talk about a general ability in the past."],
+  ["Modal Verbs • can","___ you help me carry these books?",["Can","Must","Should","Might"],0,"'Can you...?' is a common way to make a request."],
+  ["Modal Verbs • can","You ___ use my laptop if you need it.",["can","must","should","would"],0,"'Can' can express permission."],
+  ["Modal Verbs • can","It ___ be very cold here in winter.",["can","must","has to","ought"],0,"'Can' can describe a general possibility."],
+  ["Modal Verbs • can't","You ___ park here; it is for buses only.",["can't","should","may","would"],0,"'Can't' expresses prohibition."],
+  ["Modal Verbs • could","When I was young, I ___ run 10 km without stopping.",["could","can","may","must"],0,"'Could' expresses past ability."],
+  ["Modal Verbs • could","___ I borrow your pen, please?",["Could","Must","Need","Shall"],0,"'Could I...?' is a polite request for permission."],
+  ["Modal Verbs • could","The problem ___ be solved with a simpler method.",["could","must","has to","ought"],0,"'Could' can express a possible solution."],
+  ["Modal Verbs • could","We ___ go to the museum this afternoon if it stops raining.",["could","must","need","shall"],0,"'Could' can express a possible plan."],
+  ["Modal Verbs • could have","She ___ have missed the train; she arrived very late.",["could","must","should","shall"],0,"'Could have' can express a past possibility."],
+  ["Modal Verbs • may","___ I come in, teacher?",["May","Must","Would","Ought"],0,"'May I...?' is a formal request for permission."],
+  ["Modal Verbs • may","Students ___ use calculators in this test.",["may","must","should","would"],0,"'May' can give permission."],
+  ["Modal Verbs • may","It ___ rain tonight, so take an umbrella.",["may","must","has to","ought"],0,"'May' expresses possibility."],
+  ["Modal Verbs • may","You ___ be right about the answer.",["may","must","need","shall"],0,"'May' can show that something is possible."],
+  ["Modal Verbs • might","We ___ be late because of the traffic.",["might","must","can","shall"],0,"'Might' expresses a weaker possibility."],
+  ["Modal Verbs • might","He ___ come to the party, but he is not sure.",["might","has to","must","should"],0,"'Might' expresses uncertainty."],
+  ["Modal Verbs • might","I thought you ___ know the answer.",["might","must","have to","shall"],0,"'Might' can express a tentative possibility."],
+  ["Modal Verbs • might have","They ___ have taken the wrong road.",["might","should","must","can"],0,"'Might have + past participle' expresses a past possibility."],
+  ["Modal Verbs • must","You ___ wear a seat belt in a car.",["must","might","could","would"],0,"'Must' expresses strong obligation."],
+  ["Modal Verbs • must","I ___ finish this report before 5 p.m.",["must","may","could","would"],0,"'Must' expresses a strong requirement."],
+  ["Modal Verbs • must","You ___ not touch that wire; it is dangerous.",["must","could","would","might"],0,"'Must not' expresses a strong prohibition."],
+  ["Modal Verbs • must","She ___ be exhausted after working all night.",["must","can","may","would"],0,"'Must' can express a strong deduction."],
+  ["Modal Verbs • must have","The lights are on, so they ___ be at home.",["must","could","might","should"],0,"'Must be' expresses a strong present deduction."],
+  ["Modal Verbs • must have","He left at 6 a.m., so he ___ have arrived by now.",["must","can","might","would"],0,"'Must have + past participle' expresses a strong deduction about the past."],
+  ["Modal Verbs • have to","I ___ go to school tomorrow because we have an exam.",["have to","might","could","would"],0,"'Have to' expresses external obligation."],
+  ["Modal Verbs • have to","She ___ wear a uniform at her school.",["has to","may","could","would"],0,"'Has to' expresses an obligation."],
+  ["Modal Verbs • have to","Do we ___ bring our own food?",["have to","must to","should to","can to"],0,"After 'do', use 'have to' to express obligation."],
+  ["Modal Verbs • don't have to","You ___ bring a towel; the hotel provides one.",["don't have to","mustn't","couldn't","can't"],0,"'Don't have to' means it is not necessary."],
+  ["Modal Verbs • doesn't have to","Tom ___ work on Sundays.",["doesn't have to","mustn't","can't","shouldn't to"],0,"'Doesn't have to' means there is no obligation."],
+  ["Modal Verbs • had to","We ___ leave early because the last bus was at 9 p.m.",["had to","must","could","may"],0,"'Had to' is the past form of 'have to' for past obligation."],
+  ["Modal Verbs • had to","She ___ cancel the trip because she was ill.",["had to","might","would","can"],0,"'Had to' expresses a past necessity."],
+  ["Modal Verbs • should","You ___ drink more water every day.",["should","mustn't","can","would"],0,"'Should' is used to give advice."],
+  ["Modal Verbs • should","We ___ leave now if we want to catch the train.",["should","may","could","would"],0,"'Should' can give advice or a recommendation."],
+  ["Modal Verbs • should","You ___ apologize for being rude.",["should","might","can","shall"],0,"'Should' expresses what is advisable."],
+  ["Modal Verbs • should","The package ___ arrive tomorrow.",["should","mustn't","can't","wouldn't"],0,"'Should' can express an expectation."],
+  ["Modal Verbs • shouldn't","You ___ eat so much fast food.",["shouldn't","must","may","can"],0,"'Shouldn't' gives negative advice."],
+  ["Modal Verbs • shouldn't","We ___ ignore the teacher's instructions.",["shouldn't","could","might","will"],0,"'Shouldn't' means something is not advisable."],
+  ["Modal Verbs • should have","You ___ have told me earlier.",["should","can","must","may"],0,"In 'should have + past participle', 'should' expresses past advice or regret."],
+  ["Modal Verbs • should have","He ___ have studied more for the test.",["should","might","can","will"],0,"'Should have studied' expresses what was advisable in the past but did not happen."],
+  ["Modal Verbs • ought to","You ___ respect your parents.",["ought to","can","might","mustn't"],0,"'Ought to' is used for advice or moral duty."],
+  ["Modal Verbs • ought to","We ___ be more careful next time.",["ought to","would","may","can't"],0,"'Ought to' means something is advisable or expected."],
+  ["Modal Verbs • ought to","The students ___ arrive before 7:30.",["ought to","could","might","would"],0,"'Ought to' can express expectation."],
+  ["Modal Verbs • would","___ you like some tea?",["Would","Must","Need","Could to"],0,"'Would you like...?' is a polite offer."],
+  ["Modal Verbs • would","When we were children, we ___ play outside every evening.",["would","must","may","can"],0,"'Would' can describe repeated past habits."],
+  ["Modal Verbs • would","I ___ help you if I had more time.",["would","must","may","can"],0,"'Would' is used in the main clause of a second conditional."],
+  ["Modal Verbs • would","___ you mind closing the window?",["Would","Must","Shall","Need"],0,"'Would you mind...?' is a polite request."],
+  ["Modal Verbs • wouldn't","My old computer ___ start this morning.",["wouldn't","mustn't","shouldn't","can't"],0,"'Wouldn't' can describe refusal or failure to operate in the past."],
+  ["Modal Verbs • will","I ___ call you when I arrive.",["will","might","mustn't","could"],0,"'Will' expresses a future decision or promise."],
+  ["Modal Verbs • will","Don't worry. I ___ help you with the project.",["will","may","could","shouldn't"],0,"'Will' can express a willingness to help."],
+  ["Modal Verbs • will","If it rains, the match ___ be cancelled.",["will","could have","mustn't","would have"],0,"In the first conditional, use 'will' in the result clause."],
+  ["Modal Verbs • won't","The door ___ open. It must be locked.",["won't","shouldn't","may not","couldn't"],0,"'Won't' can describe something refusing or failing to operate."],
+  ["Modal Verbs • shall","___ we start the meeting now?",["Shall","Must","Could to","May not"],0,"'Shall we...?' is used to make a suggestion."],
+  ["Modal Verbs • shall","___ I carry that bag for you?",["Shall","Would","Must","Ought"],0,"'Shall I...?' can offer help or ask for instructions."],
+  ["Modal Verbs • need","You ___ bring a pen; there are plenty here.",["needn't","mustn't","can't","couldn't"],0,"'Needn't' means something is not necessary."],
+  ["Modal Verbs • needn't","You ___ worry about the results yet.",["needn't","must","should to","can to"],0,"'Needn't' expresses lack of necessity."],
+  ["Modal Verbs • needn't have","You ___ have bought more food; we already had enough.",["needn't","mustn't","can't","wouldn't"],0,"'Needn't have + past participle' means the action was unnecessary but happened."],
+  ["Modal Verbs • be able to","After months of practice, she ___ play the piano very well.",["is able to","must to","may to","should to"],0,"'Be able to' expresses ability."],
+  ["Modal Verbs • be able to","Will you ___ finish the work by Friday?",["be able to","must","can to","should"],0,"After 'will', use 'be able to' for future ability."],
+  ["Modal Verbs • be able to","He wasn't ___ attend the meeting yesterday.",["able to","can","could to","must to"],0,"After 'wasn't', use 'able to' to express inability."],
+  ["Modal Verbs • permission","Visitors ___ not enter this area without a badge.",["may","could","would","should"],0,"'May not' can express a formal prohibition."],
+  ["Modal Verbs • permission","You ___ leave early today if you finish your work.",["may","must","shouldn't","wouldn't"],0,"'May' can give permission."],
+  ["Modal Verbs • prohibition","Employees ___ use their phones during the safety briefing.",["mustn't","might","could","would"],0,"'Mustn't' expresses prohibition."],
+  ["Modal Verbs • prohibition","You ___ tell anyone this password.",["mustn't","may","should","can"],0,"'Mustn't' means you are not allowed to do it."],
+  ["Modal Verbs • possibility","It ___ snow in the mountains tonight.",["might","must","has to","shouldn't"],0,"'Might' expresses possibility."],
+  ["Modal Verbs • possibility","Anyone ___ make a mistake sometimes.",["can","must","shall","would"],0,"'Can' can describe a general possibility."],
+  ["Modal Verbs • deduction","The ground is wet. It ___ have rained.",["must","can","shouldn't","would"],0,"'Must have + past participle' expresses a strong deduction about the past."],
+  ["Modal Verbs • deduction","She isn't answering her phone. She ___ be asleep.",["might","mustn't","can't to","would"],0,"'Might be' expresses a possible explanation."],
+  ["Modal Verbs • deduction","That ___ be John's car; he sold his car last week.",["can't","should","may","would"],0,"'Can't be' expresses a strong belief that something is impossible."],
+  ["Modal Verbs • can't have","They arrived at 10:00. They ___ have seen the announcement at 9:30.",["couldn't","must","should","may"],0,"'Couldn't have + past participle' expresses an impossible past situation."],
+  ["Modal Verbs • advice","If you have a headache, you ___ rest.",["should","mustn't","couldn't","would"],0,"'Should' is commonly used for advice."],
+  ["Modal Verbs • advice","You ___ see a doctor if the pain continues.",["should","may","can","would"],0,"'Should' gives advice."],
+  ["Modal Verbs • advice","We ___ leave a little earlier to avoid traffic.",["should","might","mustn't","can't"],0,"'Should' suggests a sensible action."],
+  ["Modal Verbs • obligation","All passengers ___ show their tickets before boarding.",["must","could","might","would"],0,"'Must' expresses a strong rule or obligation."],
+  ["Modal Verbs • obligation","You ___ submit the form by Friday.",["have to","may","could","would"],0,"'Have to' expresses an obligation."],
+  ["Modal Verbs • obligation","We ___ wear helmets on this construction site.",["have to","might","can","would"],0,"'Have to' expresses an external safety requirement."],
+  ["Modal Verbs • no necessity","You ___ pay now; payment can be made next week.",["don't have to","mustn't","can't","shouldn't"],0,"'Don't have to' means payment is not necessary now."],
+  ["Modal Verbs • no necessity","She ___ come with us if she is busy.",["doesn't have to","mustn't","can't","shouldn't to"],0,"'Doesn't have to' expresses lack of obligation."],
+  ["Modal Verbs • past ability","Before the accident, he ___ drive for eight hours without a break.",["could","can","may","must"],0,"'Could' expresses ability in the past."],
+  ["Modal Verbs • past permission","When I was a child, I ___ stay up late on Saturdays.",["could","must","should","may"],0,"'Could' can describe past permission in context."],
+  ["Modal Verbs • polite request","___ you please send me the file again?",["Could","Must","Shall","Need"],0,"'Could you...?' is a polite request."],
+  ["Modal Verbs • polite request","___ you mind opening the door?",["Would","Must","May","Shall"],0,"'Would you mind...?' is a polite request."],
+  ["Modal Verbs • offer","___ I get you a glass of water?",["Shall","Must","Should to","Might not"],0,"'Shall I...?' can be used to offer help."],
+  ["Modal Verbs • suggestion","___ we order pizza tonight?",["Shall","Must","Need","Could to"],0,"'Shall we...?' is a common suggestion."],
+  ["Modal Verbs • conditional","If I were you, I ___ study a little every day.",["would","must","can","may"],0,"'Would' is used in the second conditional."],
+  ["Modal Verbs • conditional","If she had more time, she ___ learn another language.",["would","must","can","shall"],0,"'Would' is the usual result-clause modal in a second conditional."],
+  ["Modal Verbs • conditional","If you ask him, he ___ help you.",["may","mustn't","would have","shouldn't"],0,"'May' expresses a possible result."],
+  ["Modal Verbs • conditional","If we leave now, we ___ catch the 7:00 train.",["can","mustn't","would have","might not to"],0,"'Can' can express possibility or opportunity in a conditional sentence."],
+  ["Modal Verbs • past regret","I ___ have listened to your advice.",["should","must","can","may"],0,"'Should have + past participle' can express regret."],
+  ["Modal Verbs • past possibility","He ___ have left before we arrived.",["may","mustn't","should to","can"],0,"'May have + past participle' expresses a past possibility."],
+  ["Modal Verbs • past possibility","She ___ have forgotten the meeting.",["might","mustn't","can to","shall"],0,"'Might have + past participle' expresses a past possibility."],
+  ["Modal Verbs • past deduction","The exam was easy, so they ___ have finished early.",["must","can't","shouldn't","wouldn't"],0,"'Must have finished' is a strong deduction about the past."],
+  ["Modal Verbs • past impossibility","He was in London that day, so he ___ have attended the meeting in Hanoi.",["couldn't","must","should","may"],0,"'Couldn't have + past participle' expresses an impossible past event."],
+  ["Modal Verbs • grammar","Which sentence is correct?",["She can sings.","She can sing.","She cans sing.","She can to sing."],1,"A modal verb is followed by the base form of the verb: 'can sing'."],
+  ["Modal Verbs • grammar","Which sentence is correct?",["He must to leave now.","He must leaves now.","He must leave now.","He must leaving now."],2,"After 'must', use the base form: 'must leave'."],
+  ["Modal Verbs • grammar","Which sentence is correct?",["You should to study.","You should studying.","You should studied.","You should study."],3,"After 'should', use the base form: 'should study'."],
+  ["Modal Verbs • grammar","Which sentence is correct?",["They might come later.","They might comes later.","They might to come later.","They might coming later."],0,"After 'might', use the base form: 'might come'."],
+  ["Modal Verbs • grammar","Choose the correct negative form: 'He ___ drive because he is too young.'",["mustn't","mustn't to","doesn't must","must not to"],0,"The correct negative modal form is 'mustn't'."],
+  ["Modal Verbs • grammar","Choose the correct question: '___ I open the window?'",["May","May to","Am may","Do may"],0,"Use 'May I + base verb?' to ask for permission."],
+  ["Modal Verbs • grammar","Choose the correct sentence.",["Does she can swim?","Can she swim?","Can she swims?","Can does she swim?"],1,"Questions with 'can' use inversion: 'Can she swim?'"],
+  ["Modal Verbs • grammar","Choose the correct sentence.",["Do you should go now?","Should you to go now?","Should you go now?","Should do you go now?"],2,"With 'should', form the question as 'Should + subject + base verb?'"]
+];
+
 const QUIZ_BANK = [
   ...toQuestions("Ngữ văn", "van", VAN_QUESTIONS),
   ...toQuestions("Vật lý", "ly", LY_QUESTIONS),
@@ -338,12 +464,13 @@ const QUIZ_BANK = [
   ...toQuestions("Tiếng Anh", "anh", ANH_QUESTIONS),
   ...toQuestions("GDCD", "gdcd", GDCD_QUESTIONS),
   ...toQuestions("Đố mẹo", "meo", MEO_QUESTIONS),
+  ...toQuestions("Modal Verbs", "modalverb", MODAL_VERB_QUESTIONS),
 ];
 
 /* =========================================================
    CÁC KỲ THI TRONG NĂM HỌC
    5 kỳ thi × 8 môn × 5 câu = 200 câu riêng biệt.
-   Bộ đề thi độc lập với 180 câu ôn tập phía trên.
+   Bộ đề thi độc lập với kho 380 câu ôn tập phía trên.
 ========================================================= */
 const EXAM_SUBJECTS = ["Ngữ văn", "Vật lý", "Hóa học", "Sinh học", "Lịch sử", "Địa lý", "Tiếng Anh", "GDCD"];
 
@@ -1051,6 +1178,26 @@ function pickDailyEvent(lastId){
 }
 
 /* =========================================================
+   NGƯỜI CHƠI KHÁC — FALLBACK DEMO
+   Dùng khi Supabase chưa được cấu hình.
+   Khi online hoạt động, leaderboard lấy dữ liệu thật từ server.
+========================================================= */
+
+const OTHER_PLAYER_SEEDS = [
+  {id:"p1", name:"Mai Anh", icon:"👩🏻‍🎓", points:44},
+  {id:"p2", name:"Gia Hân", icon:"👩🏼‍🎓", points:39},
+  {id:"p3", name:"Khánh Linh", icon:"👩🏻‍💻", points:35},
+  {id:"p4", name:"Hoàng Nam", icon:"👨🏻‍🎓", points:32},
+  {id:"p5", name:"Minh Khang", icon:"👨🏼‍🎓", points:28},
+  {id:"p6", name:"Thảo Vy", icon:"👩🏽‍🎓", points:25},
+  {id:"p7", name:"Đức Anh", icon:"👨🏻‍💻", points:22},
+  {id:"p8", name:"Ngọc Hà", icon:"👩🏻‍🎨", points:19}
+];
+
+const createOtherPlayers = () =>
+  OTHER_PLAYER_SEEDS.map(p=>({...p, today:0}));
+
+/* =========================================================
    NGHỀ
 ========================================================= */
 
@@ -1370,6 +1517,7 @@ function createInitialState(){
     totalDays:45,
     timeIndex:0,
     location:"class",
+    playerName:"",
 
     stats:{
       hp:85,
@@ -1427,6 +1575,8 @@ function createInitialState(){
     },
 
     dailyCompetition:emptyDailyCompetition(),
+
+    otherPlayers:createOtherPlayers(),
 
     examResults:{},
 
@@ -1496,11 +1646,23 @@ function normalizeState(raw){
       ...base.relationships,
       ...(raw?.relationships || {})
     },
+    otherPlayers:Array.isArray(raw?.otherPlayers)
+      ? raw.otherPlayers.map((p,i)=>({
+          ...(base.otherPlayers[i] || OTHER_PLAYER_SEEDS[i]),
+          ...p,
+          id:p.id || base.otherPlayers[i]?.id || `p${i+1}`,
+          name:String(p.name || base.otherPlayers[i]?.name || `Người chơi ${i+1}`).slice(0,20),
+          points:Math.max(0,Math.round(Number(p.points)||0)),
+          today:Math.max(0,Math.round(Number(p.today)||0))
+        }))
+      : createOtherPlayers(),
     outfit:{
       ...base.outfit,
       ...(raw?.outfit || {})
     }
   };
+
+  g.playerName = String(g.playerName || "").trim().slice(0,20);
 
   g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
   g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
@@ -1616,8 +1778,16 @@ export default function App(){
 
   const [saveCode,setSaveCode] = useState("");
   const [fashionCategory,setFashionCategory] = useState("Áo");
+  const [playerNameDraft,setPlayerNameDraft] = useState("");
 
   const [audioOn,setAudioOn] = useState(false);
+
+  const [onlineUser,setOnlineUser] = useState(null);
+  const [onlinePlayers,setOnlinePlayers] = useState([]);
+  const [onlineReady,setOnlineReady] = useState(false);
+  const [onlineError,setOnlineError] = useState("");
+  const [onlineCount,setOnlineCount] = useState(0);
+  const onlineChannelRef = useRef(null);
 
   const advancingRef = useRef(false);
   const examAutoOpenedRef = useRef(null);
@@ -1640,24 +1810,45 @@ export default function App(){
 
   const leaderboard = useMemo(()=>{
     const rows = [
-      {
-        id:"player",
-        name:"Bạn",
-        icon:currentTitle.icon,
-        points:game.competitionPoints,
-        today:game.dailyCompetition.player
-      },
       ...NPCS.map(n=>({
         id:n.id,
         name:n.name,
         icon:n.icon,
         points:game.npcCompetition[n.id] || 0,
-        today:game.dailyCompetition[n.id] || 0
-      }))
+        today:game.dailyCompetition[n.id] || 0,
+        type:"NPC"
+      })),
+      ...(onlinePlayers.length
+        ? onlinePlayers
+            .filter(p=>p.id !== onlineUser?.id)
+            .map(p=>({
+              id:`online-${p.id}`,
+              name:p.player_name || "Người chơi",
+              icon:p.icon || "👩🏻‍🎓",
+              points:Number(p.points)||0,
+              today:Number(p.today)||0,
+              type:"Online"
+            }))
+        : game.otherPlayers.map(p=>({
+            id:`other-${p.id}`,
+            name:p.name,
+            icon:p.icon,
+            points:p.points,
+            today:p.today,
+            type:"Người chơi (demo)"
+          }))),
+      {
+        id:"player",
+        name:game.playerName || "Bạn",
+        icon:currentTitle.icon,
+        points:game.competitionPoints,
+        today:game.dailyCompetition.player,
+        type:onlineReady ? "Bạn • Online" : "Bạn"
+      }
     ];
 
     return rows.sort((a,b)=>b.points-a.points);
-  },[game,currentTitle]);
+  },[game,currentTitle,onlinePlayers,onlineReady,onlineUser]);
 
   const ownedFashion = useMemo(
     ()=>FASHION.filter(item=>game.wardrobe.includes(item.id)),
@@ -1668,6 +1859,177 @@ export default function App(){
     ()=>FASHION.filter(item=>item.category===fashionCategory),
     [fashionCategory]
   );
+
+  /* -----------------------------------------
+     MULTIPLAYER ONLINE
+  ----------------------------------------- */
+
+  const refreshOnlinePlayers = useCallback(async()=>{
+    if(!supabase) return;
+
+    const { data, error } = await supabase
+      .from(ONLINE_TABLE)
+      .select("id,player_name,icon,points,today,day,time_index,updated_at")
+      .order("points", { ascending:false })
+      .order("updated_at", { ascending:false })
+      .limit(100);
+
+    if(error){
+      setOnlineError(error.message || "Không tải được bảng online.");
+      return;
+    }
+
+    setOnlinePlayers(data || []);
+    setOnlineError("");
+  },[]);
+
+  useEffect(()=>{
+    if(!supabase){
+      setOnlineReady(false);
+      setOnlineError("Chưa cấu hình Supabase — đang dùng bảng demo cục bộ.");
+      return;
+    }
+
+    let cancelled = false;
+    let channel = null;
+
+    const initOnline = async()=>{
+      try{
+        let { data:{ session } } = await supabase.auth.getSession();
+        let user = session?.user || null;
+
+        if(!user){
+          const { data, error } = await supabase.auth.signInAnonymously({
+            options:{
+              data:{ app:"thanh-xuan-ruc-ro" }
+            }
+          });
+
+          if(error) throw error;
+          user = data?.user || null;
+        }
+
+        if(!user) throw new Error("Không tạo được phiên người chơi.");
+        if(cancelled) return;
+
+        setOnlineUser(user);
+        setOnlineReady(true);
+        await refreshOnlinePlayers();
+
+        channel = supabase
+          .channel(ONLINE_CHANNEL, {
+            config:{
+              presence:{ key:user.id }
+            }
+          })
+          .on("postgres_changes",
+            {
+              event:"*",
+              schema:"public",
+              table:ONLINE_TABLE
+            },
+            ()=>{
+              refreshOnlinePlayers();
+            }
+          )
+          .on("presence", {event:"sync"}, ()=>{
+            const state = channel.presenceState();
+            setOnlineCount(Object.keys(state || {}).length);
+          })
+          .subscribe(async status=>{
+            if(status==="SUBSCRIBED"){
+              try{
+                await channel.track({
+                  user_id:user.id,
+                  player_name:game.playerName || "Người chơi",
+                  at:new Date().toISOString()
+                });
+              }catch{}
+            }
+          });
+
+        onlineChannelRef.current = channel;
+      }catch(error){
+        if(cancelled) return;
+        setOnlineReady(false);
+        setOnlineError(
+          error?.message ||
+          "Không kết nối được máy chủ online."
+        );
+      }
+    };
+
+    initOnline();
+
+    const authSubscription = supabase.auth.onAuthStateChange(
+      (_event, session)=>{
+        const user = session?.user || null;
+        if(user) setOnlineUser(user);
+      }
+    );
+
+    return ()=>{
+      cancelled = true;
+      authSubscription.data.subscription.unsubscribe();
+
+      if(channel){
+        channel.untrack().catch(()=>{});
+        supabase.removeChannel(channel);
+      }
+
+      onlineChannelRef.current = null;
+      setOnlineCount(0);
+    };
+  // Online init intentionally runs once. Presence payload is updated separately.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  useEffect(()=>{
+    if(!supabase || !onlineUser || !onlineReady || !game.playerName) return;
+
+    const pushScore = async()=>{
+      const { error } = await supabase
+        .from(ONLINE_TABLE)
+        .upsert({
+          id:onlineUser.id,
+          player_name:game.playerName.slice(0,20),
+          icon:currentTitle.icon,
+          points:Math.max(0,Math.round(game.competitionPoints)),
+          today:Math.max(0,Math.round(game.dailyCompetition.player)),
+          day:Math.max(1,Math.round(game.day)),
+          time_index:Math.max(0,Math.round(game.timeIndex)),
+          updated_at:new Date().toISOString()
+        },{onConflict:"id"});
+
+      if(error){
+        setOnlineError(error.message || "Không đồng bộ được điểm.");
+      }else{
+        setOnlineError("");
+      }
+    };
+
+    pushScore();
+  },[
+    game.playerName,
+    game.competitionPoints,
+    game.dailyCompetition.player,
+    game.day,
+    game.timeIndex,
+    currentTitle.icon,
+    onlineReady,
+    onlineUser
+  ]);
+
+  useEffect(()=>{
+    const channel = onlineChannelRef.current;
+    if(!channel || !onlineUser || !game.playerName) return;
+
+    channel.track({
+      user_id:onlineUser.id,
+      player_name:game.playerName.slice(0,20),
+      at:new Date().toISOString()
+    }).catch(()=>{});
+  },[game.playerName,onlineUser]);
 
   /* -----------------------------------------
      SAVE
@@ -1730,6 +2092,29 @@ export default function App(){
     });
   },[]);
 
+  const confirmPlayerName = useCallback(()=>{
+    const name = playerNameDraft.trim().replace(/\s+/g," ");
+
+    if(!name){
+      setToast("✏️ Hãy nhập tên nhân vật.");
+      return;
+    }
+
+    updateGame(g=>{
+      g.playerName = name.slice(0,20);
+    });
+
+    setOverlay(null);
+    setToast(`✨ Chào mừng ${name}!`);
+  },[playerNameDraft,updateGame]);
+
+  useEffect(()=>{
+    if(!game.playerName && !game.isGameOver && overlay===null){
+      setPlayerNameDraft("");
+      setOverlay("nameSetup");
+    }
+  },[game.playerName,game.isGameOver,overlay]);
+
   const canDoMainActivity = useCallback(()=>{
     if(game.isGameOver) return false;
     if((game.mainActivityCount || 0) >= 2){
@@ -1765,6 +2150,12 @@ export default function App(){
             (next.npcCompetition[npc.id] || 0) + gain;
           next.dailyCompetition[npc.id] =
             (next.dailyCompetition[npc.id] || 0) + gain;
+        });
+
+        next.otherPlayers.forEach(player=>{
+          const gain = Math.floor(Math.random() * 5);
+          player.points += gain;
+          player.today += gain;
         });
       }
       const before = next.dayStart || snapshotDay(next);
@@ -1825,6 +2216,10 @@ export default function App(){
       next.mainActivityLabels = [];
 
       next.dailyCompetition = emptyDailyCompetition();
+      next.otherPlayers = next.otherPlayers.map(player=>({
+        ...player,
+        today:0
+      }));
 
       const ev = pickDailyEvent(next.lastEventId);
 
@@ -1866,6 +2261,12 @@ export default function App(){
             (next.dailyCompetition[npc.id] || 0) + gain;
         });
 
+        next.otherPlayers.forEach(player=>{
+          const gain = Math.floor(Math.random() * 5);
+          player.points += gain;
+          player.today += gain;
+        });
+
         next.timeIndex += 1;
 
         // Mốc mới = 2 lượt hoạt động chính mới.
@@ -1892,7 +2293,7 @@ export default function App(){
   useEffect(()=>{
     // Quiz 5 câu và kiểm tra miệng là các hoạt động cần tập trung:
     // thời gian của mốc sẽ tạm dừng trong suốt lúc làm bài.
-    const quizTimePaused = overlay === "quiz" || overlay === "oral";
+    const quizTimePaused = overlay === "quiz" || overlay === "oral" || overlay === "nameSetup";
 
     if(
       !autoTime ||
@@ -1905,7 +2306,7 @@ export default function App(){
     const timer = setInterval(()=>{
       setSecondsLeft(prev=>{
         // Bảo vệ thêm cho tick đã xếp hàng ngay lúc modal vừa mở.
-        if(overlay === "quiz" || overlay === "oral") return prev;
+        if(overlay === "quiz" || overlay === "oral" || overlay === "nameSetup") return prev;
 
         if(prev > 1){
           return prev - 1;
@@ -2478,6 +2879,7 @@ export default function App(){
     setQuiz(null);
     setQuizFeedback(null);
     setSaveCode("");
+    setPlayerNameDraft("");
     examAutoOpenedRef.current = null;
     examDismissedRef.current = null;
 
@@ -2492,7 +2894,7 @@ export default function App(){
     {
       icon:"📚",
       title:"Quiz 5 câu",
-      desc:"Ôn tập 280 câu",
+      desc:"Ôn tập 380 câu",
       action:()=>startQuiz("quick")
     },
     {
@@ -3256,6 +3658,17 @@ export default function App(){
       title="🏆 Bảng thi đua"
       onClose={()=>setOverlay(null)}
     >
+      <div className="online-status">
+        <span>🟢 {onlineCount || (onlineReady ? 1 : 0)} người đang online</span>
+        <small>
+          {onlineReady ? "Bảng điểm đồng bộ trực tiếp" : "Chế độ demo cục bộ"}
+        </small>
+      </div>
+
+      {onlineError && (
+        <div className="online-warning">⚠️ {onlineError}</div>
+      )}
+
       <div className="leaderboard">
         {leaderboard.map((row,index)=>(
           <div
@@ -3269,7 +3682,8 @@ export default function App(){
             </div>
 
             <div className="rank-name">
-              {row.icon} {row.name}
+              <span>{row.icon} {row.name}</span>
+              <small>{row.type}</small>
             </div>
 
             <div className="rank-points">
@@ -3359,7 +3773,7 @@ export default function App(){
             </p>
             <p>
               Mỗi kỳ có <b>5 câu cho 8 môn học = 40 câu</b>. Mỗi kỳ dùng một bộ đề riêng,
-              không lấy lại câu trong 180 câu ôn tập. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
+              không lấy lại câu trong kho 380 câu ôn tập. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
             </p>
           </div>
 
@@ -3392,7 +3806,7 @@ export default function App(){
           <div className="guide-card">
             <h3>🏆 5. Thi đua</h3>
             <p>
-              Điểm thi đua của bạn dùng để so với các NPC trên bảng xếp hạng.
+              Điểm thi đua của bạn dùng để so với NPC và các người chơi mô phỏng trên bảng xếp hạng.
             </p>
             <p>
               Mỗi khi đồng hồ sang mốc mới, mỗi NPC nhận ngẫu nhiên
@@ -3501,6 +3915,34 @@ export default function App(){
           <h2>
             {currentTitle.icon} {currentTitle.name}
           </h2>
+
+          <div className="player-name-card">
+            <label htmlFor="player-name-input">✏️ Tên nhân vật</label>
+            <div className="player-name-row">
+              <input
+                id="player-name-input"
+                value={playerNameDraft || game.playerName}
+                placeholder="Nhập tên nhân vật"
+                maxLength={20}
+                onChange={e=>setPlayerNameDraft(e.target.value)}
+              />
+              <Button
+                onClick={()=>{
+                  const nextName = (playerNameDraft || game.playerName).trim().replace(/\s+/g," ");
+                  if(!nextName){
+                    setToast("✏️ Hãy nhập tên nhân vật.");
+                    return;
+                  }
+                  updateGame(g=>{g.playerName=nextName.slice(0,20);});
+                  setPlayerNameDraft(nextName.slice(0,20));
+                  setToast("✅ Đã đổi tên nhân vật.");
+                }}
+              >
+                Lưu tên
+              </Button>
+            </div>
+            <small>Tên này sẽ xuất hiện trên bảng xếp hạng.</small>
+          </div>
         </div>
 
         <div className="profile-stats">
@@ -3936,6 +4378,34 @@ export default function App(){
         <div className="toast">
           {toast}
         </div>
+      )}
+
+      {overlay==="nameSetup" && (
+        <Modal
+          title="🌸 Đặt tên nhân vật"
+          onClose={null}
+          wide
+        >
+          <div className="name-setup">
+            <div className="name-setup-icon">👩🏻‍🎓</div>
+            <h2>Nhân vật của bạn tên gì?</h2>
+            <p>Tên này sẽ được dùng trên hồ sơ và bảng xếp hạng.</p>
+
+            <input
+              autoFocus
+              className="name-setup-input"
+              value={playerNameDraft}
+              maxLength={20}
+              placeholder="Ví dụ: Minh Anh"
+              onChange={e=>setPlayerNameDraft(e.target.value)}
+              onKeyDown={e=>{
+                if(e.key==="Enter") confirmPlayerName();
+              }}
+            />
+
+            <Button onClick={confirmPlayerName}>✨ Bắt đầu hành trình</Button>
+          </div>
+        </Modal>
       )}
 
       {/* =====================================================
@@ -5576,6 +6046,37 @@ button:disabled{
   font-size:9px;
 }
 
+/* ONLINE */
+
+.online-status{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  margin-bottom:7px;
+  border-radius:10px;
+  background:#f2fbf4;
+  color:#2d7745;
+  font-size:9px;
+  font-weight:800;
+}
+
+.online-status small{
+  color:#7b8a80;
+  font-size:8px;
+  font-weight:600;
+}
+
+.online-warning{
+  padding:8px 10px;
+  margin-bottom:7px;
+  border-radius:9px;
+  background:#fff6df;
+  color:#86651a;
+  font-size:8px;
+}
+
 /* LEADERBOARD */
 
 .leaderboard{
@@ -5808,6 +6309,93 @@ button:disabled{
   display:grid;
   grid-template-columns:220px 1fr;
   gap:15px;
+}
+
+.player-name-card{
+  width:100%;
+  max-width:420px;
+  margin:14px auto 0;
+  padding:14px;
+  border:1px solid rgba(126,93,190,.16);
+  border-radius:18px;
+  background:rgba(255,255,255,.72);
+}
+
+.player-name-card label{
+  display:block;
+  font-weight:800;
+  margin-bottom:8px;
+}
+
+.player-name-row{
+  display:flex;
+  gap:8px;
+}
+
+.player-name-row input{
+  flex:1;
+  min-width:0;
+  border:1px solid #d9d2ea;
+  border-radius:12px;
+  padding:10px 12px;
+  background:#fff;
+  outline:none;
+}
+
+.player-name-card small{
+  display:block;
+  margin-top:7px;
+  color:#777;
+}
+
+.name-setup{
+  max-width:520px;
+  margin:0 auto;
+  padding:18px 10px 8px;
+  text-align:center;
+}
+
+.name-setup-icon{
+  font-size:72px;
+  margin-bottom:8px;
+}
+
+.name-setup h2{
+  margin:8px 0 6px;
+}
+
+.name-setup p{
+  margin:0 0 18px;
+  color:#666;
+}
+
+.name-setup-input{
+  width:100%;
+  max-width:420px;
+  border:2px solid #d9d2ea;
+  border-radius:16px;
+  padding:13px 16px;
+  font-size:17px;
+  text-align:center;
+  outline:none;
+  margin-bottom:12px;
+}
+
+.name-setup-input:focus,
+.player-name-row input:focus{
+  border-color:#a98be8;
+}
+
+.rank-name{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+}
+
+.rank-name small{
+  color:#888;
+  font-size:11px;
 }
 
 .profile-character{
