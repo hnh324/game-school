@@ -19,7 +19,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Save code
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v9";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v13";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -1254,8 +1254,6 @@ export default function App(){
 
   const advancingRef = useRef(false);
 
-  const blockingOverlay = Boolean(overlay);
-
   const currentTime = TIME_SLOTS[game.timeIndex];
   const nextTime =
     TIME_SLOTS[Math.min(game.timeIndex + 1,TIME_SLOTS.length - 1)];
@@ -1472,7 +1470,7 @@ export default function App(){
   ----------------------------------------- */
 
   const advanceTime = useCallback(()=>{
-    if(advancingRef.current || game.isGameOver || blockingOverlay) return;
+    if(advancingRef.current || game.isGameOver) return;
 
     advancingRef.current = true;
 
@@ -1498,7 +1496,7 @@ export default function App(){
     }
 
     setTimeout(()=>{ advancingRef.current = false; },50);
-  },[game.isGameOver,game.timeIndex,blockingOverlay,finishDay,beep]);
+  },[game.isGameOver,game.timeIndex,finishDay,beep]);
 
   /* -----------------------------------------
      TIMER
@@ -1507,7 +1505,6 @@ export default function App(){
   useEffect(()=>{
     if(
       !autoTime ||
-      blockingOverlay ||
       game.isGameOver
     ){
       return;
@@ -1527,7 +1524,6 @@ export default function App(){
     return ()=>clearInterval(timer);
   },[
     autoTime,
-    blockingOverlay,
     game.isGameOver,
     game.timeIndex,
     advanceTime
