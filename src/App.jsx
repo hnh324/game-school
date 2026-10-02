@@ -1,111 +1,108 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v3";
+/* =========================================================
+   THANH XUÂN RỰC RỠ
+   Deluxe Career & Assets Edition
+   SINGLE FILE REACT APP
+========================================================= */
 
-const TIMES = ["07:30", "09:15", "11:30", "14:00", "17:00", "20:30"];
+const SAVE_KEY = "thanh_xuan_ruc_ro_save_v3";
 
-const LOCATION_META = {
+const TIMES = [
+  { label: "07:30", name: "Buổi sáng" },
+  { label: "09:15", name: "Tiết 2" },
+  { label: "11:30", name: "Giờ trưa" },
+  { label: "14:00", name: "Buổi chiều" },
+  { label: "17:00", name: "Tan học" },
+  { label: "20:30", name: "Buổi tối" },
+];
+
+const LOCATIONS = {
   class: { name: "Lớp học", icon: "🏫" },
-  canteen: { name: "Căn tin", icon: "🍜" },
+  canteen: { name: "Căn-tin", icon: "🍜" },
   job: { name: "Việc làm", icon: "💼" },
-  cert: { name: "Phòng chứng chỉ", icon: "🎓" },
-  prop: { name: "Cửa hàng tài sản", icon: "🏠" },
-  home: { name: "Nhà", icon: "🏡" }
+  cert: { name: "Phòng thi", icon: "📜" },
+  prop: { name: "Tài sản", icon: "🏠" },
+  home: { name: "Nhà", icon: "🏡" },
 };
 
-const NPCS = {
-  lan: {
+const NPCS = [
+  {
     id: "lan",
     name: "Lan",
     avatar: "👧",
-    color: "#ff7aa2",
-    description: "Bạn thân, chăm chỉ và khá cạnh tranh.",
+    color: "#ff7eb6",
+    role: "Bạn thân",
   },
-  trieu_man: {
+  {
     id: "trieu_man",
     name: "Triệu Mẫn",
-    avatar: "👩",
-    color: "#9b7cff",
-    description: "Học sinh nổi bật, thông minh và tự tin.",
+    avatar: "🌸",
+    color: "#a78bfa",
+    role: "Crush",
   },
-  tuan: {
+  {
     id: "tuan",
     name: "Tuấn",
-    avatar: "👦",
-    color: "#4ca9ff",
-    description: "Bạn cùng lớp, năng động và thích thử thách.",
-  }
-};
+    avatar: "🧑‍🎓",
+    color: "#38bdf8",
+    role: "Bạn cùng lớp",
+  },
+];
 
 const JOBS = [
   {
     id: "canteen",
-    name: "Phụ căn tin",
+    name: "Phụ căn-tin",
     icon: "🍜",
-    income: 25000,
-    energy: -12,
-    mood: 3,
-    skill: 1,
-    description: "Phụ giúp căn tin sau giờ học."
+    pay: 25000,
+    desc: "Phụ bán đồ ăn sau giờ học.",
+    req: () => true,
   },
   {
     id: "flyer",
     name: "Phát tờ rơi",
     icon: "📄",
-    income: 30000,
-    energy: -18,
-    mood: -2,
-    skill: 2,
-    description: "Công việc đơn giản, nhận tiền nhanh."
+    pay: 30000,
+    desc: "Công việc đơn giản, mất ít thời gian.",
+    req: () => true,
   },
   {
     id: "excel",
-    name: "Nhập dữ liệu Excel",
+    name: "Nhập liệu Excel",
     icon: "💻",
-    income: 70000,
-    energy: -18,
-    mood: 1,
-    skill: 4,
-    requirement: 35,
-    requirementText: "Kỹ năng ≥ 35",
-    description: "Công việc văn phòng bán thời gian."
+    pay: 70000,
+    desc: "Cần kỹ năng máy tính.",
+    req: (s) => s.stats.skill >= 100,
   },
   {
     id: "driver",
-    name: "Lái xe VIP",
+    name: "Tài xế VIP",
     icon: "🚗",
-    income: 120000,
-    energy: -25,
-    mood: 3,
-    skill: 3,
-    requirementCert: "cert_driver",
-    requirementText: "Có bằng lái",
-    description: "Công việc có thu nhập cao nhưng yêu cầu chứng chỉ."
+    pay: 100000,
+    desc: "Cần bằng lái và xe riêng.",
+    req: (s) =>
+      s.certificates.includes("cert_driver") &&
+      s.assets.some((x) => x === "asset_car_sedan" || x === "asset_car_super"),
   },
   {
     id: "interpreter",
     name: "Trợ lý phiên dịch",
-    icon: "🌐",
-    income: 200000,
-    energy: -25,
-    mood: 4,
-    skill: 5,
-    requirementCert: "cert_toeic",
-    requirementText: "Có TOEIC",
-    description: "Hỗ trợ phiên dịch cho sự kiện."
+    icon: "🌎",
+    pay: 150000,
+    desc: "Cần TOEIC và kỹ năng tốt.",
+    req: (s) =>
+      s.certificates.includes("cert_toeic") && s.stats.skill >= 300,
   },
   {
     id: "broker",
-    name: "Cộng tác viên tài chính",
+    name: "Cộng tác viên chứng khoán",
     icon: "📈",
-    income: 300000,
-    energy: -28,
-    mood: 5,
-    skill: 7,
-    requirementCert: "cert_finance",
-    requirementText: "Có chứng chỉ tài chính",
-    description: "Công việc phân tích và hỗ trợ tài chính."
-  }
+    pay: 250000,
+    desc: "Cần chứng chỉ tài chính và kỹ năng.",
+    req: (s) =>
+      s.certificates.includes("cert_finance") && s.stats.skill >= 500,
+  },
 ];
 
 const PROPERTIES = [
@@ -113,158 +110,146 @@ const PROPERTIES = [
     id: "asset_bike",
     name: "Xe đạp",
     icon: "🚲",
-    price: 1000000,
-    effect: "Di chuyển nhanh hơn.",
-    reputation: 2
+    price: 500000,
+    desc: "+5 kỹ năng di chuyển",
+    effect: { skill: 5 },
   },
   {
     id: "asset_car_sedan",
     name: "Ô tô Sedan",
     icon: "🚘",
-    price: 1650000,
-    effect: "Tăng hình ảnh cá nhân.",
-    reputation: 6,
-    skill: 2
+    price: 350000000,
+    desc: "+10 uy tín",
+    effect: { reputation: 10 },
   },
   {
     id: "asset_car_super",
     name: "Siêu xe",
     icon: "🏎️",
-    price: 5500000,
-    effect: "Tài sản đáng mơ ước.",
-    reputation: 12,
-    mood: 8
+    price: 1200000000,
+    desc: "+20 uy tín, +10 tâm trạng",
+    effect: { reputation: 20, mood: 10 },
   },
   {
     id: "asset_condo",
     name: "Căn hộ",
     icon: "🏢",
-    price: 50000000,
-    effect: "Có nơi ở riêng.",
-    reputation: 15,
-    mood: 10
+    price: 2500000000,
+    desc: "+15 tâm trạng, +10 uy tín",
+    effect: { mood: 15, reputation: 10 },
   },
   {
     id: "asset_villa",
     name: "Biệt thự",
-    icon: "🏡",
-    price: 120000000,
-    effect: "Đẳng cấp tài sản cao nhất.",
-    reputation: 25,
-    mood: 15
-  }
+    icon: "🏰",
+    price: 8000000000,
+    desc: "+25 tâm trạng, +20 uy tín",
+    effect: { mood: 25, reputation: 20 },
+  },
 ];
 
 const CERTS = {
   cert_driver: {
     id: "cert_driver",
     name: "Bằng lái xe",
-    icon: "🚘",
-    fee: 100000,
-    skill: 140,
+    icon: "🚗",
+    fee: 500000,
+    skill: 100,
     questions: [
       {
-        q: "Khi gặp đèn đỏ, người điều khiển xe phải làm gì?",
-        options: ["Tăng tốc", "Dừng trước vạch", "Bấm còi", "Đi tiếp"],
-        answer: 1
+        q: "Đèn đỏ có được phép đi tiếp không?",
+        choices: ["Có", "Không", "Tùy đường", "Nếu vắng xe"],
+        answer: 1,
       },
       {
-        q: "Biển báo hình tròn viền đỏ thường biểu thị?",
-        options: ["Cấm", "Chỉ dẫn", "Nguy hiểm", "Thông tin"],
-        answer: 0
+        q: "Khi lái xe cần thắt dây an toàn?",
+        choices: ["Có", "Không", "Chỉ đường dài", "Chỉ ban đêm"],
+        answer: 0,
       },
       {
-        q: "Khi lái xe cần ưu tiên điều gì?",
-        options: ["Tốc độ", "An toàn", "Âm nhạc", "Hình thức"],
-        answer: 1
-      }
-    ]
+        q: "Biển báo hình tam giác thường có ý nghĩa gì?",
+        choices: ["Cấm", "Chỉ dẫn", "Cảnh báo", "Bắt buộc"],
+        answer: 2,
+      },
+    ],
   },
-
   cert_toeic: {
     id: "cert_toeic",
     name: "TOEIC",
-    icon: "🌐",
-    fee: 150000,
-    skill: 500,
+    icon: "🇬🇧",
+    fee: 700000,
+    skill: 300,
     questions: [
       {
-        q: "Choose: She ___ to school every day.",
-        options: ["go", "goes", "going", "gone"],
-        answer: 1
+        q: "She ___ to school every day.",
+        choices: ["go", "goes", "going", "gone"],
+        answer: 1,
       },
       {
-        q: "Opposite of 'expensive' is:",
-        options: ["cheap", "large", "fast", "strong"],
-        answer: 0
+        q: "Choose the opposite of 'cheap'.",
+        choices: ["small", "expensive", "easy", "short"],
+        answer: 1,
       },
       {
-        q: "I have lived here ___ 2020.",
-        options: ["for", "since", "at", "on"],
-        answer: 1
-      }
-    ]
+        q: "I have lived here ___ 2022.",
+        choices: ["for", "since", "at", "on"],
+        answer: 1,
+      },
+    ],
   },
-
   cert_mos: {
     id: "cert_mos",
     name: "MOS Office",
     icon: "💻",
-    fee: 120000,
-    skill: 800,
+    fee: 600000,
+    skill: 100,
     questions: [
       {
-        q: "Phím tắt sao chép trong Windows?",
-        options: ["Ctrl + C", "Ctrl + V", "Ctrl + X", "Ctrl + Z"],
-        answer: 0
+        q: "Ctrl + C dùng để làm gì?",
+        choices: ["Dán", "Sao chép", "Cắt", "Lưu"],
+        answer: 1,
       },
       {
-        q: "Excel dùng để làm gì?",
-        options: ["Tính toán dữ liệu", "Chụp ảnh", "Nghe nhạc", "Vẽ tranh"],
-        answer: 0
+        q: "Excel thường dùng để?",
+        choices: ["Tính toán dữ liệu", "Chụp ảnh", "Nghe nhạc", "Vẽ 3D"],
+        answer: 0,
       },
       {
-        q: "Hàm SUM trong Excel dùng để?",
-        options: ["Đếm", "Tính tổng", "Tìm chữ", "Đổi màu"],
-        answer: 1
-      }
-    ]
+        q: "Ctrl + S thường dùng để?",
+        choices: ["Lưu", "Xóa", "In", "Đóng"],
+        answer: 0,
+      },
+    ],
   },
-
   cert_finance: {
     id: "cert_finance",
     name: "Tài chính cơ bản",
     icon: "📈",
-    fee: 200000,
-    skill: 1000,
+    fee: 1000000,
+    skill: 500,
     questions: [
       {
-        q: "Lợi nhuận được hiểu đơn giản là?",
-        options: [
-          "Doanh thu + chi phí",
-          "Doanh thu - chi phí",
-          "Chi phí - doanh thu",
-          "Tài sản + nợ"
-        ],
-        answer: 1
+        q: "ROI là chỉ số liên quan đến?",
+        choices: ["Lợi nhuận đầu tư", "Dân số", "Thời tiết", "Tốc độ mạng"],
+        answer: 0,
       },
       {
-        q: "Đa dạng hóa danh mục nhằm mục đích gì?",
-        options: [
+        q: "Đa dạng hóa danh mục giúp?",
+        choices: [
           "Tăng mọi rủi ro",
           "Giảm rủi ro tập trung",
-          "Không cần theo dõi",
-          "Đảm bảo lợi nhuận"
+          "Không có tác dụng",
+          "Luôn tăng lợi nhuận",
         ],
-        answer: 1
+        answer: 1,
       },
       {
-        q: "ROI thường liên quan đến?",
-        options: ["Hiệu quả đầu tư", "Thời tiết", "Dân số", "Điểm danh"],
-        answer: 0
-      }
-    ]
-  }
+        q: "Cổ phiếu đại diện cho?",
+        choices: ["Khoản vay", "Quyền sở hữu doanh nghiệp", "Tiền mặt", "Thuế"],
+        answer: 1,
+      },
+    ],
+  },
 };
 
 const CANTEEN_ITEMS = [
@@ -273,376 +258,256 @@ const CANTEEN_ITEMS = [
     name: "Bánh mì",
     icon: "🥪",
     price: 15000,
-    energy: 10,
-    mood: 2
+    effect: { energy: 8, mood: 3 },
   },
   {
     id: "meal",
     name: "Cơm phần",
     icon: "🍱",
     price: 30000,
-    energy: 22,
-    hp: 5,
-    mood: 3
+    effect: { energy: 20, hp: 5 },
   },
   {
     id: "milk",
     name: "Sữa",
     icon: "🥛",
     price: 12000,
-    energy: 8,
-    hp: 3
+    effect: { hp: 8, energy: 5 },
   },
   {
     id: "coffee",
     name: "Cà phê",
     icon: "☕",
-    price: 18000,
-    energy: 18,
-    mood: -1
+    price: 20000,
+    effect: { energy: 25, mood: -2 },
   },
   {
     id: "fruit",
     name: "Trái cây",
     icon: "🍎",
-    price: 20000,
-    energy: 12,
-    hp: 8,
-    mood: 4
-  }
+    price: 25000,
+    effect: { hp: 10, mood: 5 },
+  },
 ];
+
+/* =========================================================
+   QUIZ BANK
+========================================================= */
 
 const QUIZ_BANK = [
   {
     id: "m1",
     subject: "Toán",
-    q: "Đạo hàm của y = x² là gì?",
-    options: ["x", "2x", "x²", "2"],
+    q: "Đạo hàm của y = x² là?",
+    choices: ["x", "2x", "x²", "2"],
     answer: 1,
-    explain: "Theo quy tắc đạo hàm, (x²)' = 2x."
+    explain: "Theo quy tắc đạo hàm: (x²)' = 2x.",
   },
   {
     id: "m2",
     subject: "Toán",
-    q: "Cấp số cộng có công sai d = 3, a₁ = 2. a₄ bằng?",
-    options: ["8", "9", "11", "12"],
+    q: "Cấp số cộng có công sai d = 3, số hạng đầu là 2. Số hạng thứ 4 bằng?",
+    choices: ["8", "9", "11", "12"],
     answer: 2,
-    explain: "a₄ = a₁ + 3d = 2 + 9 = 11."
+    explain: "a4 = a1 + 3d = 2 + 9 = 11.",
   },
   {
     id: "m3",
-    subject: "Toán",
-    q: "Tổng ba số tự nhiên liên tiếp 10, 11, 12 bằng?",
-    options: ["31", "32", "33", "34"],
-    answer: 2,
-    explain: "10 + 11 + 12 = 33."
-  },
-  {
-    id: "l1",
-    subject: "Vật lý",
-    q: "Đơn vị của công suất là gì?",
-    options: ["J", "N", "W", "Pa"],
-    answer: 2,
-    explain: "Công suất có đơn vị Watt (W)."
-  },
-  {
-    id: "l2",
-    subject: "Vật lý",
-    q: "Vận tốc được tính bằng?",
-    options: ["s/t", "t/s", "s × t", "m × s"],
-    answer: 0,
-    explain: "v = s/t."
-  },
-  {
-    id: "l3",
-    subject: "Vật lý",
-    q: "Đơn vị của lực là?",
-    options: ["J", "N", "W", "V"],
+    subject: "Ngữ văn",
+    q: "Tác phẩm 'Vợ nhặt' của nhà văn nào?",
+    choices: ["Nam Cao", "Kim Lân", "Tô Hoài", "Nguyễn Tuân"],
     answer: 1,
-    explain: "Lực được đo bằng Newton (N)."
+    explain: "Vợ nhặt là truyện ngắn nổi tiếng của Kim Lân.",
   },
   {
-    id: "h1",
-    subject: "Hóa",
+    id: "m4",
+    subject: "Vật lý",
+    q: "Đơn vị của công suất là?",
+    choices: ["Jun", "Oát", "Niutơn", "Pascal"],
+    answer: 1,
+    explain: "Công suất có đơn vị SI là Watt (W).",
+  },
+  {
+    id: "m5",
+    subject: "Hóa học",
     q: "Công thức hóa học của nước là?",
-    options: ["CO₂", "H₂O", "O₂", "NaCl"],
-    answer: 1,
-    explain: "Nước gồm hai nguyên tử H và một nguyên tử O."
+    choices: ["CO₂", "O₂", "H₂O", "NaCl"],
+    answer: 2,
+    explain: "Một phân tử nước gồm 2 H và 1 O.",
   },
   {
-    id: "h2",
-    subject: "Hóa",
-    q: "NaCl thường được gọi là?",
-    options: ["Đường", "Muối ăn", "Giấm", "Vôi"],
-    answer: 1,
-    explain: "NaCl là natri clorua, thành phần chính của muối ăn."
-  },
-  {
-    id: "h3",
-    subject: "Hóa",
-    q: "pH < 7 thường biểu thị môi trường?",
-    options: ["Axit", "Bazơ", "Trung tính", "Kim loại"],
-    answer: 0,
-    explain: "Dung dịch có pH < 7 có tính axit."
-  },
-  {
-    id: "s1",
-    subject: "Sinh",
+    id: "m6",
+    subject: "Sinh học",
     q: "Đơn vị cơ bản của sự sống là?",
-    options: ["Mô", "Cơ quan", "Tế bào", "Hệ cơ quan"],
+    choices: ["Mô", "Cơ quan", "Tế bào", "Hệ cơ quan"],
     answer: 2,
-    explain: "Tế bào là đơn vị cấu trúc và chức năng cơ bản của sự sống."
+    explain: "Tế bào là đơn vị cấu trúc và chức năng cơ bản của sự sống.",
   },
   {
-    id: "s2",
-    subject: "Sinh",
-    q: "DNA có vai trò chính nào?",
-    options: ["Lưu trữ thông tin di truyền", "Tiêu hóa", "Hô hấp", "Vận động"],
-    answer: 0,
-    explain: "DNA mang và lưu trữ thông tin di truyền."
-  },
-  {
-    id: "s3",
-    subject: "Sinh",
-    q: "Quang hợp ở thực vật chủ yếu diễn ra tại?",
-    options: ["Rễ", "Lục lạp", "Không bào", "Nhân"],
-    answer: 1,
-    explain: "Quang hợp chủ yếu diễn ra ở lục lạp."
-  },
-  {
-    id: "su1",
+    id: "m7",
     subject: "Lịch sử",
-    q: "Cách mạng tháng Tám ở Việt Nam diễn ra vào năm nào?",
-    options: ["1930", "1945", "1954", "1975"],
+    q: "Cách mạng tháng Tám thành công vào năm nào?",
+    choices: ["1930", "1945", "1954", "1975"],
     answer: 1,
-    explain: "Cách mạng tháng Tám thành công năm 1945."
+    explain: "Cách mạng tháng Tám diễn ra và giành chính quyền năm 1945.",
   },
   {
-    id: "su2",
-    subject: "Lịch sử",
-    q: "Chiến thắng Điện Biên Phủ diễn ra năm?",
-    options: ["1945", "1954", "1968", "1975"],
-    answer: 1,
-    explain: "Chiến thắng Điện Biên Phủ diễn ra năm 1954."
-  },
-  {
-    id: "su3",
-    subject: "Lịch sử",
-    q: "Ngày Quốc khánh Việt Nam là?",
-    options: ["30/4", "2/9", "19/8", "7/5"],
-    answer: 1,
-    explain: "Ngày 2/9/1945 là ngày Quốc khánh Việt Nam."
-  },
-  {
-    id: "d1",
+    id: "m8",
     subject: "Địa lý",
-    q: "Việt Nam thuộc khu vực nào của châu Á?",
-    options: ["Đông Á", "Đông Nam Á", "Nam Á", "Tây Á"],
-    answer: 1,
-    explain: "Việt Nam thuộc khu vực Đông Nam Á."
-  },
-  {
-    id: "d2",
-    subject: "Địa lý",
-    q: "Đồng bằng lớn nhất Việt Nam là?",
-    options: [
-      "Đồng bằng sông Hồng",
-      "Đồng bằng sông Cửu Long",
-      "Đồng bằng ven biển miền Trung",
-      "Cao nguyên"
+    q: "Việt Nam nằm ở khu vực nào của châu Á?",
+    choices: [
+      "Đông Nam Á",
+      "Tây Á",
+      "Bắc Á",
+      "Trung Á",
     ],
-    answer: 1,
-    explain: "Đồng bằng sông Cửu Long là đồng bằng lớn nhất Việt Nam."
-  },
-  {
-    id: "d3",
-    subject: "Địa lý",
-    q: "Khí hậu Việt Nam nhìn chung mang tính chất?",
-    options: ["Nhiệt đới gió mùa", "Ôn đới", "Hàn đới", "Hoang mạc"],
     answer: 0,
-    explain: "Việt Nam có khí hậu nhiệt đới gió mùa."
+    explain: "Việt Nam thuộc khu vực Đông Nam Á.",
   },
   {
-    id: "a1",
+    id: "m9",
     subject: "Tiếng Anh",
-    q: "If I were you, I ___ harder.",
-    options: ["study", "studied", "would study", "will study"],
+    q: "If I ___ rich, I would travel around the world.",
+    choices: ["am", "was", "were", "be"],
     answer: 2,
-    explain: "Câu điều kiện loại 2 dùng would + V."
+    explain: "Câu điều kiện loại 2 dùng 'were' cho giả định.",
   },
   {
-    id: "a2",
-    subject: "Tiếng Anh",
-    q: "She ___ English for five years.",
-    options: ["learns", "has learned", "learned", "learning"],
-    answer: 1,
-    explain: "For five years phù hợp với hiện tại hoàn thành."
-  },
-  {
-    id: "a3",
-    subject: "Tiếng Anh",
-    q: "Opposite of 'difficult' is?",
-    options: ["easy", "hard", "slow", "late"],
-    answer: 0,
-    explain: "Difficult trái nghĩa với easy."
-  },
-  {
-    id: "gd1",
+    id: "m10",
     subject: "GDCD",
-    q: "Pháp luật có tính chất nào?",
-    options: [
-      "Bắt buộc chung",
+    q: "Pháp luật có tính chất nào sau đây?",
+    choices: [
       "Tự nguyện tuyệt đối",
-      "Chỉ dành cho học sinh",
-      "Không cần tuân thủ"
+      "Bắt buộc chung",
+      "Chỉ áp dụng cho học sinh",
+      "Không có chế tài",
     ],
-    answer: 0,
-    explain: "Pháp luật có tính bắt buộc chung."
-  },
-  {
-    id: "gd2",
-    subject: "GDCD",
-    q: "Công dân bình đẳng trước pháp luật nghĩa là?",
-    options: [
-      "Mọi người đều có quyền và nghĩa vụ theo quy định pháp luật",
-      "Không cần tuân thủ pháp luật",
-      "Chỉ người giàu có quyền",
-      "Chỉ cán bộ mới chịu pháp luật"
-    ],
-    answer: 0,
-    explain: "Mọi công dân đều bình đẳng về quyền và nghĩa vụ trước pháp luật."
-  },
-  {
-    id: "gd3",
-    subject: "GDCD",
-    q: "Hành vi nào thể hiện trách nhiệm?",
-    options: [
-      "Giữ lời hứa",
-      "Đổ lỗi",
-      "Trốn tránh",
-      "Gian dối"
-    ],
-    answer: 0,
-    explain: "Giữ lời hứa là biểu hiện của trách nhiệm."
-  },
-  {
-    id: "r1",
-    subject: "Đố mẹo",
-    q: "Cái gì càng lấy đi càng lớn?",
-    options: ["Cái hố", "Cái túi", "Cái bàn", "Quả bóng"],
-    answer: 0,
-    explain: "Càng đào/lấy đất đi thì cái hố càng lớn."
-  },
-  {
-    id: "r2",
-    subject: "Đố mẹo",
-    q: "Con gì không có chân nhưng vẫn đi khắp nơi?",
-    options: ["Con rắn", "Đám mây", "Con mèo", "Con chó"],
     answer: 1,
-    explain: "Đám mây có thể trôi đi khắp nơi."
+    explain: "Pháp luật là hệ thống quy tắc xử sự có tính bắt buộc chung.",
   },
   {
-    id: "r3",
+    id: "m11",
     subject: "Đố mẹo",
-    q: "Cái gì có cổ nhưng không có đầu?",
-    options: ["Cái chai", "Cái bàn", "Cái ghế", "Cái quạt"],
+    q: "Cái gì càng lấy đi thì càng lớn?",
+    choices: ["Cái túi", "Cái hố", "Cái bàn", "Cái cây"],
+    answer: 1,
+    explain: "Càng đào/lấy đất khỏi cái hố thì cái hố càng lớn.",
+  },
+  {
+    id: "m12",
+    subject: "Đố mẹo",
+    q: "Một năm có bao nhiêu tháng có 28 ngày?",
+    choices: ["1", "2", "6", "12"],
+    answer: 3,
+    explain: "Tất cả 12 tháng đều có ít nhất 28 ngày.",
+  },
+  {
+    id: "m13",
+    subject: "Toán",
+    q: "5 × 6 + 4 bằng?",
+    choices: ["34", "44", "50", "54"],
     answer: 0,
-    explain: "Chai có cổ chai nhưng không có đầu."
-  }
+    explain: "5 × 6 = 30, cộng 4 bằng 34.",
+  },
+  {
+    id: "m14",
+    subject: "Hóa học",
+    q: "Oxi có công thức phân tử là?",
+    choices: ["O", "O₂", "O₃", "CO₂"],
+    answer: 1,
+    explain: "Khí oxi trong điều kiện thường có công thức O₂.",
+  },
 ];
+
+/* =========================================================
+   TITLES
+========================================================= */
 
 const TITLES = [
   {
-    id: "first_step",
+    id: "newbie",
+    name: "Tân binh Thanh Xuân",
     icon: "🌱",
-    name: "Tân Binh Thanh Xuân",
-    desc: "Đạt 100 điểm thi đua.",
-    condition: s => s.competitionScore >= 100
+    desc: "Bắt đầu hành trình cấp 3.",
+    condition: (s) => s.day >= 1,
   },
   {
-    id: "hard_worker",
+    id: "study",
+    name: "Học Bá",
     icon: "📚",
-    name: "Học Sinh Chăm Chỉ",
-    desc: "Đạt 700 điểm thi đua.",
-    condition: s => s.competitionScore >= 300
+    desc: "Điểm học tập đạt 80.",
+    condition: (s) => s.stats.study >= 80,
   },
   {
-    id: "all_rounder",
-    icon: "⭐",
-    name: "Học Sinh Toàn Diện",
-    desc: "Học tập, kỹ năng và bạn bè đều từ 70.",
-    condition: s =>
-      s.stats.study >= 70 &&
-      s.stats.skill >= 70 &&
-      s.stats.friends >= 70
+    id: "social",
+    name: "Người Kết Nối",
+    icon: "🤝",
+    desc: "Điểm bạn bè đạt 80.",
+    condition: (s) => s.stats.friends >= 80,
   },
   {
-    id: "top3",
-    icon: "🥉",
-    name: "Ngôi Sao Top 3",
-    desc: "Có ít nhất một lần lọt Top 3.",
-    condition: s => s.titleFlags.includes("top3")
+    id: "love",
+    name: "Kẻ Si Tình",
+    icon: "💖",
+    desc: "Tình cảm đạt 80.",
+    condition: (s) => s.stats.love >= 80,
+  },
+  {
+    id: "skill",
+    name: "Đa Tài",
+    icon: "⚡",
+    desc: "Kỹ năng đạt 80.",
+    condition: (s) => s.stats.skill >= 80,
+  },
+  {
+    id: "rich",
+    name: "Đại Gia Học Đường",
+    icon: "💰",
+    desc: "Tài sản tiền mặt đạt 10 tỷ.",
+    condition: (s) => s.stats.money >= 10000000000,
+  },
+  {
+    id: "certificate",
+    name: "Thợ Săn Chứng Chỉ",
+    icon: "🏅",
+    desc: "Có đủ 4 chứng chỉ.",
+    condition: (s) => s.certificates.length >= 4,
+  },
+  {
+    id: "asset",
+    name: "Ông Trùm Tài Sản",
+    icon: "🏠",
+    desc: "Sở hữu ít nhất 3 tài sản.",
+    condition: (s) => s.assets.length >= 3,
   },
   {
     id: "champion",
-    icon: "🥇",
     name: "Quán Quân Thi Đua",
-    desc: "Có ít nhất một lần đứng đầu bảng.",
-    condition: s => s.titleFlags.includes("champion")
+    icon: "🏆",
+    desc: "Điểm thi đua cá nhân đạt 500.",
+    condition: (s) => s.competition.self >= 500,
   },
   {
-    id: "rich_student",
-    icon: "💰",
-    name: "Đại Gia Học Đường",
-    desc: "Sở hữu từ 1.000.000đ.",
-    condition: s => s.stats.money >= 1000000
-  },
-  {
-    id: "skill_master",
-    icon: "🧠",
-    name: "Bậc Thầy Kỹ Năng",
-    desc: "Đạt 90 điểm kỹ năng.",
-    condition: s => s.stats.skill >= 90
-  },
-  {
-    id: "love_master",
-    icon: "💖",
-    name: "Người Được Yêu Mến",
-    desc: "Đạt 90 điểm tình cảm.",
-    condition: s => s.stats.love >= 90
-  },
-  {
-    id: "scholar",
-    icon: "🎓",
-    name: "Học Bá Thanh Xuân",
-    desc: "Đạt 90 điểm học tập.",
-    condition: s => s.stats.study >= 90
-  },
-  {
-    id: "asset_master",
-    icon: "🏠",
-    name: "Ông Trùm Tài Sản",
-    desc: "Sở hữu ít nhất 3 tài sản.",
-    condition: s => s.assets.length >= 3
-  },
-  {
-    id: "certificate_master",
-    icon: "📜",
-    name: "Bộ Sưu Tập Chứng Chỉ",
-    desc: "Sở hữu đủ 4 chứng chỉ.",
-    condition: s => s.certificates.length >= 4
-  },
-  {
-    id: "graduation_star",
-    icon: "🎉",
-    name: "Ngôi Sao Thanh Xuân",
+    id: "perfect",
+    name: "Thanh Xuân Rực Rỡ",
+    icon: "🌟",
     desc: "Hoàn thành hành trình 45 ngày.",
-    condition: s => s.isGameOver
-  }
+    condition: (s) => s.day >= 45 || s.isGameOver,
+  },
 ];
 
+/* =========================================================
+   HELPERS
+========================================================= */
+
 const clamp = (value, min = 0, max = 100) =>
-  Math.min(max, Math.max(min, Number(value) || 0));
+  Math.max(min, Math.min(max, Number(value) || 0));
+
+const money = (n) =>
+  new Intl.NumberFormat("vi-VN").format(Math.max(0, Math.round(n || 0))) + "đ";
+
+const uid = () =>
+  Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 function createInitialState() {
   return {
@@ -661,7 +526,7 @@ function createInitialState() {
       love: 20,
       reputation: 30,
       skill: 25,
-      money: 50000
+      money: 150000,
     },
 
     certificates: [],
@@ -673,43 +538,44 @@ function createInitialState() {
         name: "Sổ Công Thức",
         icon: "📘",
         count: 1,
-        desc: "+8 Điểm học tập"
+        desc: "+8 học tập",
       },
       {
         id: "gift_strawberry",
         name: "Kẹo Dâu Tây",
         icon: "🍬",
         count: 2,
-        desc: "+8% Tình cảm"
-      }
+        desc: "+8 tình cảm",
+      },
     ],
 
-    todayEvents: [],
-    diaryEntries: [],
-
-    competitionScore: 0,
-
-    npcScores: {
-      lan: 42,
-      trieu_man: 48,
-      tuan: 45
+    npc: {
+      lan: {
+        friendship: 35,
+        competition: 100,
+      },
+      trieu_man: {
+        friendship: 20,
+        competition: 120,
+      },
+      tuan: {
+        friendship: 30,
+        competition: 110,
+      },
     },
 
-    competitionHistory: [],
-    currentRank: 4,
-    bestRank: 4,
-    competitionStreak: 0,
+    competition: {
+      self: 0,
+      history: [],
+    },
 
-    titleFlags: [],
-    unlockedTitles: [],
+    titles: ["newbie"],
 
-    lastHomeRestKey: null,
+    diaryEntries: [],
 
-    npcRelationships: {
-      lan: 40,
-      trieu_man: 20,
-      tuan: 35
-    }
+    lastHomeRestKey: "",
+
+    createdAt: Date.now(),
   };
 }
 
@@ -718,73 +584,59 @@ function normalizeState(raw) {
 
   if (!raw || typeof raw !== "object") return base;
 
-  const state = {
+  const merged = {
     ...base,
     ...raw,
     stats: {
       ...base.stats,
-      ...(raw.stats || {})
+      ...(raw.stats || {}),
     },
-    npcScores: {
-      ...base.npcScores,
-      ...(raw.npcScores || {})
+    npc: {
+      ...base.npc,
+      ...(raw.npc || {}),
     },
-    npcRelationships: {
-      ...base.npcRelationships,
-      ...(raw.npcRelationships || {})
+    competition: {
+      ...base.competition,
+      ...(raw.competition || {}),
     },
-    bag: Array.isArray(raw.bag) ? raw.bag : base.bag,
-    certificates: Array.isArray(raw.certificates)
-      ? raw.certificates
-      : [],
-    assets: Array.isArray(raw.assets) ? raw.assets : [],
-    diaryEntries: Array.isArray(raw.diaryEntries)
-      ? raw.diaryEntries
-      : [],
-    competitionHistory: Array.isArray(raw.competitionHistory)
-      ? raw.competitionHistory
-      : [],
-    titleFlags: Array.isArray(raw.titleFlags)
-      ? raw.titleFlags
-      : [],
-    unlockedTitles: Array.isArray(raw.unlockedTitles)
-      ? raw.unlockedTitles
-      : []
   };
 
-  Object.keys(state.stats).forEach(key => {
+  merged.day = Math.max(1, Math.min(45, Number(merged.day) || 1));
+  merged.timeIndex = Math.max(
+    0,
+    Math.min(TIMES.length - 1, Number(merged.timeIndex) || 0)
+  );
+
+  Object.keys(merged.stats).forEach((key) => {
     if (key === "money") {
-      state.stats.money = Math.max(
-        0,
-        Number(state.stats.money) || 0
-      );
+      merged.stats[key] = Math.max(0, Number(merged.stats[key]) || 0);
     } else {
-      state.stats[key] = clamp(state.stats[key]);
+      merged.stats[key] = clamp(merged.stats[key]);
     }
   });
 
-  state.day = Math.max(1, Number(state.day) || 1);
-  state.timeIndex = Math.min(
-    TIMES.length - 1,
-    Math.max(0, Number(state.timeIndex) || 0)
-  );
+  merged.certificates = Array.isArray(merged.certificates)
+    ? merged.certificates
+    : [];
 
-  state.competitionScore =
-    Math.max(0, Number(state.competitionScore) || 0);
+  merged.assets = Array.isArray(merged.assets) ? merged.assets : [];
 
-  return state;
+  merged.bag = Array.isArray(merged.bag) ? merged.bag : base.bag;
+
+  merged.diaryEntries = Array.isArray(merged.diaryEntries)
+    ? merged.diaryEntries
+    : [];
+
+  return merged;
 }
 
 function encodeSaveCode(data) {
-  const json = JSON.stringify(data);
-  const bytes = new TextEncoder().encode(json);
-
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
   let binary = "";
-  const chunk = 0x8000;
 
-  for (let i = 0; i < bytes.length; i += chunk) {
+  for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(
-      ...bytes.subarray(i, i + chunk)
+      ...bytes.subarray(i, i + 0x8000)
     );
   }
 
@@ -810,265 +662,65 @@ function decodeSaveCode(code) {
     bytes[i] = binary.charCodeAt(i);
   }
 
-  return JSON.parse(
-    new TextDecoder().decode(bytes)
-  );
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-function formatMoney(value) {
-  return new Intl.NumberFormat("vi-VN").format(
-    Math.round(value || 0)
-  ) + "đ";
-}
+/* =========================================================
+   MAIN APP
+========================================================= */
 
-function getPlayerDailyScore(state) {
-  let score = 0;
-
-  score += Math.floor(state.stats.study / 10);
-  score += Math.floor(state.stats.skill / 15);
-  score += Math.floor(state.stats.friends / 20);
-  score += Math.floor(state.stats.love / 25);
-  score += Math.floor(state.stats.reputation / 15);
-
-  if (state.stats.mood >= 70) score += 3;
-  if (state.stats.energy >= 70) score += 2;
-
-  score += state.certificates.length * 5;
-  score += state.assets.length * 3;
-
-  return Math.max(5, score);
-}
-
-function calculateCompetition(state, dailyScore) {
-  const npcGain = {
-    lan: Math.floor(Math.random() * 9) + 5,
-    trieu_man: Math.floor(Math.random() * 11) + 6,
-    tuan: Math.floor(Math.random() * 10) + 5
-  };
-
-  const playerTotal =
-    state.competitionScore + dailyScore;
-
-  const npcScores = {
-    lan: state.npcScores.lan + npcGain.lan,
-    trieu_man:
-      state.npcScores.trieu_man +
-      npcGain.trieu_man,
-    tuan:
-      state.npcScores.tuan +
-      npcGain.tuan
-  };
-
-  const ranking = [
-    {
-      id: "player",
-      name: "Bạn",
-      score: playerTotal
-    },
-    {
-      id: "lan",
-      name: "Lan",
-      score: npcScores.lan
-    },
-    {
-      id: "trieu_man",
-      name: "Triệu Mẫn",
-      score: npcScores.trieu_man
-    },
-    {
-      id: "tuan",
-      name: "Tuấn",
-      score: npcScores.tuan
-    }
-  ].sort((a, b) => b.score - a.score);
-
-  const rank =
-    ranking.findIndex(
-      item => item.id === "player"
-    ) + 1;
-
-  const flags = [
-    ...(state.titleFlags || [])
-  ];
-
-  if (rank <= 3 && !flags.includes("top3")) {
-    flags.push("top3");
-  }
-
-  if (rank === 1 && !flags.includes("champion")) {
-    flags.push("champion");
-  }
-
-  let streak = state.competitionStreak || 0;
-
-  if (rank < (state.currentRank || 4)) {
-    streak += 1;
-  } else if (rank > (state.currentRank || 4)) {
-    streak = 0;
-  }
-
-  return {
-    npcScores,
-    competitionScore: playerTotal,
-    currentRank: rank,
-    bestRank: Math.min(
-      state.bestRank || 99,
-      rank
-    ),
-    competitionStreak: streak,
-    titleFlags: flags,
-    npcGain,
-    dailyScore,
-    history: {
-      day: state.day,
-      playerGain: dailyScore,
-      playerTotal,
-      lanGain: npcGain.lan,
-      lanTotal: npcScores.lan,
-      trieuManGain: npcGain.trieu_man,
-      trieuManTotal: npcScores.trieu_man,
-      tuanGain: npcGain.tuan,
-      tuanTotal: npcScores.tuan,
-      rank
-    }
-  };
-}
-
-function App() {
+export default function App() {
   const [game, setGame] = useState(() => {
     try {
       const saved = localStorage.getItem(SAVE_KEY);
-
-      if (saved) {
-        return normalizeState(
-          JSON.parse(saved)
-        );
-      }
-    } catch {}
-
-    return createInitialState();
+      return saved ? normalizeState(JSON.parse(saved)) : createInitialState();
+    } catch {
+      return createInitialState();
+    }
   });
 
   const [overlay, setOverlay] = useState(null);
+  const [drawer, setDrawer] = useState(null);
   const [toast, setToast] = useState("");
-  const [audioEnabled, setAudioEnabled] =
-    useState(true);
 
   const [quiz, setQuiz] = useState(null);
   const [quizIndex, setQuizIndex] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
 
-  const [certExam, setCertExam] = useState(null);
-  const [certIndex, setCertIndex] = useState(0);
-  const [certScore, setCertScore] = useState(0);
+  const [exam, setExam] = useState(null);
+  const [examIndex, setExamIndex] = useState(0);
+  const [examScore, setExamScore] = useState(0);
 
   const [saveCode, setSaveCode] = useState("");
-  const [saveCodeInput, setSaveCodeInput] =
-    useState("");
+  const [saveInput, setSaveInput] = useState("");
 
-  const [drawer, setDrawer] = useState(null);
+  const [audioEnabled, setAudioEnabled] = useState(true);
 
-  const fileInputRef = useRef(null);
   const audioRef = useRef(null);
+  const fileRef = useRef(null);
+
+  /* =====================================================
+     SAVE
+  ===================================================== */
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        SAVE_KEY,
-        JSON.stringify(game)
-      );
+      localStorage.setItem(SAVE_KEY, JSON.stringify(game));
     } catch {}
   }, [game]);
 
-  useEffect(() => {
-    if (!toast) return;
+  /* =====================================================
+     TOAST
+  ===================================================== */
 
-    const timer = setTimeout(
-      () => setToast(""),
-      2500
-    );
+  const notify = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 2200);
+  };
 
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
-    setGame(prev => {
-      const unlocked = [
-        ...(prev.unlockedTitles || [])
-      ];
-
-      let changed = false;
-
-      TITLES.forEach(title => {
-        let passed = false;
-
-        try {
-          passed = title.condition(prev);
-        } catch {}
-
-        if (
-          passed &&
-          !unlocked.includes(title.id)
-        ) {
-          unlocked.push(title.id);
-          changed = true;
-        }
-      });
-
-      if (!changed) return prev;
-
-      return {
-        ...prev,
-        unlockedTitles: unlocked
-      };
-    });
-  }, [
-    game.competitionScore,
-    game.stats.study,
-    game.stats.skill,
-    game.stats.friends,
-    game.stats.love,
-    game.stats.money,
-    game.stats.reputation,
-    game.certificates.length,
-    game.assets.length,
-    game.isGameOver,
-    game.titleFlags
-  ]);
-
-  const ranking = useMemo(() => {
-    return [
-      {
-        id: "player",
-        name: "Bạn",
-        avatar: "🧑‍🎓",
-        score: game.competitionScore
-      },
-      {
-        id: "lan",
-        name: "Lan",
-        avatar: NPCS.lan.avatar,
-        score: game.npcScores.lan
-      },
-      {
-        id: "trieu_man",
-        name: "Triệu Mẫn",
-        avatar: NPCS.trieu_man.avatar,
-        score: game.npcScores.trieu_man
-      },
-      {
-        id: "tuan",
-        name: "Tuấn",
-        avatar: NPCS.tuan.avatar,
-        score: game.npcScores.tuan
-      }
-    ]
-      .sort((a, b) => b.score - a.score)
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1
-      }));
-  }, [game]);
+  /* =====================================================
+     AUDIO
+  ===================================================== */
 
   const playTone = (
     frequency = 440,
@@ -1078,861 +730,748 @@ function App() {
     if (!audioEnabled) return;
 
     try {
-      const AudioContext =
-        window.AudioContext ||
-        window.webkitAudioContext;
+      const Ctx =
+        window.AudioContext || window.webkitAudioContext;
 
-      if (!AudioContext) return;
+      if (!Ctx) return;
 
-      const ctx =
-        audioRef.current ||
-        new AudioContext();
-
+      const ctx = audioRef.current || new Ctx();
       audioRef.current = ctx;
 
       if (ctx.state === "suspended") {
         ctx.resume();
       }
 
-      const oscillator =
-        ctx.createOscillator();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-      const gain =
-        ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = frequency;
 
-      oscillator.type = type;
-      oscillator.frequency.value =
-        frequency;
-
-      gain.gain.setValueAtTime(
-        0.035,
-        ctx.currentTime
-      );
-
+      gain.gain.setValueAtTime(0.035, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(
         0.001,
         ctx.currentTime + duration
       );
 
-      oscillator.connect(gain);
+      osc.connect(gain);
       gain.connect(ctx.destination);
 
-      oscillator.start();
-
-      oscillator.stop(
-        ctx.currentTime + duration
-      );
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
     } catch {}
   };
 
-  const modifyStats = delta => {
-    setGame(prev => {
-      const stats = {
-        ...prev.stats
-      };
+  /* =====================================================
+     TITLES
+  ===================================================== */
 
-      Object.entries(delta).forEach(
-        ([key, value]) => {
-          if (key === "money") {
-            stats.money = Math.max(
-              0,
-              stats.money + value
-            );
-          } else {
-            stats[key] = clamp(
-              stats[key] + value
-            );
-          }
-        }
-      );
+  useEffect(() => {
+    const unlocked = TITLES
+      .filter((title) => title.condition(game))
+      .map((title) => title.id);
 
-      return {
+    const missing = unlocked.filter(
+      (id) => !game.titles.includes(id)
+    );
+
+    if (missing.length) {
+      setGame((prev) => ({
         ...prev,
-        stats
-      };
-    });
-  };
+        titles: [...new Set([...prev.titles, ...missing])],
+      }));
 
-  const showToast = message => {
-    setToast(message);
-  };
+      const names = missing
+        .map((id) => TITLES.find((x) => x.id === id))
+        .filter(Boolean)
+        .map((x) => `${x.icon} ${x.name}`)
+        .join(", ");
 
-  const advanceTime = () => {
-    playTone(660, 0.06);
+      notify(`🎖️ Mở khóa danh hiệu: ${names}`);
+      playTone(880, 0.15);
+    }
+  }, [
+    game.stats.study,
+    game.stats.friends,
+    game.stats.love,
+    game.stats.skill,
+    game.stats.money,
+    game.assets.length,
+    game.certificates.length,
+    game.competition.self,
+    game.day,
+    game.isGameOver,
+  ]);
 
-    setGame(prev => {
-      if (prev.isGameOver) return prev;
+  /* =====================================================
+     NPC AUTOMATIC COMPETITION
+  ===================================================== */
 
+  useEffect(() => {
+    if (game.day <= 1) return;
+
+    const history = game.competition.history || [];
+
+    if (history.some((x) => x.day === game.day)) return;
+
+    const increments = {
+      lan: 12 + Math.floor(Math.random() * 9),
+      trieu_man: 10 + Math.floor(Math.random() * 12),
+      tuan: 13 + Math.floor(Math.random() * 10),
+    };
+
+    setGame((prev) => {
       if (
-        prev.timeIndex <
-        TIMES.length - 1
+        (prev.competition.history || []).some(
+          (x) => x.day === prev.day
+        )
       ) {
-        return {
-          ...prev,
-          timeIndex:
-            prev.timeIndex + 1
-        };
+        return prev;
       }
-
-      const dailyScore =
-        getPlayerDailyScore(prev);
-
-      const competition =
-        calculateCompetition(
-          prev,
-          dailyScore
-        );
-
-      const nextHistory = [
-        ...(prev.competitionHistory || []),
-        competition.history
-      ];
-
-      const newDiary = [
-        ...(prev.diaryEntries || []),
-        {
-          day: prev.day,
-          text:
-            `Ngày ${prev.day}: ` +
-            `Bạn nhận +${dailyScore} điểm thi đua. ` +
-            `Kết thúc ngày ở hạng #${competition.currentRank}.`
-        }
-      ];
 
       const next = {
         ...prev,
-
-        ...competition,
-
-        competitionHistory:
-          nextHistory,
-
-        diaryEntries: newDiary,
-
-        lastHomeRestKey: null
+        npc: {
+          ...prev.npc,
+          lan: {
+            ...prev.npc.lan,
+            competition:
+              prev.npc.lan.competition + increments.lan,
+          },
+          trieu_man: {
+            ...prev.npc.trieu_man,
+            competition:
+              prev.npc.trieu_man.competition +
+              increments.trieu_man,
+          },
+          tuan: {
+            ...prev.npc.tuan,
+            competition:
+              prev.npc.tuan.competition + increments.tuan,
+          },
+        },
+        competition: {
+          ...prev.competition,
+          history: [
+            ...(prev.competition.history || []),
+            {
+              day: prev.day,
+              self: prev.competition.self,
+              lan:
+                prev.npc.lan.competition +
+                increments.lan,
+              trieu_man:
+                prev.npc.trieu_man.competition +
+                increments.trieu_man,
+              tuan:
+                prev.npc.tuan.competition +
+                increments.tuan,
+            },
+          ],
+        },
       };
 
-      if (
-        prev.day >= prev.totalDays
-      ) {
+      return next;
+    });
+  }, [game.day]);
+
+  /* =====================================================
+     AUTO CLOCK
+  ===================================================== */
+
+  useEffect(() => {
+    if (game.isGameOver) return;
+
+    const timer = setInterval(() => {
+      setGame((prev) => {
+        if (prev.isGameOver) return prev;
+
+        if (prev.timeIndex < TIMES.length - 1) {
+          return {
+            ...prev,
+            timeIndex: prev.timeIndex + 1,
+          };
+        }
+
+        if (prev.day >= prev.totalDays) {
+          return {
+            ...prev,
+            isGameOver: true,
+          };
+        }
+
+        const nextDay = prev.day + 1;
+
+        const entry = {
+          id: uid(),
+          day: prev.day,
+          text: createDiaryText(prev),
+          createdAt: Date.now(),
+        };
+
         return {
-          ...next,
-          isGameOver: true
+          ...prev,
+          day: nextDay,
+          timeIndex: 0,
+          location: "class",
+          diaryEntries: [
+            ...prev.diaryEntries,
+            entry,
+          ],
+          lastHomeRestKey: "",
+        };
+      });
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [game.isGameOver]);
+
+  /* =====================================================
+     GAME ACTIONS
+  ===================================================== */
+
+  const modifyStats = (delta) => {
+    setGame((prev) => {
+      const stats = { ...prev.stats };
+
+      Object.entries(delta).forEach(([key, value]) => {
+        if (!(key in stats)) return;
+
+        if (key === "money") {
+          stats[key] = Math.max(
+            0,
+            Number(stats[key]) + Number(value)
+          );
+        } else {
+          stats[key] = clamp(
+            Number(stats[key]) + Number(value)
+          );
+        }
+      });
+
+      return {
+        ...prev,
+        stats,
+      };
+    });
+  };
+
+  const addCompetition = (amount, reason = "") => {
+    setGame((prev) => ({
+      ...prev,
+      competition: {
+        ...prev.competition,
+        self: prev.competition.self + amount,
+        history: prev.competition.history,
+      },
+    }));
+
+    if (reason) {
+      notify(`🏆 +${amount} điểm thi đua — ${reason}`);
+    }
+  };
+
+  const advanceTime = (reason = "Hoàn thành hoạt động") => {
+    setGame((prev) => {
+      if (prev.isGameOver) return prev;
+
+      if (prev.timeIndex < TIMES.length - 1) {
+        return {
+          ...prev,
+          timeIndex: prev.timeIndex + 1,
+          location: "class",
         };
       }
 
+      if (prev.day >= prev.totalDays) {
+        return {
+          ...prev,
+          isGameOver: true,
+        };
+      }
+
+      const entry = {
+        id: uid(),
+        day: prev.day,
+        text: createDiaryText(prev),
+        reason,
+        createdAt: Date.now(),
+      };
+
       return {
-        ...next,
+        ...prev,
         day: prev.day + 1,
         timeIndex: 0,
         location: "class",
-        todayEvents: []
+        diaryEntries: [
+          ...prev.diaryEntries,
+          entry,
+        ],
+        lastHomeRestKey: "",
       };
     });
 
-    setOverlay(null);
+    playTone(620, 0.07);
   };
 
-  const goLocation = location => {
-    playTone(500, 0.05);
-
-    if (location === "class") {
-      setGame(prev => ({
-        ...prev,
-        location: "class"
-      }));
-    } else {
-      setGame(prev => ({
-        ...prev,
-        location
-      }));
-    }
-
-    setOverlay(null);
-    setDrawer(null);
-  };
-
-  const restAtHome = () => {
-    const restKey =
-      `${game.day}-${game.timeIndex}`;
-
-    if (game.lastHomeRestKey === restKey) {
-      showToast(
-        "Bạn đã nghỉ ở nhà trong khung giờ này rồi."
-      );
-      return;
-    }
-
-    modifyStats({
-      energy: 25,
-      mood: 4,
-      hp: 4
-    });
-
-    setGame(prev => ({
+  const goLocation = (location) => {
+    setGame((prev) => ({
       ...prev,
-      lastHomeRestKey: restKey
+      location,
     }));
 
-    showToast(
-      "🏡 Bạn nghỉ ngơi và hồi phục năng lượng."
-    );
-
-    advanceTime();
+    setDrawer(null);
+    playTone(520, 0.05);
   };
 
-  const studyAction = () => {
-    if (game.stats.energy < 8) {
-      showToast(
-        "⚡ Không đủ năng lượng để học."
-      );
-      return;
-    }
-
-    modifyStats({
-      energy: -10,
-      study: 5,
-      skill: 2,
-      mood: 1
-    });
-
-    showToast(
-      "📚 Học tập hiệu quả! +5 học tập."
-    );
-
-    advanceTime();
-  };
+  /* =====================================================
+     STUDY
+  ===================================================== */
 
   const startQuiz = () => {
     const shuffled = [...QUIZ_BANK]
       .sort(() => Math.random() - 0.5)
       .slice(0, 5);
 
-    setQuiz(shuffled);
+    setQuiz({
+      questions: shuffled,
+    });
+
     setQuizIndex(0);
     setQuizScore(0);
     setOverlay("quiz");
+    playTone(700, 0.08);
   };
 
-  const answerQuiz = index => {
+  const answerQuiz = (answer) => {
     if (!quiz) return;
 
-    const current =
-      quiz[quizIndex];
-
-    const correct =
-      index === current.answer;
+    const current = quiz.questions[quizIndex];
+    const correct = answer === current.answer;
 
     if (correct) {
-      setQuizScore(
-        score => score + 1
-      );
+      setQuizScore((x) => x + 1);
 
       modifyStats({
         study: 5,
         skill: 1,
-        mood: 1
+        mood: 2,
       });
 
-      showToast(
-        `✅ Chính xác! ${current.explain}`
-      );
+      addCompetition(10, "Trả lời đúng câu hỏi");
+      notify("✅ Chính xác! +5 học tập");
+      playTone(880, 0.1);
     } else {
       modifyStats({
         study: 1,
-        mood: -3
+        mood: -3,
+        energy: -3,
       });
 
-      showToast(
-        `❌ Chưa đúng. ${current.explain}`
-      );
+      notify(`❌ Sai rồi! Đáp án: ${current.choices[current.answer]}`);
+      playTone(180, 0.12);
     }
 
-    if (
-      quizIndex >= quiz.length - 1
-    ) {
-      const finalScore =
-        quizScore + (correct ? 1 : 0);
-
+    if (quizIndex >= quiz.questions.length - 1) {
       setTimeout(() => {
-        setQuiz(null);
         setOverlay(null);
+        setQuiz(null);
+        advanceTime("Hoàn thành tiết học");
+      }, 450);
+    } else {
+      setQuizIndex((x) => x + 1);
+    }
+  };
 
-        showToast(
-          `📝 Hoàn thành quiz: ${finalScore}/${quiz.length}`
-        );
+  /* =====================================================
+     HOME
+  ===================================================== */
 
-        advanceTime();
-      }, 650);
+  const restAtHome = () => {
+    const key = `${game.day}-${game.timeIndex}`;
 
+    if (game.lastHomeRestKey === key) {
+      notify("😴 Bạn đã nghỉ ở nhà trong khung giờ này rồi.");
       return;
     }
 
-    setQuizIndex(
-      index => index + 1
-    );
+    setGame((prev) => ({
+      ...prev,
+      lastHomeRestKey: key,
+      location: "home",
+    }));
+
+    modifyStats({
+      energy: 25,
+      hp: 5,
+      mood: 5,
+    });
+
+    addCompetition(3, "Nghỉ ngơi đúng giờ");
+    notify("🏡 Nghỉ ngơi +25 năng lượng");
+    playTone(560, 0.08);
   };
 
-  const buyFood = item => {
+  /* =====================================================
+     CANTEEN
+  ===================================================== */
+
+  const buyFood = (item) => {
     if (game.stats.money < item.price) {
-      showToast("💸 Bạn không đủ tiền.");
+      notify("💸 Không đủ tiền.");
       return;
     }
 
-    setGame(prev => ({
-      ...prev,
-      stats: {
+    setGame((prev) => {
+      const stats = {
         ...prev.stats,
-        money:
-          prev.stats.money - item.price,
-        energy: clamp(
-          prev.stats.energy +
-            (item.energy || 0)
-        ),
-        hp: clamp(
-          prev.stats.hp +
-            (item.hp || 0)
-        ),
-        mood: clamp(
-          prev.stats.mood +
-            (item.mood || 0)
-        )
-      }
-    }));
+        money: prev.stats.money - item.price,
+      };
 
-    showToast(
-      `${item.icon} Đã mua ${item.name}.`
-    );
+      Object.entries(item.effect).forEach(([key, value]) => {
+        stats[key] =
+          key === "money"
+            ? Math.max(0, stats[key] + value)
+            : clamp(stats[key] + value);
+      });
+
+      return {
+        ...prev,
+        stats,
+      };
+    });
+
+    notify(`${item.icon} Đã mua ${item.name}`);
+    playTone(640, 0.06);
   };
 
-  const workJob = job => {
-    if (
-      job.requirement &&
-      game.stats.skill < job.requirement
-    ) {
-      showToast(
-        `🔒 Cần kỹ năng ≥ ${job.requirement}.`
-      );
+  /* =====================================================
+     JOBS
+  ===================================================== */
+
+  const doJob = (job) => {
+    if (!job.req(game)) {
+      notify("🔒 Bạn chưa đủ điều kiện cho công việc này.");
       return;
     }
 
-    if (
-      job.requirementCert &&
-      !game.certificates.includes(
-        job.requirementCert
-      )
-    ) {
-      showToast(
-        `🔒 ${job.requirementText}.`
-      );
+    if (game.stats.energy < 20) {
+      notify("😵 Không đủ năng lượng.");
       return;
     }
 
-    if (game.stats.energy < Math.abs(job.energy)) {
-      showToast(
-        "⚡ Không đủ năng lượng."
-      );
-      return;
-    }
+    modifyStats({
+      money: job.pay,
+      energy: -20,
+      mood: -2,
+      skill: 2,
+      reputation: 1,
+    });
 
-    setGame(prev => ({
-      ...prev,
-      stats: {
-        ...prev.stats,
-        money:
-          prev.stats.money + job.income,
-        energy: clamp(
-          prev.stats.energy + job.energy
-        ),
-        mood: clamp(
-          prev.stats.mood + job.mood
-        ),
-        skill: clamp(
-          prev.stats.skill + job.skill
-        ),
-        reputation: clamp(
-          prev.stats.reputation +
-            (job.income >= 180000 ? 2 : 1)
-        )
-      }
-    }));
-
-    showToast(
-      `💼 Làm việc xong! +${formatMoney(
-        job.income
-      )}`
-    );
-
-    advanceTime();
+    addCompetition(15, `Hoàn thành: ${job.name}`);
+    notify(`💼 +${money(job.pay)} từ ${job.name}`);
+    advanceTime(`Làm việc: ${job.name}`);
   };
 
-  const buyProperty = property => {
-    if (
-      game.assets.includes(property.id)
-    ) {
-      showToast(
-        "🏠 Bạn đã sở hữu tài sản này."
-      );
+  /* =====================================================
+     PROPERTY
+  ===================================================== */
+
+  const buyProperty = (property) => {
+    if (game.assets.includes(property.id)) {
+      notify("🏠 Bạn đã sở hữu tài sản này.");
       return;
     }
 
-    if (
-      game.stats.money < property.price
-    ) {
-      showToast(
-        "💸 Không đủ tiền mua tài sản."
-      );
+    if (game.stats.money < property.price) {
+      notify("💸 Chưa đủ tiền.");
       return;
     }
 
-    setGame(prev => ({
-      ...prev,
-      assets: [
-        ...prev.assets,
-        property.id
-      ],
-      stats: {
+    setGame((prev) => {
+      const stats = {
         ...prev.stats,
-        money:
-          prev.stats.money -
-          property.price,
-        reputation: clamp(
-          prev.stats.reputation +
-            (property.reputation || 0)
-        ),
-        skill: clamp(
-          prev.stats.skill +
-            (property.skill || 0)
-        ),
-        mood: clamp(
-          prev.stats.mood +
-            (property.mood || 0)
-        )
-      }
-    }));
+        money: prev.stats.money - property.price,
+      };
 
-    showToast(
-      `🏠 Đã mua ${property.name}!`
-    );
+      Object.entries(property.effect || {}).forEach(
+        ([key, value]) => {
+          stats[key] = clamp(
+            Number(stats[key] || 0) + Number(value)
+          );
+        }
+      );
+
+      return {
+        ...prev,
+        stats,
+        assets: [...prev.assets, property.id],
+      };
+    });
+
+    addCompetition(25, `Mua ${property.name}`);
+    notify(`🏠 Đã mua ${property.name}`);
+    playTone(900, 0.12);
   };
 
-  const startCertificateExam = cert => {
-    if (
-      game.certificates.includes(cert.id)
-    ) {
-      showToast(
-        "🎓 Bạn đã có chứng chỉ này."
-      );
-      return;
-    }
+  /* =====================================================
+     CERTIFICATE
+  ===================================================== */
 
-    if (game.stats.skill < cert.skill) {
-      showToast(
-        `🔒 Cần kỹ năng ≥ ${cert.skill}.`
-      );
+  const startExam = (cert) => {
+    if (game.certificates.includes(cert.id)) {
+      notify("🏅 Bạn đã có chứng chỉ này.");
       return;
     }
 
     if (game.stats.money < cert.fee) {
-      showToast(
-        "💸 Không đủ lệ phí thi."
-      );
+      notify("💸 Không đủ lệ phí.");
       return;
     }
 
-    setGame(prev => ({
-      ...prev,
-      stats: {
-        ...prev.stats,
-        money:
-          prev.stats.money - cert.fee
-      }
-    }));
-
-    setCertExam(cert);
-    setCertIndex(0);
-    setCertScore(0);
-    setOverlay("certExam");
-  };
-
-  const answerCertificate = index => {
-    if (!certExam) return;
-
-    const question =
-      certExam.questions[certIndex];
-
-    const correct =
-      index === question.answer;
-
-    const nextScore =
-      certScore + (correct ? 1 : 0);
-
-    if (correct) {
-      showToast("✅ Đúng!");
-      setCertScore(nextScore);
-    } else {
-      showToast("❌ Chưa đúng!");
-    }
-
-    if (
-      certIndex >=
-      certExam.questions.length - 1
-    ) {
-      setTimeout(() => {
-        const passed =
-          nextScore >= 2;
-
-        if (passed) {
-          setGame(prev => ({
-            ...prev,
-            certificates: [
-              ...prev.certificates,
-              certExam.id
-            ],
-            stats: {
-              ...prev.stats,
-              skill: clamp(
-                prev.stats.skill + 5
-              ),
-              reputation: clamp(
-                prev.stats.reputation + 5
-              )
-            }
-          }));
-
-          showToast(
-            `🎓 Đậu chứng chỉ ${certExam.name}!`
-          );
-        } else {
-          showToast(
-            `📄 Chưa đạt. Cần ít nhất 2/3 câu đúng.`
-          );
-        }
-
-        setCertExam(null);
-        setOverlay(null);
-        advanceTime();
-      }, 500);
-
+    if (game.stats.skill < cert.skill) {
+      notify(`🔒 Cần kỹ năng tối thiểu ${cert.skill}.`);
       return;
     }
 
-    setCertIndex(
-      value => value + 1
-    );
-  };
-
-  const interactNPC = id => {
-    const npc = NPCS[id];
-
-    if (!npc) return;
-
-    if (id === "lan") {
-      setGame(prev => ({
-        ...prev,
-        stats: {
-          ...prev.stats,
-          friends: clamp(
-            prev.stats.friends + 6
-          ),
-          mood: clamp(
-            prev.stats.mood + 4
-          )
-        },
-        npcRelationships: {
-          ...prev.npcRelationships,
-          lan: clamp(
-            prev.npcRelationships.lan + 5
-          )
-        }
-      }));
-
-      showToast(
-        "👧 Lan vui vẻ nói chuyện với bạn. +6 bạn bè."
-      );
-    }
-
-    if (id === "trieu_man") {
-      setGame(prev => ({
-        ...prev,
-        stats: {
-          ...prev.stats,
-          love: clamp(
-            prev.stats.love + 5
-          ),
-          friends: clamp(
-            prev.stats.friends + 2
-          ),
-          mood: clamp(
-            prev.stats.mood + 5
-          )
-        },
-        npcRelationships: {
-          ...prev.npcRelationships,
-          trieu_man: clamp(
-            prev.npcRelationships.trieu_man + 6
-          )
-        }
-      }));
-
-      showToast(
-        "💖 Triệu Mẫn có vẻ rất vui khi gặp bạn."
-      );
-    }
-
-    if (id === "tuan") {
-      setGame(prev => ({
-        ...prev,
-        stats: {
-          ...prev.stats,
-          skill: clamp(
-            prev.stats.skill + 3
-          ),
-          reputation: clamp(
-            prev.stats.reputation + 3
-          ),
-          friends: clamp(
-            prev.stats.friends + 3
-          )
-        },
-        npcRelationships: {
-          ...prev.npcRelationships,
-          tuan: clamp(
-            prev.npcRelationships.tuan + 5
-          )
-        }
-      }));
-
-      showToast(
-        "👦 Tuấn rủ bạn cùng luyện kỹ năng."
-      );
-    }
-  };
-
-  const useBagItem = id => {
-    const item =
-      game.bag.find(
-        x => x.id === id
-      );
-
-    if (
-      !item ||
-      item.count <= 0
-    ) {
-      showToast(
-        "🎒 Không còn vật phẩm."
-      );
-      return;
-    }
-
-    setGame(prev => {
-      const bag =
-        prev.bag.map(item => {
-          if (item.id !== id) return item;
-
-          return {
-            ...item,
-            count: Math.max(
-              0,
-              item.count - 1
-            )
-          };
-        });
-
-      const stats = {
-        ...prev.stats
-      };
-
-      if (id === "math_note") {
-        stats.study = clamp(
-          stats.study + 8
-        );
-      }
-
-      if (
-        id === "gift_strawberry"
-      ) {
-        stats.love = clamp(
-          stats.love + 8
-        );
-      }
-
-      return {
-        ...prev,
-        bag,
-        stats
-      };
+    modifyStats({
+      money: -cert.fee,
     });
 
-    showToast(
-      `🎒 Đã sử dụng ${item.name}.`
-    );
+    setExam(cert);
+    setExamIndex(0);
+    setExamScore(0);
+    setOverlay("exam");
+    playTone(720, 0.08);
   };
 
-  const saveNow = () => {
-    try {
-      localStorage.setItem(
-        SAVE_KEY,
-        JSON.stringify(game)
-      );
+  const answerExam = (answer) => {
+    if (!exam) return;
 
-      showToast(
-        "💾 Đã lưu game."
-      );
+    const current = exam.questions[examIndex];
+    const correct = answer === current.answer;
 
-      playTone(880, 0.08);
-    } catch {
-      showToast(
-        "❌ Không thể lưu game."
-      );
+    const newScore = examScore + (correct ? 1 : 0);
+
+    if (correct) {
+      notify("✅ Đúng!");
+      playTone(850, 0.08);
+    } else {
+      notify("❌ Sai!");
+      playTone(180, 0.1);
+    }
+
+    if (examIndex >= exam.questions.length - 1) {
+      if (newScore >= 2) {
+        setGame((prev) => ({
+          ...prev,
+          certificates: [
+            ...new Set([
+              ...prev.certificates,
+              exam.id,
+            ]),
+          ],
+        }));
+
+        modifyStats({
+          skill: 8,
+          reputation: 5,
+        });
+
+        addCompetition(35, `Đậu ${exam.name}`);
+        notify(`🎉 ĐẬU ${exam.name}!`);
+      } else {
+        notify("😢 Chưa đạt. Hãy ôn luyện thêm.");
+      }
+
+      setTimeout(() => {
+        setOverlay(null);
+        setExam(null);
+      }, 600);
+    } else {
+      setExamScore(newScore);
+      setExamIndex((x) => x + 1);
     }
   };
+
+  /* =====================================================
+     NPC
+  ===================================================== */
+
+  const interactNPC = (npcId) => {
+    if (npcId === "lan") {
+      setGame((prev) => ({
+        ...prev,
+        npc: {
+          ...prev.npc,
+          lan: {
+            ...prev.npc.lan,
+            friendship: clamp(
+              prev.npc.lan.friendship + 6
+            ),
+          },
+        },
+      }));
+
+      modifyStats({
+        friends: 5,
+        mood: 4,
+      });
+
+      addCompetition(8, "Giúp đỡ Lan");
+      notify("👧 Lan rất vui vì bạn đã giúp đỡ!");
+    }
+
+    if (npcId === "trieu_man") {
+      setGame((prev) => ({
+        ...prev,
+        npc: {
+          ...prev.npc,
+          trieu_man: {
+            ...prev.npc.trieu_man,
+            friendship: clamp(
+              prev.npc.trieu_man.friendship + 5
+            ),
+          },
+        },
+      }));
+
+      modifyStats({
+        love: 6,
+        mood: 5,
+      });
+
+      addCompetition(8, "Tương tác tích cực với Triệu Mẫn");
+      notify("🌸 Triệu Mẫn mỉm cười với bạn.");
+    }
+
+    if (npcId === "tuan") {
+      setGame((prev) => ({
+        ...prev,
+        npc: {
+          ...prev.npc,
+          tuan: {
+            ...prev.npc.tuan,
+            friendship: clamp(
+              prev.npc.tuan.friendship + 5
+            ),
+          },
+        },
+      }));
+
+      modifyStats({
+        skill: 4,
+        friends: 3,
+      });
+
+      addCompetition(8, "Học hỏi từ Tuấn");
+      notify("🧑‍🎓 Tuấn chia sẻ một mẹo học hay.");
+    }
+  };
+
+  /* =====================================================
+     BAG
+  ===================================================== */
+
+  const useBagItem = (item) => {
+    if (!item || item.count <= 0) return;
+
+    let effect = {};
+
+    if (item.id === "math_note") {
+      effect = { study: 8 };
+    }
+
+    if (item.id === "gift_strawberry") {
+      effect = { love: 8 };
+    }
+
+    setGame((prev) => ({
+      ...prev,
+      bag: prev.bag.map((x) =>
+        x.id === item.id
+          ? { ...x, count: Math.max(0, x.count - 1) }
+          : x
+      ),
+    }));
+
+    modifyStats(effect);
+    addCompetition(5, `Sử dụng ${item.name}`);
+    notify(`🎒 Đã sử dụng ${item.name}`);
+  };
+
+  /* =====================================================
+     SAVE CODE
+  ===================================================== */
 
   const generateSaveCode = () => {
-    try {
-      const code =
-        encodeSaveCode(game);
-
-      setSaveCode(code);
-      setSaveCodeInput(code);
-      setOverlay("saveCode");
-
-      playTone(880, 0.08);
-    } catch {
-      showToast(
-        "❌ Không tạo được mã lưu."
-      );
-    }
+    const code = encodeSaveCode(game);
+    setSaveCode(code);
+    setSaveInput(code);
+    setOverlay("save");
+    playTone(700, 0.08);
   };
 
   const importSaveCode = () => {
     try {
-      if (!saveCodeInput.trim()) {
-        showToast(
-          "⚠️ Hãy nhập mã lưu."
-        );
-        return;
-      }
+      const decoded = decodeSaveCode(saveInput);
 
-      const decoded =
-        decodeSaveCode(
-          saveCodeInput
-        );
-
-      const normalized =
-        normalizeState(decoded);
+      const normalized = normalizeState(decoded);
 
       setGame(normalized);
-
-      localStorage.setItem(
-        SAVE_KEY,
-        JSON.stringify(normalized)
-      );
-
       setOverlay(null);
 
-      showToast(
-        "✅ Đã tải game từ mã lưu."
-      );
-
-      playTone(880, 0.1);
+      notify("✅ Đã khôi phục game từ Save Code!");
+      playTone(900, 0.1);
     } catch {
-      showToast(
-        "❌ Mã lưu không hợp lệ hoặc đã bị hỏng."
-      );
+      notify("❌ Save Code không hợp lệ.");
     }
   };
 
   const copySaveCode = async () => {
     try {
       await navigator.clipboard.writeText(
-        saveCode
+        saveCode || saveInput
       );
 
-      showToast(
-        "📋 Đã sao chép mã lưu."
-      );
+      notify("📋 Đã copy Save Code!");
     } catch {
-      showToast(
-        "Không thể tự sao chép. Hãy bôi đen và copy mã."
-      );
+      notify("⚠️ Trình duyệt không cho phép copy tự động.");
     }
   };
 
-  const exportSave = () => {
-    try {
-      const blob = new Blob(
-        [
-          JSON.stringify(
-            game,
-            null,
-            2
-          )
-        ],
-        {
-          type: "application/json"
-        }
-      );
+  const exportFile = () => {
+    const blob = new Blob(
+      [JSON.stringify(game, null, 2)],
+      { type: "application/json" }
+    );
 
-      const url =
-        URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
 
-      const a =
-        document.createElement("a");
+    a.href = url;
+    a.download = `thanh-xuan-ngay-${game.day}.json`;
+    a.click();
 
-      a.href = url;
-      a.download =
-        "thanh-xuan-ruc-ro-save.json";
+    URL.revokeObjectURL(url);
 
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      URL.revokeObjectURL(url);
-
-      showToast(
-        "📦 Đã xuất file save."
-      );
-    } catch {
-      showToast(
-        "❌ Không thể xuất file."
-      );
-    }
+    notify("💾 Đã xuất file save.");
   };
 
-  const importSaveFile = event => {
-    const file =
-      event.target.files?.[0];
+  const importFile = (event) => {
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
-    const reader =
-      new FileReader();
+    const reader = new FileReader();
 
-    reader.onload = e => {
+    reader.onload = () => {
       try {
-        const parsed =
-          JSON.parse(
-            e.target.result
-          );
-
-        const normalized =
-          normalizeState(parsed);
-
-        setGame(normalized);
-
-        localStorage.setItem(
-          SAVE_KEY,
-          JSON.stringify(normalized)
-        );
-
-        showToast(
-          "✅ Đã tải file save."
-        );
+        const data = JSON.parse(reader.result);
+        setGame(normalizeState(data));
+        notify("✅ Đã tải file save.");
       } catch {
-        showToast(
-          "❌ File save không hợp lệ."
-        );
+        notify("❌ File save không hợp lệ.");
       }
 
       event.target.value = "";
@@ -1941,137 +1480,417 @@ function App() {
     reader.readAsText(file);
   };
 
-  const restartGame = () => {
-    const ok =
-      window.confirm(
-        "Bạn có chắc muốn bắt đầu lại từ đầu?"
-      );
+  /* =====================================================
+     RESET
+  ===================================================== */
 
-    if (!ok) return;
+  const restart = () => {
+    if (
+      !window.confirm(
+        "Bạn có chắc muốn bắt đầu lại từ đầu không?"
+      )
+    ) {
+      return;
+    }
 
-    const fresh =
-      createInitialState();
+    const fresh = createInitialState();
 
     setGame(fresh);
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify(fresh)
-    );
-
     setOverlay(null);
     setDrawer(null);
-
-    showToast(
-      "🔄 Đã bắt đầu lại hành trình."
-    );
+    notify("🌱 Một thanh xuân mới bắt đầu!");
   };
 
-  const handleA = () => {
-    playTone(760, 0.06);
+  /* =====================================================
+     NAVIGATION
+  ===================================================== */
 
-    if (game.location === "class") {
-      startQuiz();
-      return;
-    }
+  const navigation = [
+    ["class", "🏫", "Lớp"],
+    ["canteen", "🍜", "Căn-tin"],
+    ["job", "💼", "Việc"],
+    ["cert", "📜", "Thi"],
+    ["prop", "🏠", "Tài sản"],
+    ["home", "🏡", "Nhà"],
+  ];
 
-    if (game.location === "home") {
-      restAtHome();
-      return;
-    }
+  /* =====================================================
+     COMPUTED
+  ===================================================== */
 
-    setOverlay("competition");
-  };
+  const currentTime = TIMES[game.timeIndex];
 
-  const handleB = () => {
-    playTone(380, 0.06);
-    setDrawer("bag");
-  };
+  const ranking = useMemo(() => {
+    const rows = [
+      {
+        id: "self",
+        name: "Bạn",
+        avatar: "🧑‍🎓",
+        score: game.competition.self,
+        type: "self",
+      },
+      {
+        id: "lan",
+        name: "Lan",
+        avatar: "👧",
+        score: game.npc.lan.competition,
+      },
+      {
+        id: "trieu_man",
+        name: "Triệu Mẫn",
+        avatar: "🌸",
+        score: game.npc.trieu_man.competition,
+      },
+      {
+        id: "tuan",
+        name: "Tuấn",
+        avatar: "🧑‍🎓",
+        score: game.npc.tuan.competition,
+      },
+    ];
 
-  const navLeft = () => {
-    const locations =
-      Object.keys(
-        LOCATION_META
-      );
+    return rows.sort((a, b) => b.score - a.score);
+  }, [game]);
 
-    const current =
-      locations.indexOf(
-        game.location
-      );
+  const rankPosition =
+    ranking.findIndex((x) => x.id === "self") + 1;
 
-    const next =
-      current <= 0
-        ? locations.length - 1
-        : current - 1;
+  const progressPercent =
+    ((game.timeIndex + 1) / TIMES.length) * 100;
 
-    goLocation(
-      locations[next]
-    );
-  };
+  /* =====================================================
+     UI HELPERS
+  ===================================================== */
 
-  const navRight = () => {
-    const locations =
-      Object.keys(
-        LOCATION_META
-      );
+  const StatBar = ({
+    label,
+    value,
+    icon,
+  }) => (
+    <div className="stat">
+      <div className="stat-top">
+        <span>
+          {icon} {label}
+        </span>
+        <b>{Math.round(value)}</b>
+      </div>
 
-    const current =
-      locations.indexOf(
-        game.location
-      );
+      <div className="bar">
+        <div
+          className="bar-fill"
+          style={{ width: `${clamp(value)}%` }}
+        />
+      </div>
+    </div>
+  );
 
-    const next =
-      current >= locations.length - 1
-        ? 0
-        : current + 1;
+  const Header = () => (
+    <header className="topbar">
+      <div>
+        <div className="brand">
+          🌸 THANH XUÂN RỰC RỠ
+        </div>
+        <div className="subtitle">
+          Nhật ký cấp 3 · Deluxe Edition
+        </div>
+      </div>
 
-    goLocation(
-      locations[next]
-    );
-  };
+      <div className="top-actions">
+        <button
+          className="icon-btn"
+          onClick={() => setAudioEnabled((x) => !x)}
+        >
+          {audioEnabled ? "🔊" : "🔇"}
+        </button>
 
-  const renderLocation = () => {
+        <button
+          className="icon-btn"
+          onClick={generateSaveCode}
+        >
+          💾
+        </button>
+
+        <button
+          className="icon-btn"
+          onClick={() => setDrawer("competition")}
+        >
+          🏆
+        </button>
+      </div>
+    </header>
+  );
+
+  const HUD = () => (
+    <section className="hud">
+      <div className="day-card">
+        <div className="day-big">
+          NGÀY {game.day}
+        </div>
+
+        <div className="time-big">
+          {currentTime.label}
+        </div>
+
+        <div className="time-name">
+          {currentTime.name}
+        </div>
+
+        <div className="progress">
+          <div
+            style={{
+              width: `${progressPercent}%`,
+            }}
+          />
+        </div>
+
+        <small>
+          Tự động chuyển thời gian
+        </small>
+      </div>
+
+      <div className="stats-grid">
+        <StatBar
+          label="HP"
+          value={game.stats.hp}
+          icon="❤️"
+        />
+
+        <StatBar
+          label="Năng lượng"
+          value={game.stats.energy}
+          icon="⚡"
+        />
+
+        <StatBar
+          label="Tâm trạng"
+          value={game.stats.mood}
+          icon="😊"
+        />
+
+        <StatBar
+          label="Học tập"
+          value={game.stats.study}
+          icon="📚"
+        />
+
+        <StatBar
+          label="Bạn bè"
+          value={game.stats.friends}
+          icon="🤝"
+        />
+
+        <StatBar
+          label="Tình cảm"
+          value={game.stats.love}
+          icon="💖"
+        />
+      </div>
+
+      <div className="money-card">
+        <span>💰 Tài sản tiền mặt</span>
+        <strong>{money(game.stats.money)}</strong>
+
+        <div className="mini-stats">
+          <span>⚡ {Math.round(game.stats.skill)}</span>
+          <span>⭐ {Math.round(game.stats.reputation)}</span>
+          <span>🏆 {game.competition.self}</span>
+        </div>
+      </div>
+    </section>
+  );
+
+  const Scene = () => (
+    <section className="scene">
+      <div className="scene-background">
+        <div className="scene-cloud cloud1" />
+        <div className="scene-cloud cloud2" />
+
+        <div className="school">
+          🏫
+        </div>
+
+        <div className="scene-title">
+          {LOCATIONS[game.location]?.icon}{" "}
+          {LOCATIONS[game.location]?.name}
+        </div>
+
+        <div className="character-main">
+          🧑‍🎓
+        </div>
+
+        <div className="npc-row">
+          {NPCS.map((npc) => (
+            <button
+              key={npc.id}
+              className="npc-card"
+              onClick={() => interactNPC(npc.id)}
+            >
+              <span className="npc-avatar">
+                {npc.avatar}
+              </span>
+
+              <strong>{npc.name}</strong>
+
+              <small>{npc.role}</small>
+
+              <span className="npc-score">
+                🏆{" "}
+                {game.npc[npc.id]?.competition || 0}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+
+  const Navigation = () => (
+    <div className="navigation">
+      {navigation.map(([id, icon, label]) => (
+        <button
+          key={id}
+          className={
+            game.location === id
+              ? "nav-btn active"
+              : "nav-btn"
+          }
+          onClick={() => goLocation(id)}
+        >
+          <span>{icon}</span>
+          <small>{label}</small>
+        </button>
+      ))}
+    </div>
+  );
+
+  const BottomControls = () => (
+    <div className="controls">
+      <div className="dpad">
+        <button
+          onClick={() =>
+            setGame((prev) => ({
+              ...prev,
+              timeIndex: Math.max(
+                0,
+                prev.timeIndex - 1
+              ),
+            }))
+          }
+        >
+          ◀
+        </button>
+
+        <button
+          onClick={() =>
+            setGame((prev) => ({
+              ...prev,
+              timeIndex: Math.min(
+                TIMES.length - 1,
+                prev.timeIndex + 1
+              ),
+            }))
+          }
+        >
+          ▶
+        </button>
+      </div>
+
+      <div className="control-main">
+        <button
+          className="rpg-btn"
+          onClick={startQuiz}
+        >
+          📚 HỌC
+        </button>
+
+        <button
+          className="rpg-btn"
+          onClick={() => setDrawer("profile")}
+        >
+          👤 PROFILE
+        </button>
+
+        <button
+          className="rpg-btn"
+          onClick={() => setDrawer("bag")}
+        >
+          🎒 TÚI
+        </button>
+
+        <button
+          className="rpg-btn"
+          onClick={() => setDrawer("diary")}
+        >
+          📖 NHẬT KÝ
+        </button>
+      </div>
+
+      <div className="ab-buttons">
+        <button
+          className="btn-a"
+          onClick={startQuiz}
+        >
+          A
+        </button>
+
+        <button
+          className="btn-b"
+          onClick={restAtHome}
+        >
+          B
+        </button>
+      </div>
+    </div>
+  );
+
+  /* =====================================================
+     LOCATION PANEL
+  ===================================================== */
+
+  const LocationPanel = () => {
     if (game.location === "class") {
       return (
-        <div className="location-panel">
-          <div className="pixel-scene class-scene">
-            <div className="scene-cloud">☁️</div>
-            <div className="scene-school">🏫</div>
-            <div className="scene-student">🧑‍🎓</div>
+        <div className="panel">
+          <div className="panel-title">
+            🏫 LỚP HỌC
           </div>
 
-          <div className="location-content">
-            <h2>🏫 Lớp học</h2>
+          <p>
+            Thời gian tự động chạy. Bạn có thể học để
+            tăng điểm học tập và điểm thi đua.
+          </p>
 
-            <p>
-              Một ngày học mới bắt đầu.
-              Hãy học tập, giao lưu và tích
-              lũy điểm thi đua.
-            </p>
+          <button
+            className="primary"
+            onClick={startQuiz}
+          >
+            📚 Bắt đầu tiết học
+          </button>
 
-            <div className="action-grid">
-              <button
-                className="primary-btn"
-                onClick={startQuiz}
-              >
-                📝 Làm quiz
-              </button>
+          <div className="quick-row">
+            <button
+              onClick={() =>
+                interactNPC("lan")
+              }
+            >
+              👧 Nói chuyện Lan
+            </button>
 
-              <button
-                className="secondary-btn"
-                onClick={studyAction}
-              >
-                📚 Tự học
-              </button>
+            <button
+              onClick={() =>
+                interactNPC("trieu_man")
+              }
+            >
+              🌸 Nói chuyện Triệu Mẫn
+            </button>
 
-              <button
-                className="secondary-btn"
-                onClick={() =>
-                  setOverlay("npc")
-                }
-              >
-                👥 Gặp bạn bè
-              </button>
-            </div>
+            <button
+              onClick={() =>
+                interactNPC("tuan")
+              }
+            >
+              🧑‍🎓 Học cùng Tuấn
+            </button>
           </div>
         </div>
       );
@@ -2079,47 +1898,29 @@ function App() {
 
     if (game.location === "canteen") {
       return (
-        <div className="location-panel">
-          <div className="pixel-scene canteen-scene">
-            <div className="scene-food">🍜🥪🥛</div>
-            <div className="scene-student">🧑‍🎓</div>
+        <div className="panel">
+          <div className="panel-title">
+            🍜 CĂN-TIN
           </div>
 
-          <div className="location-content">
-            <h2>🍜 Căn tin</h2>
+          <div className="shop-grid">
+            {CANTEEN_ITEMS.map((item) => (
+              <button
+                className="shop-item"
+                key={item.id}
+                onClick={() => buyFood(item)}
+              >
+                <span className="shop-icon">
+                  {item.icon}
+                </span>
 
-            <p>
-              Ăn uống để hồi phục năng lượng.
-            </p>
+                <strong>{item.name}</strong>
 
-            <div className="shop-grid">
-              {CANTEEN_ITEMS.map(item => (
-                <div
-                  className="shop-card"
-                  key={item.id}
-                >
-                  <div className="shop-icon">
-                    {item.icon}
-                  </div>
-
-                  <strong>
-                    {item.name}
-                  </strong>
-
-                  <small>
-                    {formatMoney(item.price)}
-                  </small>
-
-                  <button
-                    onClick={() =>
-                      buyFood(item)
-                    }
-                  >
-                    Mua
-                  </button>
-                </div>
-              ))}
-            </div>
+                <small>
+                  {money(item.price)}
+                </small>
+              </button>
+            ))}
           </div>
         </div>
       );
@@ -2127,76 +1928,40 @@ function App() {
 
     if (game.location === "job") {
       return (
-        <div className="location-panel">
-          <div className="location-content">
-            <h2>💼 Việc làm</h2>
+        <div className="panel">
+          <div className="panel-title">
+            💼 VIỆC LÀM
+          </div>
 
-            <p>
-              Kiếm tiền và tăng kỹ năng.
-              Mỗi công việc sẽ tiêu hao
-              năng lượng.
-            </p>
+          <div className="job-list">
+            {JOBS.map((job) => {
+              const available = job.req(game);
 
-            <div className="job-list">
-              {JOBS.map(job => {
-                const locked =
-                  (
-                    job.requirement &&
-                    game.stats.skill <
-                      job.requirement
-                  ) ||
-                  (
-                    job.requirementCert &&
-                    !game.certificates.includes(
-                      job.requirementCert
-                    )
-                  );
+              return (
+                <button
+                  key={job.id}
+                  className={
+                    available
+                      ? "job-item"
+                      : "job-item locked"
+                  }
+                  onClick={() => doJob(job)}
+                >
+                  <span className="job-icon">
+                    {job.icon}
+                  </span>
 
-                return (
-                  <div
-                    className="job-card"
-                    key={job.id}
-                  >
-                    <div className="job-icon">
-                      {job.icon}
-                    </div>
+                  <span className="job-info">
+                    <strong>{job.name}</strong>
+                    <small>{job.desc}</small>
+                  </span>
 
-                    <div className="job-main">
-                      <strong>
-                        {job.name}
-                      </strong>
-
-                      <p>
-                        {job.description}
-                      </p>
-
-                      <span>
-                        💰 {formatMoney(job.income)}
-                        {" • "}
-                        ⚡ {Math.abs(job.energy)}
-                      </span>
-
-                      {job.requirementText && (
-                        <small>
-                          🔒 {job.requirementText}
-                        </small>
-                      )}
-                    </div>
-
-                    <button
-                      disabled={locked}
-                      onClick={() =>
-                        workJob(job)
-                      }
-                    >
-                      {locked
-                        ? "🔒"
-                        : "Làm"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  <span className="job-pay">
+                    +{money(job.pay)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -2204,66 +1969,46 @@ function App() {
 
     if (game.location === "cert") {
       return (
-        <div className="location-panel">
-          <div className="location-content">
-            <h2>🎓 Phòng chứng chỉ</h2>
+        <div className="panel">
+          <div className="panel-title">
+            📜 PHÒNG THI CHỨNG CHỈ
+          </div>
 
-            <p>
-              Học đủ kỹ năng rồi thi chứng
-              chỉ để mở khóa công việc mới.
-            </p>
+          <div className="job-list">
+            {Object.values(CERTS).map((cert) => {
+              const owned =
+                game.certificates.includes(cert.id);
 
-            <div className="cert-grid">
-              {Object.values(CERTS).map(cert => {
-                const owned =
-                  game.certificates.includes(
-                    cert.id
-                  );
+              return (
+                <button
+                  key={cert.id}
+                  className={
+                    owned
+                      ? "job-item owned"
+                      : "job-item"
+                  }
+                  onClick={() =>
+                    !owned && startExam(cert)
+                  }
+                >
+                  <span className="job-icon">
+                    {cert.icon}
+                  </span>
 
-                return (
-                  <div
-                    className={
-                      `cert-card ${
-                        owned
-                          ? "owned"
-                          : ""
-                      }`
-                    }
-                    key={cert.id}
-                  >
-                    <div className="cert-icon">
-                      {cert.icon}
-                    </div>
+                  <span className="job-info">
+                    <strong>{cert.name}</strong>
+                    <small>
+                      Kỹ năng ≥ {cert.skill} · Phí{" "}
+                      {money(cert.fee)}
+                    </small>
+                  </span>
 
-                    <strong>
-                      {cert.name}
-                    </strong>
-
-                    <p>
-                      Kỹ năng: {cert.skill}
-                    </p>
-
-                    <p>
-                      Lệ phí:{" "}
-                      {formatMoney(cert.fee)}
-                    </p>
-
-                    <button
-                      disabled={owned}
-                      onClick={() =>
-                        startCertificateExam(
-                          cert
-                        )
-                      }
-                    >
-                      {owned
-                        ? "✓ Đã có"
-                        : "Thi ngay"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  <span>
+                    {owned ? "✅" : "📝"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -2271,67 +2016,45 @@ function App() {
 
     if (game.location === "prop") {
       return (
-        <div className="location-panel">
-          <div className="location-content">
-            <h2>🏠 Cửa hàng tài sản</h2>
+        <div className="panel">
+          <div className="panel-title">
+            🏠 CỬA HÀNG TÀI SẢN
+          </div>
 
-            <p>
-              Dùng tiền kiếm được để xây dựng
-              tài sản cá nhân.
-            </p>
+          <div className="property-grid">
+            {PROPERTIES.map((property) => {
+              const owned =
+                game.assets.includes(property.id);
 
-            <div className="property-grid">
-              {PROPERTIES.map(property => {
-                const owned =
-                  game.assets.includes(
-                    property.id
-                  );
+              return (
+                <button
+                  key={property.id}
+                  className={
+                    owned
+                      ? "property owned"
+                      : "property"
+                  }
+                  onClick={() =>
+                    !owned &&
+                    buyProperty(property)
+                  }
+                >
+                  <span className="property-icon">
+                    {property.icon}
+                  </span>
 
-                return (
-                  <div
-                    className={
-                      `property-card ${
-                        owned
-                          ? "owned"
-                          : ""
-                      }`
-                    }
-                    key={property.id}
-                  >
-                    <div className="property-icon">
-                      {property.icon}
-                    </div>
+                  <strong>{property.name}</strong>
 
-                    <strong>
-                      {property.name}
-                    </strong>
+                  <small>{property.desc}</small>
 
-                    <p>
-                      {property.effect}
-                    </p>
-
-                    <b>
-                      {formatMoney(
-                        property.price
-                      )}
-                    </b>
-
-                    <button
-                      disabled={owned}
-                      onClick={() =>
-                        buyProperty(
-                          property
-                        )
-                      }
-                    >
-                      {owned
-                        ? "✓ Đã sở hữu"
-                        : "Mua"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  <b>
+                    {owned
+                      ? "ĐÃ SỞ HỮU"
+                      : money(property.price)}
+                  </b>
+                </button>
+              );
+            })}
           </div>
         </div>
       );
@@ -2339,29 +2062,485 @@ function App() {
 
     if (game.location === "home") {
       return (
-        <div className="location-panel">
-          <div className="pixel-scene home-scene">
-            <div>🏡</div>
-            <div className="scene-bed">
-              🛏️
-            </div>
+        <div className="panel home-panel">
+          <div className="panel-title">
+            🏡 NHÀ
           </div>
 
-          <div className="location-content">
-            <h2>🏡 Nhà</h2>
+          <div className="home-art">
+            🛏️ 🌙 🪟
+          </div>
 
-            <p>
-              Nghỉ ngơi để hồi phục năng lượng.
-              Mỗi khung giờ chỉ nhận thưởng
-              nghỉ một lần.
-            </p>
+          <p>
+            Một chút nghỉ ngơi giúp bạn hồi phục
+            năng lượng.
+          </p>
+
+          <button
+            className="primary"
+            onClick={restAtHome}
+          >
+            😴 Nghỉ ngơi +25 năng lượng
+          </button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  /* =====================================================
+     DRAWERS
+  ===================================================== */
+
+  const Drawer = () => {
+    if (!drawer) return null;
+
+    return (
+      <div
+        className="drawer-backdrop"
+        onClick={() => setDrawer(null)}
+      >
+        <div
+          className="drawer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="drawer-head">
+            <strong>
+              {drawer === "profile" &&
+                "👤 Hồ sơ nhân vật"}
+
+              {drawer === "bag" &&
+                "🎒 Túi đồ"}
+
+              {drawer === "diary" &&
+                "📖 Nhật ký"}
+
+              {drawer === "competition" &&
+                "🏆 Bảng thi đua"}
+            </strong>
 
             <button
-              className="primary-btn large"
-              onClick={restAtHome}
+              onClick={() => setDrawer(null)}
             >
-              😴 Nghỉ ngơi +25 năng lượng
+              ✕
             </button>
+          </div>
+
+          {drawer === "profile" && (
+            <div className="drawer-content">
+              <div className="profile-avatar">
+                🧑‍🎓
+              </div>
+
+              <h2>Học sinh Thanh Xuân</h2>
+
+              <div className="profile-grid">
+                <div>
+                  <span>📚 Học tập</span>
+                  <b>{Math.round(game.stats.study)}</b>
+                </div>
+
+                <div>
+                  <span>⚡ Kỹ năng</span>
+                  <b>{Math.round(game.stats.skill)}</b>
+                </div>
+
+                <div>
+                  <span>🤝 Bạn bè</span>
+                  <b>{Math.round(game.stats.friends)}</b>
+                </div>
+
+                <div>
+                  <span>💖 Tình cảm</span>
+                  <b>{Math.round(game.stats.love)}</b>
+                </div>
+
+                <div>
+                  <span>⭐ Uy tín</span>
+                  <b>
+                    {Math.round(
+                      game.stats.reputation
+                    )}
+                  </b>
+                </div>
+
+                <div>
+                  <span>🏆 Thi đua</span>
+                  <b>
+                    {game.competition.self}
+                  </b>
+                </div>
+              </div>
+
+              <h3>🎖️ Danh hiệu</h3>
+
+              <div className="title-list">
+                {TITLES.map((title) => {
+                  const unlocked =
+                    game.titles.includes(title.id);
+
+                  return (
+                    <div
+                      key={title.id}
+                      className={
+                        unlocked
+                          ? "title-card"
+                          : "title-card locked"
+                      }
+                    >
+                      <span>
+                        {unlocked
+                          ? title.icon
+                          : "🔒"}
+                      </span>
+
+                      <div>
+                        <strong>
+                          {title.name}
+                        </strong>
+                        <small>
+                          {title.desc}
+                        </small>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {drawer === "bag" && (
+            <div className="drawer-content">
+              {game.bag.length === 0 && (
+                <p>Túi đồ đang trống.</p>
+              )}
+
+              {game.bag.map((item) => (
+                <div
+                  className="bag-item"
+                  key={item.id}
+                >
+                  <span className="bag-icon">
+                    {item.icon}
+                  </span>
+
+                  <div>
+                    <strong>
+                      {item.name} × {item.count}
+                    </strong>
+
+                    <small>
+                      {item.desc}
+                    </small>
+                  </div>
+
+                  <button
+                    disabled={item.count <= 0}
+                    onClick={() =>
+                      useBagItem(item)
+                    }
+                  >
+                    Dùng
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {drawer === "diary" && (
+            <div className="drawer-content">
+              {game.diaryEntries.length === 0 && (
+                <p>
+                  Chưa có trang nhật ký nào.
+                </p>
+              )}
+
+              {[...game.diaryEntries]
+                .reverse()
+                .map((entry) => (
+                  <div
+                    className="diary-entry"
+                    key={entry.id}
+                  >
+                    <strong>
+                      Ngày {entry.day}
+                    </strong>
+
+                    <p>{entry.text}</p>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {drawer === "competition" && (
+            <div className="drawer-content">
+              <div className="competition-header">
+                <div>
+                  <small>Thứ hạng hiện tại</small>
+                  <strong>
+                    #{rankPosition}
+                  </strong>
+                </div>
+
+                <div>
+                  <small>Điểm của bạn</small>
+                  <strong>
+                    {game.competition.self}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="ranking-list">
+                {ranking.map((row, index) => (
+                  <div
+                    key={row.id}
+                    className={
+                      row.id === "self"
+                        ? "rank-row me"
+                        : "rank-row"
+                    }
+                  >
+                    <span className="rank-number">
+                      {index === 0
+                        ? "🥇"
+                        : index === 1
+                        ? "🥈"
+                        : index === 2
+                        ? "🥉"
+                        : `#${index + 1}`}
+                    </span>
+
+                    <span className="rank-avatar">
+                      {row.avatar}
+                    </span>
+
+                    <div className="rank-name">
+                      <strong>{row.name}</strong>
+
+                      {row.id === "self" && (
+                        <small>Bạn</small>
+                      )}
+                    </div>
+
+                    <b>
+                      {row.score}
+                    </b>
+                  </div>
+                ))}
+              </div>
+
+              <div className="npc-note">
+                💡 NPC sẽ tự động tăng điểm thi đua
+                mỗi ngày. Bạn cần học tập, làm việc,
+                tương tác và hoàn thành nhiệm vụ để
+                cạnh tranh.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /* =====================================================
+     OVERLAYS
+  ===================================================== */
+
+  const Overlay = () => {
+    if (!overlay) return null;
+
+    if (overlay === "quiz" && quiz) {
+      const current =
+        quiz.questions[quizIndex];
+
+      return (
+        <div className="overlay">
+          <div className="modal">
+            <div className="modal-head">
+              <span>
+                📚 CÂU HỎI {quizIndex + 1}/
+                {quiz.questions.length}
+              </span>
+
+              <button
+                onClick={() => {
+                  setOverlay(null);
+                  setQuiz(null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="quiz-subject">
+              {current.subject}
+            </div>
+
+            <h2>{current.q}</h2>
+
+            <div className="choice-list">
+              {current.choices.map(
+                (choice, index) => (
+                  <button
+                    key={choice}
+                    onClick={() =>
+                      answerQuiz(index)
+                    }
+                  >
+                    <span>
+                      {String.fromCharCode(
+                        65 + index
+                      )}
+                    </span>
+
+                    {choice}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="quiz-score">
+              Điểm hiện tại: {quizScore}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (overlay === "exam" && exam) {
+      const current =
+        exam.questions[examIndex];
+
+      return (
+        <div className="overlay">
+          <div className="modal">
+            <div className="modal-head">
+              <span>
+                {exam.icon} {exam.name}
+              </span>
+
+              <button
+                onClick={() => {
+                  setOverlay(null);
+                  setExam(null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="exam-progress">
+              Câu {examIndex + 1}/
+              {exam.questions.length}
+            </div>
+
+            <h2>{current.q}</h2>
+
+            <div className="choice-list">
+              {current.choices.map(
+                (choice, index) => (
+                  <button
+                    key={choice}
+                    onClick={() =>
+                      answerExam(index)
+                    }
+                  >
+                    <span>
+                      {String.fromCharCode(
+                        65 + index
+                      )}
+                    </span>
+
+                    {choice}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (overlay === "save") {
+      return (
+        <div className="overlay">
+          <div className="modal save-modal">
+            <div className="modal-head">
+              <span>💾 SAVE GAME</span>
+
+              <button
+                onClick={() =>
+                  setOverlay(null)
+                }
+              >
+                ✕
+              </button>
+            </div>
+
+            <h3>Tạo / khôi phục Save Code</h3>
+
+            <textarea
+              value={saveInput}
+              onChange={(e) =>
+                setSaveInput(e.target.value)
+              }
+              placeholder="Dán Save Code vào đây..."
+            />
+
+            <div className="save-buttons">
+              <button
+                className="primary"
+                onClick={generateSaveCode}
+              >
+                🔄 Tạo mã mới
+              </button>
+
+              <button
+                onClick={copySaveCode}
+              >
+                📋 Copy
+              </button>
+
+              <button
+                onClick={importSaveCode}
+              >
+                📥 Khôi phục
+              </button>
+
+              <button
+                onClick={exportFile}
+              >
+                📄 Xuất file
+              </button>
+
+              <button
+                onClick={() =>
+                  fileRef.current?.click()
+                }
+              >
+                📂 Nhập file
+              </button>
+
+              <button
+                onClick={restart}
+              >
+                🔄 Chơi lại
+              </button>
+            </div>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={importFile}
+            />
+
+            <p className="save-help">
+              💡 Bạn có thể copy Save Code sang máy
+              khác rồi dán vào đây để tiếp tục chơi.
+            </p>
           </div>
         </div>
       );
@@ -2370,1307 +2549,177 @@ function App() {
     return null;
   };
 
-  return (
-    <>
-      <style>{CSS}</style>
+  /* =====================================================
+     GAME OVER
+  ===================================================== */
 
-      <div className="app">
-        <header className="topbar">
-          <div>
-            <div className="brand">
-              ✨ Thanh Xuân Rực Rỡ
+  if (game.isGameOver) {
+    return (
+      <>
+        <div className="game-shell">
+          <div className="ending">
+            <div className="ending-icon">
+              🎓
             </div>
 
-            <div className="subtitle">
-              Deluxe Career & Assets Edition
-            </div>
-          </div>
+            <h1>
+              THANH XUÂN RỰC RỠ
+            </h1>
 
-          <div className="top-actions">
-            <button
-              onClick={() =>
-                setAudioEnabled(
-                  value => !value
-                )
-              }
-              title="Âm thanh"
-            >
-              {audioEnabled
-                ? "🔊"
-                : "🔇"}
-            </button>
+            <h2>
+              Bạn đã hoàn thành 45 ngày cấp 3!
+            </h2>
 
-            <button
-              onClick={saveNow}
-              title="Lưu"
-            >
-              💾
-            </button>
-
-            <button
-              onClick={generateSaveCode}
-              title="Mã lưu"
-            >
-              🔐
-            </button>
-
-            <button
-              onClick={() =>
-                setOverlay("settings")
-              }
-              title="Cài đặt"
-            >
-              ⚙️
-            </button>
-          </div>
-        </header>
-
-        <main className="game-shell">
-          <section className="hud">
-            <div className="day-card">
-              <span>NGÀY</span>
-              <strong>
-                {game.day}/{game.totalDays}
-              </strong>
-            </div>
-
-            <div className="time-card">
-              <span>THỜI GIAN</span>
-              <strong>
-                {TIMES[game.timeIndex]}
-              </strong>
-            </div>
-
-            <div className="money-card">
-              <span>TIỀN</span>
-              <strong>
-                💰{" "}
-                {formatMoney(
-                  game.stats.money
-                )}
-              </strong>
-            </div>
-
-            <div className="rank-card">
-              <span>THI ĐUA</span>
-              <strong>
-                #{game.currentRank}
-                {" "}
-                •{" "}
-                {game.competitionScore}
-              </strong>
-            </div>
-          </section>
-
-          <section className="stats">
-            <Stat
-              icon="❤️"
-              name="HP"
-              value={game.stats.hp}
-            />
-
-            <Stat
-              icon="⚡"
-              name="Năng lượng"
-              value={game.stats.energy}
-            />
-
-            <Stat
-              icon="😊"
-              name="Tâm trạng"
-              value={game.stats.mood}
-            />
-
-            <Stat
-              icon="📚"
-              name="Học tập"
-              value={game.stats.study}
-            />
-
-            <Stat
-              icon="💖"
-              name="Tình cảm"
-              value={game.stats.love}
-            />
-
-            <Stat
-              icon="🧠"
-              name="Kỹ năng"
-              value={game.stats.skill}
-            />
-          </section>
-
-          <section className="location-tabs">
-            {Object.entries(
-              LOCATION_META
-            ).map(([id, info]) => (
-              <button
-                key={id}
-                className={
-                  game.location === id
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  goLocation(id)
-                }
-              >
-                <span>
-                  {info.icon}
-                </span>
-
-                <small>
-                  {info.name}
-                </small>
-              </button>
-            ))}
-          </section>
-
-          <section className="main-panel">
-            {renderLocation()}
-          </section>
-
-          <section className="npc-strip">
-            {Object.values(NPCS).map(npc => (
-              <button
-                className="npc-mini"
-                key={npc.id}
-                onClick={() =>
-                  interactNPC(npc.id)
-                }
-              >
-                <span className="npc-avatar">
-                  {npc.avatar}
-                </span>
-
-                <span>
-                  <b>{npc.name}</b>
-                  <small>
-                    ❤️{" "}
-                    {
-                      game.npcRelationships[
-                        npc.id
-                      ]
-                    }
-                  </small>
-                </span>
-              </button>
-            ))}
-          </section>
-
-          <section className="bottom-actions">
-            <button
-              onClick={() =>
-                setDrawer("profile")
-              }
-            >
-              👤
-              <span>Hồ sơ</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setOverlay("competition")
-              }
-            >
-              🏆
-              <span>Thi đua</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setOverlay("titles")
-              }
-            >
-              🎖️
-              <span>Danh hiệu</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setDrawer("assets")
-              }
-            >
-              🏠
-              <span>Tài sản</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setDrawer("bag")
-              }
-            >
-              🎒
-              <span>Túi đồ</span>
-            </button>
-
-            <button
-              onClick={() =>
-                setDrawer("diary")
-              }
-            >
-              📖
-              <span>Nhật ký</span>
-            </button>
-          </section>
-
-          <section className="controller">
-            <div className="dpad">
-              <button
-                onClick={navLeft}
-              >
-                ◀
-              </button>
-
-              <button
-                onClick={navRight}
-              >
-                ▶
-              </button>
-            </div>
-
-            <div className="controller-info">
-              <span>
-                {LOCATION_META[
-                  game.location
-                ]?.icon}
-              </span>
-
-              <b>
-                {LOCATION_META[
-                  game.location
-                ]?.name}
-              </b>
-            </div>
-
-            <div className="ab-buttons">
-              <button
-                className="btn-b"
-                onClick={handleB}
-              >
-                B
-              </button>
-
-              <button
-                className="btn-a"
-                onClick={handleA}
-              >
-                A
-              </button>
-            </div>
-          </section>
-
-          <section className="advance-row">
-            <button
-              className="next-time"
-              onClick={advanceTime}
-            >
-              ⏩ Kết thúc hoạt động
-              <span>
-                Sang{" "}
-                {game.timeIndex <
-                TIMES.length - 1
-                  ? TIMES[
-                      game.timeIndex + 1
-                    ]
-                  : "ngày mới"}
-              </span>
-            </button>
-          </section>
-        </main>
-
-        {toast && (
-          <div className="toast">
-            {toast}
-          </div>
-        )}
-
-        {drawer === "profile" && (
-          <Drawer
-            title="👤 Hồ sơ nhân vật"
-            onClose={() =>
-              setDrawer(null)
-            }
-          >
-            <div className="profile-avatar">
-              🧑‍🎓
-            </div>
-
-            <h3>
-              Học sinh Thanh Xuân
-            </h3>
-
-            <div className="profile-grid">
-              <MiniStat
-                name="Học tập"
-                value={game.stats.study}
-              />
-              <MiniStat
-                name="Kỹ năng"
-                value={game.stats.skill}
-              />
-              <MiniStat
-                name="Bạn bè"
-                value={game.stats.friends}
-              />
-              <MiniStat
-                name="Tình cảm"
-                value={game.stats.love}
-              />
-              <MiniStat
-                name="Danh tiếng"
-                value={game.stats.reputation}
-              />
-              <MiniStat
-                name="Thi đua"
-                value={game.competitionScore}
-              />
-            </div>
-
-            <div className="profile-section">
-              <b>🏅 Thành tích tốt nhất</b>
-              <p>
-                Hạng cao nhất: #
-                {game.bestRank}
-              </p>
-            </div>
-
-            <div className="profile-section">
-              <b>🔥 Chuỗi thi đua</b>
-              <p>
-                {game.competitionStreak} ngày
-              </p>
-            </div>
-          </Drawer>
-        )}
-
-        {drawer === "assets" && (
-          <Drawer
-            title="🏠 Tài sản"
-            onClose={() =>
-              setDrawer(null)
-            }
-          >
-            {game.assets.length === 0 ? (
-              <Empty text="Bạn chưa sở hữu tài sản nào." />
-            ) : (
-              <div className="drawer-list">
-                {game.assets.map(id => {
-                  const asset =
-                    PROPERTIES.find(
-                      x => x.id === id
-                    );
-
-                  if (!asset) return null;
-
-                  return (
-                    <div
-                      className="drawer-item"
-                      key={id}
-                    >
-                      <span>
-                        {asset.icon}
-                      </span>
-
-                      <div>
-                        <b>
-                          {asset.name}
-                        </b>
-                        <small>
-                          {asset.effect}
-                        </small>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Drawer>
-        )}
-
-        {drawer === "bag" && (
-          <Drawer
-            title="🎒 Túi đồ"
-            onClose={() =>
-              setDrawer(null)
-            }
-          >
-            <div className="drawer-list">
-              {game.bag.map(item => (
-                <div
-                  className="drawer-item"
-                  key={item.id}
-                >
-                  <span>
-                    {item.icon}
-                  </span>
-
-                  <div>
-                    <b>
-                      {item.name}
-                      {" "}
-                      ×{item.count}
-                    </b>
-
-                    <small>
-                      {item.desc}
-                    </small>
-                  </div>
-
-                  <button
-                    disabled={
-                      item.count <= 0
-                    }
-                    onClick={() =>
-                      useBagItem(item.id)
-                    }
-                  >
-                    Dùng
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Drawer>
-        )}
-
-        {drawer === "diary" && (
-          <Drawer
-            title="📖 Nhật ký thanh xuân"
-            onClose={() =>
-              setDrawer(null)
-            }
-          >
-            {game.diaryEntries.length === 0 ? (
-              <Empty text="Hành trình của bạn chưa có trang nhật ký nào." />
-            ) : (
-              <div className="diary-list">
-                {[...game.diaryEntries]
-                  .reverse()
-                  .map((entry, index) => (
-                    <div
-                      className="diary-entry"
-                      key={`${entry.day}-${index}`}
-                    >
-                      <b>
-                        Ngày {entry.day}
-                      </b>
-
-                      <p>
-                        {entry.text}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </Drawer>
-        )}
-
-        {overlay === "npc" && (
-          <Modal
-            title="👥 Bạn bè"
-            onClose={() =>
-              setOverlay(null)
-            }
-          >
-            <div className="npc-grid">
-              {Object.values(NPCS).map(npc => (
-                <div
-                  className="npc-card"
-                  key={npc.id}
-                >
-                  <div className="big-avatar">
-                    {npc.avatar}
-                  </div>
-
-                  <h3>{npc.name}</h3>
-
-                  <p>
-                    {npc.description}
-                  </p>
-
-                  <div>
-                    ❤️ Quan hệ:{" "}
-                    {
-                      game.npcRelationships[
-                        npc.id
-                      ]
-                    }
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      interactNPC(npc.id)
-                    }
-                  >
-                    💬 Nói chuyện
-                  </button>
-
-                  {npc.id ===
-                    "trieu_man" && (
-                    <button
-                      className="secondary-btn"
-                      onClick={() =>
-                        setOverlay("crush")
-                      }
-                    >
-                      💖 Tâm sự
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Modal>
-        )}
-
-        {overlay === "crush" && (
-          <Modal
-            title="💖 Cuộc trò chuyện"
-            onClose={() =>
-              setOverlay(null)
-            }
-          >
-            <div className="dialogue">
-              <div className="dialogue-avatar">
-                👩
-              </div>
-
-              <div className="speech">
-                <b>
-                  Triệu Mẫn
-                </b>
-
-                <p>
-                  "Nếu sau này chúng ta tốt
-                  nghiệp, cậu muốn nhớ nhất
-                  điều gì về những năm tháng
-                  này?"
-                </p>
-              </div>
-            </div>
-
-            <div className="dialogue-options">
-              <button
-                onClick={() => {
-                  modifyStats({
-                    love: 8,
-                    mood: 5
-                  });
-
-                  setOverlay(null);
-
-                  showToast(
-                    "💖 Bạn chọn lưu giữ những kỷ niệm đẹp."
-                  );
-                }}
-              >
-                🌸 Những kỷ niệm
-              </button>
-
-              <button
-                onClick={() => {
-                  modifyStats({
-                    love: 5,
-                    skill: 2
-                  });
-
-                  setOverlay(null);
-
-                  showToast(
-                    "✨ Bạn chọn cùng nhau trưởng thành."
-                  );
-                }}
-              >
-                🚀 Cùng nhau trưởng thành
-              </button>
-
-              <button
-                onClick={() => {
-                  modifyStats({
-                    love: -2,
-                    mood: 3
-                  });
-
-                  setOverlay(null);
-
-                  showToast(
-                    "😳 Bạn ngại ngùng chuyển chủ đề."
-                  );
-                }}
-              >
-                😳 Chuyển chủ đề
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {overlay === "competition" && (
-          <Modal
-            title="🏆 Bảng thi đua"
-            onClose={() =>
-              setOverlay(null)
-            }
-            wide
-          >
-            <div className="competition-summary">
-              <div className="competition-card">
-                <span>📊 Điểm của bạn</span>
-                <strong>
-                  {game.competitionScore}
-                </strong>
-              </div>
-
-              <div className="competition-card">
-                <span>🏅 Hạng hiện tại</span>
-                <strong>
-                  #{game.currentRank}
-                </strong>
-              </div>
-
-              <div className="competition-card">
-                <span>🔥 Chuỗi</span>
-                <strong>
-                  {game.competitionStreak}
-                </strong>
-              </div>
-            </div>
-
-            <div className="ranking-list">
-              {ranking.map(row => (
-                <div
-                  className={
-                    `ranking-row ${
-                      row.id === "player"
-                        ? "ranking-player"
-                        : ""
-                    }`
-                  }
-                  key={row.id}
-                >
-                  <div className="ranking-position">
-                    {row.rank === 1
-                      ? "🥇"
-                      : row.rank === 2
-                      ? "🥈"
-                      : row.rank === 3
-                      ? "🥉"
-                      : `#${row.rank}`}
-                  </div>
-
-                  <div className="ranking-avatar">
-                    {row.avatar}
-                  </div>
-
-                  <div className="ranking-name">
-                    <strong>
-                      {row.name}
-                    </strong>
-
-                    <span>
-                      {row.id === "player"
-                        ? "Nhân vật chính"
-                        : "Đối thủ thi đua"}
-                    </span>
-                  </div>
-
-                  <div className="ranking-score">
-                    {row.score}
-                    <small>
-                      {" "}điểm
-                    </small>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="competition-rule">
-              <b>
-                📅 Cơ chế thi đua
-              </b>
-
-              <p>
-                Cuối mỗi ngày, điểm thi đua
-                của bạn được tính từ học tập,
-                kỹ năng, bạn bè, tình cảm,
-                danh tiếng, chứng chỉ và tài sản.
-              </p>
-
-              <p>
-                Lan, Triệu Mẫn và Tuấn cũng
-                tự động nhận điểm mỗi ngày.
-                Vì vậy thứ hạng sẽ thay đổi
-                liên tục trong 45 ngày.
-              </p>
-            </div>
-
-            <div className="history-box">
-              <b>
-                📈 Lịch sử gần đây
-              </b>
-
-              {game.competitionHistory
-                .slice(-5)
-                .reverse()
-                .map((entry, index) => (
-                  <div
-                    className="history-row"
-                    key={`${entry.day}-${index}`}
-                  >
-                    <span>
-                      Ngày {entry.day}
-                    </span>
-
-                    <span>
-                      Bạn +{entry.playerGain}
-                    </span>
-
-                    <span>
-                      Hạng #{entry.rank}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </Modal>
-        )}
-
-        {overlay === "titles" && (
-          <Modal
-            title="🎖️ Danh hiệu"
-            onClose={() =>
-              setOverlay(null)
-            }
-            wide
-          >
-            <div className="title-counter">
-              Đã mở khóa{" "}
-              <b>
-                {game.unlockedTitles.length}
-              </b>
-              {" / "}
-              {TITLES.length}
-              {" "}danh hiệu
-            </div>
-
-            <div className="title-grid">
-              {TITLES.map(title => {
-                const unlocked =
-                  game.unlockedTitles.includes(
-                    title.id
-                  );
-
-                return (
-                  <div
-                    className={
-                      `title-item ${
-                        unlocked
-                          ? "title-unlocked"
-                          : "title-locked"
-                      }`
-                    }
-                    key={title.id}
-                  >
-                    <div className="title-icon">
-                      {unlocked
-                        ? title.icon
-                        : "🔒"}
-                    </div>
-
-                    <div>
-                      <strong>
-                        {title.name}
-                      </strong>
-
-                      <p>
-                        {title.desc}
-                      </p>
-
-                      <span
-                        className={
-                          unlocked
-                            ? "title-status"
-                            : "title-status locked"
-                        }
-                      >
-                        {unlocked
-                          ? "✓ Đã đạt"
-                          : "Chưa đạt"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Modal>
-        )}
-
-        {overlay === "quiz" &&
-          quiz && (
-            <Modal
-              title={`📝 Quiz ${
-                quizIndex + 1
-              }/${quiz.length}`}
-              onClose={() => {
-                setQuiz(null);
-                setOverlay(null);
-              }}
-              wide
-            >
-              <div className="quiz-subject">
-                {quiz[quizIndex].subject}
-              </div>
-
-              <h3 className="quiz-question">
-                {quiz[quizIndex].q}
-              </h3>
-
-              <div className="quiz-options">
-                {quiz[
-                  quizIndex
-                ].options.map(
-                  (option, index) => (
-                    <button
-                      key={option}
-                      onClick={() =>
-                        answerQuiz(
-                          index
-                        )
-                      }
-                    >
-                      <span>
-                        {String.fromCharCode(
-                          65 + index
-                        )}
-                      </span>
-                      {option}
-                    </button>
-                  )
-                )}
-              </div>
-
-              <div className="quiz-progress">
-                <div
-                  style={{
-                    width: `${
-                      ((quizIndex + 1) /
-                        quiz.length) *
-                      100
-                    }%`
-                  }}
-                />
-              </div>
-            </Modal>
-          )}
-
-        {overlay === "certExam" &&
-          certExam && (
-            <Modal
-              title={`${certExam.icon} ${
-                certExam.name
-              }`}
-              onClose={() => {
-                setCertExam(null);
-                setOverlay(null);
-              }}
-              wide
-            >
-              <div className="quiz-subject">
-                Câu {certIndex + 1}/
-                {certExam.questions.length}
-              </div>
-
-              <h3 className="quiz-question">
-                {
-                  certExam.questions[
-                    certIndex
-                  ].q
-                }
-              </h3>
-
-              <div className="quiz-options">
-                {certExam.questions[
-                  certIndex
-                ].options.map(
-                  (option, index) => (
-                    <button
-                      key={option}
-                      onClick={() =>
-                        answerCertificate(
-                          index
-                        )
-                      }
-                    >
-                      <span>
-                        {String.fromCharCode(
-                          65 + index
-                        )}
-                      </span>
-
-                      {option}
-                    </button>
-                  )
-                )}
-              </div>
-            </Modal>
-          )}
-
-        {overlay === "saveCode" && (
-          <Modal
-            title="🔐 Mã lưu game"
-            onClose={() =>
-              setOverlay(null)
-            }
-            wide
-          >
             <p>
-              Mã dưới đây chứa toàn bộ tiến
-              trình game hiện tại. Bạn có thể
-              copy để lưu lại hoặc dán trên
-              thiết bị khác.
+              Một hành trình với những bài học,
+              người bạn, rung động và kỷ niệm.
             </p>
 
-            <textarea
-              className="save-textarea"
-              value={saveCode}
-              onChange={e =>
-                setSaveCode(
-                  e.target.value
-                )
-              }
-              placeholder="Mã lưu..."
-            />
+            <div className="ending-grid">
+              <div>
+                <b>{game.stats.study}</b>
+                <span>Học tập</span>
+              </div>
 
-            <div className="modal-actions">
-              <button
-                className="primary-btn"
-                onClick={copySaveCode}
-              >
-                📋 Copy mã
-              </button>
+              <div>
+                <b>{game.stats.skill}</b>
+                <span>Kỹ năng</span>
+              </div>
+
+              <div>
+                <b>{game.stats.friends}</b>
+                <span>Bạn bè</span>
+              </div>
+
+              <div>
+                <b>{game.stats.love}</b>
+                <span>Tình cảm</span>
+              </div>
+
+              <div>
+                <b>{game.competition.self}</b>
+                <span>Thi đua</span>
+              </div>
+
+              <div>
+                <b>{game.titles.length}</b>
+                <span>Danh hiệu</span>
+              </div>
             </div>
 
-            <hr />
-
-            <h3>
-              📥 Nhập mã lưu
-            </h3>
-
-            <textarea
-              className="save-textarea"
-              value={saveCodeInput}
-              onChange={e =>
-                setSaveCodeInput(
-                  e.target.value
-                )
-              }
-              placeholder="Dán mã lưu vào đây..."
-            />
-
-            <button
-              className="primary-btn"
-              onClick={importSaveCode}
-            >
-              🔄 Tải từ mã
-            </button>
-
-            <div className="file-actions">
-              <button
-                onClick={exportSave}
-              >
-                📦 Xuất file JSON
-              </button>
-
-              <button
-                onClick={() =>
-                  fileInputRef.current?.click()
-                }
-              >
-                📥 Nhập file JSON
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                hidden
-                onChange={
-                  importSaveFile
-                }
-              />
+            <div className="ending-rank">
+              🏆 Xếp hạng thi đua:{" "}
+              <strong>
+                #{rankPosition}
+              </strong>
             </div>
-          </Modal>
-        )}
 
-        {overlay === "settings" && (
-          <Modal
-            title="⚙️ Cài đặt"
-            onClose={() =>
-              setOverlay(null)
-            }
-          >
-            <div className="settings-list">
+            <div className="ending-actions">
               <button
-                onClick={() =>
-                  setAudioEnabled(
-                    value => !value
-                  )
-                }
+                className="primary"
+                onClick={generateSaveCode}
               >
-                {audioEnabled
-                  ? "🔊 Tắt âm thanh"
-                  : "🔇 Bật âm thanh"}
+                💾 Lưu kỷ niệm
               </button>
 
               <button
-                onClick={saveNow}
+                onClick={restart}
               >
-                💾 Lưu game
+                🌱 Bắt đầu lại
               </button>
-
-              <button
-                onClick={
-                  generateSaveCode
-                }
-              >
-                🔐 Tạo mã lưu
-              </button>
-
-              <button
-                onClick={
-                  restartGame
-                }
-              >
-                🔄 Chơi lại từ đầu
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {game.isGameOver && (
-          <div className="ending-overlay">
-            <div className="ending-card">
-              <div className="ending-icon">
-                🎓
-              </div>
-
-              <div className="ending-kicker">
-                HÀNH TRÌNH 45 NGÀY
-              </div>
-
-              <h1>
-                Thanh Xuân Rực Rỡ
-              </h1>
-
-              <p>
-                Bạn đã hoàn thành hành trình
-                cấp 3 của mình.
-              </p>
-
-              <div className="ending-stats">
-                <div>
-                  <b>
-                    #{game.currentRank}
-                  </b>
-                  <span>
-                    Hạng thi đua
-                  </span>
-                </div>
-
-                <div>
-                  <b>
-                    {game.competitionScore}
-                  </b>
-                  <span>
-                    Điểm thi đua
-                  </span>
-                </div>
-
-                <div>
-                  <b>
-                    {game.stats.study}
-                  </b>
-                  <span>
-                    Học tập
-                  </span>
-                </div>
-
-                <div>
-                  <b>
-                    {game.stats.skill}
-                  </b>
-                  <span>
-                    Kỹ năng
-                  </span>
-                </div>
-
-                <div>
-                  <b>
-                    {game.stats.love}
-                  </b>
-                  <span>
-                    Tình cảm
-                  </span>
-                </div>
-
-                <div>
-                  <b>
-                    {game.unlockedTitles.length}
-                  </b>
-                  <span>
-                    Danh hiệu
-                  </span>
-                </div>
-              </div>
-
-              <div className="ending-message">
-                {game.currentRank === 1
-                  ? "🏆 Bạn đã trở thành Quán Quân Thi Đua!"
-                  : game.stats.study >= 80
-                  ? "📚 Một thanh xuân đầy nỗ lực và đáng nhớ!"
-                  : game.stats.love >= 80
-                  ? "💖 Điều đẹp nhất là những người bạn đã gặp."
-                  : "🌱 Quan trọng nhất là bạn đã trưởng thành sau hành trình này."}
-              </div>
-
-              <div className="ending-actions">
-                <button
-                  onClick={() =>
-                    setOverlay("competition")
-                  }
-                >
-                  🏆 Xem bảng thi đua
-                </button>
-
-                <button
-                  onClick={() =>
-                    setOverlay("titles")
-                  }
-                >
-                  🎖️ Xem danh hiệu
-                </button>
-
-                <button
-                  onClick={generateSaveCode}
-                >
-                  🔐 Lưu thành mã
-                </button>
-
-                <button
-                  className="danger-btn"
-                  onClick={
-                    restartGame
-                  }
-                >
-                  🔄 Chơi lại
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </div>
-    </>
-  );
-}
+        </div>
 
-function Stat({ icon, name, value }) {
+        <Overlay />
+        <Drawer />
+
+        <style>{CSS}</style>
+      </>
+    );
+  }
+
+  /* =====================================================
+     MAIN RENDER
+  ===================================================== */
+
   return (
-    <div className="stat">
-      <div className="stat-top">
+    <div className="game-shell">
+      <Header />
+
+      <HUD />
+
+      <main className="main-content">
+        <Scene />
+
+        <Navigation />
+
+        <LocationPanel />
+
+        <BottomControls />
+      </main>
+
+      <footer className="footer">
         <span>
-          {icon} {name}
+          🌸 Thanh Xuân Rực Rỡ
         </span>
 
-        <b>{value}</b>
-      </div>
+        <span>
+          Ngày {game.day}/45 ·{" "}
+          {currentTime.label}
+        </span>
 
-      <div className="bar">
-        <div
-          style={{
-            width: `${Math.min(
-              100,
-              Math.max(0, value)
-            )}%`
-          }}
-        />
-      </div>
-    </div>
-  );
-}
+        <span>
+          🏆 #{rankPosition}
+        </span>
+      </footer>
 
-function MiniStat({ name, value }) {
-  return (
-    <div className="mini-stat">
-      <span>{name}</span>
-      <b>{value}</b>
-    </div>
-  );
-}
-
-function Drawer({
-  title,
-  onClose,
-  children
-}) {
-  return (
-    <div className="overlay">
-      <div className="drawer-panel">
-        <div className="drawer-header">
-          <h2>{title}</h2>
-
-          <button
-            className="close-btn"
-            onClick={onClose}
-          >
-            ✕
-          </button>
+      {toast && (
+        <div className="toast">
+          {toast}
         </div>
+      )}
 
-        {children}
-      </div>
+      <Overlay />
+      <Drawer />
+
+      <style>{CSS}</style>
     </div>
   );
 }
 
-function Modal({
-  title,
-  onClose,
-  children,
-  wide = false
-}) {
-  return (
-    <div className="overlay">
-      <div
-        className={
-          `modal ${
-            wide ? "modal-wide" : ""
-          }`
-        }
-      >
-        <div className="modal-header">
-          <h2>{title}</h2>
+/* =========================================================
+   DIARY
+========================================================= */
 
-          <button
-            className="close-btn"
-            onClick={onClose}
-          >
-            ✕
-          </button>
-        </div>
+function createDiaryText(game) {
+  const study = game.stats.study;
+  const love = game.stats.love;
+  const friends = game.stats.friends;
+  const moneyValue = game.stats.money;
 
-        <div className="modal-body">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+  if (study >= 80) {
+    return "Hôm nay mình đã cố gắng học tập rất nhiều. Có lẽ những nỗ lực nhỏ mỗi ngày rồi sẽ tạo nên một kết quả thật lớn.";
+  }
+
+  if (love >= 70) {
+    return "Có những khoảnh khắc rất nhỏ nhưng khiến cả ngày trở nên đặc biệt. Thanh xuân hình như đang trở nên thú vị hơn.";
+  }
+
+  if (friends >= 70) {
+    return "Hôm nay tụi mình lại có thêm một đống chuyện để cười. Có lẽ điều đáng nhớ nhất của cấp 3 chính là những người bạn.";
+  }
+
+  if (moneyValue >= 10000000) {
+    return "Mình bắt đầu biết cách kiếm tiền và quản lý tài chính. Trưởng thành có lẽ là khi mình biết chịu trách nhiệm với lựa chọn của mình.";
+  }
+
+  return "Một ngày nữa của tuổi học trò khép lại. Có lúc vui, có lúc mệt, nhưng chắc chắn sau này mình sẽ nhớ những ngày bình thường như thế này.";
 }
 
-function Empty({ text }) {
-  return (
-    <div className="empty">
-      <div>📭</div>
-      <p>{text}</p>
-    </div>
-  );
-}
+/* =========================================================
+   CSS
+========================================================= */
 
 const CSS = `
 * {
@@ -3688,24 +2737,19 @@ body,
 body {
   font-family:
     Inter,
+    ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
   background:
-    radial-gradient(
-      circle at top,
-      #eef3ff 0%,
-      #dfe6f5 45%,
-      #cfd7e7 100%
-    );
-  color: #202333;
+    radial-gradient(circle at top, #e9d5ff 0%, #f8fafc 38%, #dbeafe 100%);
+  color: #172033;
 }
 
 button,
-textarea,
-input {
+textarea {
   font: inherit;
 }
 
@@ -3713,39 +2757,45 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: .5;
-}
-
-.app {
-  min-height: 100vh;
-  padding-bottom: 30px;
+.game-shell {
+  width: min(1120px, calc(100vw - 24px));
+  height: calc(100vh - 24px);
+  min-height: 650px;
+  max-height: 900px;
+  margin: 12px auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  background: rgba(255,255,255,.93);
+  box-shadow:
+    0 25px 80px rgba(15,23,42,.18),
+    0 4px 18px rgba(15,23,42,.08);
+  border: 1px solid rgba(255,255,255,.9);
 }
 
 .topbar {
-  min-height: 76px;
-  background: rgba(20, 25, 45, .96);
-  color: white;
+  min-height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px max(18px, calc((100vw - 1180px) / 2));
-  box-shadow: 0 5px 25px rgba(0,0,0,.18);
+  gap: 12px;
+  padding: 10px 18px;
+  color: white;
+  background:
+    linear-gradient(135deg, #7c3aed, #ec4899);
 }
 
 .brand {
-  font-size: 22px;
-  font-weight: 950;
-  letter-spacing: -.5px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: .4px;
 }
 
 .subtitle {
-  margin-top: 3px;
   font-size: 11px;
-  opacity: .55;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
+  opacity: .86;
+  margin-top: 2px;
 }
 
 .top-actions {
@@ -3753,1262 +2803,1249 @@ button:disabled {
   gap: 7px;
 }
 
-.top-actions button {
-  border: 0;
-  background: rgba(255,255,255,.1);
-  color: white;
-  border-radius: 11px;
-  width: 42px;
-  height: 42px;
-  font-size: 18px;
-}
-
-.top-actions button:hover {
-  background: rgba(255,255,255,.2);
-}
-
-.game-shell {
-  width: min(1180px, calc(100% - 24px));
-  margin: 18px auto;
-}
-
-.hud {
-  display: grid;
-  grid-template-columns:
-    1fr 1fr 1.4fr 1.4fr;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.day-card,
-.time-card,
-.money-card,
-.rank-card {
-  background: rgba(255,255,255,.9);
-  border-radius: 16px;
-  padding: 12px 15px;
-  box-shadow:
-    0 5px 18px rgba(30,40,80,.08);
-}
-
-.hud span {
-  display: block;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  opacity: .55;
-}
-
-.hud strong {
-  display: block;
-  margin-top: 3px;
-  font-size: 18px;
-}
-
-.rank-card strong {
-  color: #7353d6;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns:
-    repeat(6, 1fr);
-  gap: 9px;
-  margin-bottom: 12px;
-}
-
-.stat {
-  background: white;
-  border-radius: 14px;
-  padding: 9px 11px;
-  box-shadow:
-    0 5px 18px rgba(30,40,80,.07);
-}
-
-.stat-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 5px;
-  font-size: 11px;
-}
-
-.stat-top b {
-  font-size: 12px;
-}
-
-.bar {
-  height: 6px;
-  background: #edf0f5;
-  border-radius: 99px;
-  overflow: hidden;
-  margin-top: 7px;
-}
-
-.bar div {
-  height: 100%;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      90deg,
-      #7f75e9,
-      #4fb4ff
-    );
-}
-
-.location-tabs {
-  display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  padding-bottom: 9px;
-}
-
-.location-tabs button {
-  flex: 1;
-  min-width: 100px;
-  border: 0;
-  background: rgba(255,255,255,.65);
-  border-radius: 14px;
-  padding: 10px;
-  color: #30354a;
-}
-
-.location-tabs button.active {
-  background: #292e4c;
-  color: white;
-  box-shadow:
-    0 5px 15px rgba(30,30,70,.22);
-}
-
-.location-tabs span {
-  display: block;
-  font-size: 20px;
-}
-
-.location-tabs small {
-  display: block;
-  margin-top: 3px;
-  font-weight: 800;
-}
-
-.main-panel {
-  min-height: 440px;
-  background: white;
-  border-radius: 25px;
-  overflow: hidden;
-  box-shadow:
-    0 10px 35px rgba(30,40,80,.1);
-}
-
-.location-panel {
-  min-height: 440px;
-}
-
-.pixel-scene {
-  min-height: 175px;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  font-size: 80px;
-}
-
-.class-scene {
-  background:
-    linear-gradient(
-      #a8ddff 0 60%,
-      #d8e5f0 60% 100%
-    );
-}
-
-.canteen-scene {
-  background:
-    linear-gradient(
-      #ffd7a1 0 60%,
-      #f3bd7a 60% 100%
-    );
-}
-
-.home-scene {
-  background:
-    linear-gradient(
-      #b8e9ff 0 58%,
-      #a9d69b 58% 100%
-    );
-}
-
-.scene-cloud {
-  position: absolute;
-  left: 12%;
-  top: 20px;
-  font-size: 40px;
-}
-
-.scene-school {
-  font-size: 80px;
-}
-
-.scene-student {
-  position: absolute;
-  bottom: 8px;
-  font-size: 65px;
-}
-
-.scene-food {
-  font-size: 45px;
-}
-
-.scene-bed {
-  position: absolute;
-  right: 18%;
-  bottom: 5px;
-  font-size: 55px;
-}
-
-.location-content {
-  padding: 22px;
-}
-
-.location-content h2 {
-  margin: 0;
-  font-size: 25px;
-}
-
-.location-content > p {
-  color: #6d7284;
-  line-height: 1.6;
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.primary-btn,
-.secondary-btn,
-.action-grid button,
-.location-content button {
-  border: 0;
-  border-radius: 13px;
-  padding: 12px 15px;
-  font-weight: 800;
-}
-
-.primary-btn {
-  color: white;
-  background:
-    linear-gradient(
-      135deg,
-      #7167df,
-      #4f9ee9
-    );
-  box-shadow:
-    0 7px 18px rgba(91,90,210,.2);
-}
-
-.secondary-btn {
-  background: #eef0f7;
-  color: #34384c;
-}
-
-.large {
-  padding: 15px 22px;
-  font-size: 16px;
-}
-
-.shop-grid,
-.cert-grid,
-.property-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(4, 1fr);
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.shop-card,
-.cert-card,
-.property-card {
-  border: 1px solid #e8eaf0;
-  border-radius: 18px;
-  padding: 15px;
-  text-align: center;
-  background: #fbfcff;
-}
-
-.shop-icon,
-.cert-icon,
-.property-icon {
-  font-size: 42px;
-  margin-bottom: 7px;
-}
-
-.shop-card strong,
-.cert-card strong,
-.property-card strong {
-  display: block;
-}
-
-.shop-card small,
-.cert-card p,
-.property-card p {
-  display: block;
-  color: #73788a;
-  font-size: 12px;
-}
-
-.shop-card button,
-.cert-card button,
-.property-card button {
-  width: 100%;
-  margin-top: 8px;
-  background: #272c47;
-  color: white;
-}
-
-.cert-card.owned,
-.property-card.owned {
-  background: #effcf4;
-  border-color: #8bd5a5;
-}
-
-.job-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.job-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid #e8eaf0;
-  border-radius: 17px;
-  padding: 13px;
-}
-
-.job-icon {
-  font-size: 35px;
-}
-
-.job-main {
-  flex: 1;
-}
-
-.job-main strong {
-  font-size: 16px;
-}
-
-.job-main p {
-  margin: 4px 0;
-  color: #727789;
-  font-size: 12px;
-}
-
-.job-main span {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.job-main small {
-  display: block;
-  color: #a05d3d;
-  margin-top: 4px;
-}
-
-.job-card > button {
-  background: #292e4c;
-  color: white;
-  min-width: 70px;
-}
-
-.npc-strip {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.npc-mini {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  background: white;
-  border-radius: 16px;
-  padding: 10px 14px;
-  text-align: left;
-  box-shadow:
-    0 5px 18px rgba(30,40,80,.07);
-}
-
-.npc-avatar {
-  font-size: 34px;
-}
-
-.npc-mini b,
-.npc-mini small {
-  display: block;
-}
-
-.npc-mini small {
-  color: #73788a;
-  margin-top: 3px;
-}
-
-.bottom-actions {
-  display: grid;
-  grid-template-columns:
-    repeat(6, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.bottom-actions button {
-  border: 0;
-  border-radius: 14px;
-  padding: 11px 5px;
-  background: white;
-  box-shadow:
-    0 5px 18px rgba(30,40,80,.07);
-  font-size: 19px;
-}
-
-.bottom-actions span {
-  display: block;
-  font-size: 10px;
-  margin-top: 4px;
-  font-weight: 800;
-}
-
-.controller {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 15px;
-  padding: 15px 18px;
-  background: #252a45;
-  color: white;
-  border-radius: 20px;
-}
-
-.dpad {
-  display: flex;
-  gap: 6px;
-}
-
-.dpad button,
-.ab-buttons button {
-  width: 46px;
-  height: 46px;
-  border: 0;
-  border-radius: 50%;
-  font-weight: 950;
-  font-size: 16px;
-}
-
-.dpad button {
-  background: #3d4364;
-  color: white;
-}
-
-.controller-info {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.controller-info span {
-  font-size: 24px;
-}
-
-.ab-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-a {
-  background: #ff7192;
-  color: white;
-}
-
-.btn-b {
-  background: #5e9eea;
-  color: white;
-}
-
-.advance-row {
-  margin-top: 10px;
-}
-
-.next-time {
-  width: 100%;
-  border: 0;
-  background: #171b31;
-  color: white;
-  border-radius: 15px;
-  padding: 13px;
-  font-weight: 850;
-}
-
-.next-time span {
-  margin-left: 8px;
-  opacity: .6;
-  font-weight: 500;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(13,17,33,.62);
-  backdrop-filter: blur(5px);
-}
-
-.modal,
-.drawer-panel {
-  width: min(620px, 95vw);
-  max-height: 90vh;
-  overflow-y: auto;
-  background: white;
-  border-radius: 25px;
-  box-shadow:
-    0 25px 90px rgba(0,0,0,.35);
-}
-
-.modal-wide {
-  width: min(850px, 95vw);
-}
-
-.modal-header,
-.drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 20px 22px;
-  border-bottom: 1px solid #edf0f5;
-}
-
-.modal-header h2,
-.drawer-header h2 {
-  margin: 0;
-  font-size: 22px;
-}
-
-.modal-body {
-  padding: 22px;
-}
-
-.close-btn {
+.icon-btn {
   width: 38px;
   height: 38px;
   border: 0;
   border-radius: 11px;
-  background: #f0f2f6;
-  font-size: 17px;
+  color: white;
+  background: rgba(255,255,255,.18);
+  transition: .15s;
 }
 
-.drawer-panel {
-  width: min(560px, 95vw);
+.icon-btn:hover {
+  background: rgba(255,255,255,.3);
+  transform: translateY(-1px);
 }
 
-.drawer-panel > *:not(.drawer-header) {
-  margin-left: 22px;
-  margin-right: 22px;
-}
-
-.profile-avatar {
-  font-size: 80px;
-  text-align: center;
-  margin-top: 22px;
-}
-
-.drawer-panel h3 {
-  text-align: center;
-}
-
-.profile-grid {
+.hud {
   display: grid;
-  grid-template-columns:
-    repeat(2, 1fr);
-  gap: 9px;
-  margin-top: 16px;
+  grid-template-columns: 145px 1fr 175px;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.mini-stat {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px;
-  background: #f5f6fa;
-  border-radius: 12px;
+.day-card,
+.money-card {
+  border-radius: 15px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(15,23,42,.04);
 }
 
-.profile-section {
-  margin-top: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  background: #f5f6fa;
+.day-big {
+  font-size: 14px;
+  font-weight: 900;
+  color: #7c3aed;
 }
 
-.profile-section p {
-  margin: 6px 0 0;
-  color: #717687;
+.time-big {
+  font-size: 25px;
+  line-height: 1;
+  margin-top: 4px;
+  font-weight: 900;
 }
 
-.drawer-list {
-  padding-top: 10px;
-  padding-bottom: 20px;
+.time-name {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 3px;
 }
 
-.drawer-item {
+.progress {
+  height: 5px;
+  margin: 9px 0 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.progress > div {
+  height: 100%;
+  background: linear-gradient(90deg,#8b5cf6,#ec4899);
+  transition: width .5s ease;
+}
+
+.day-card small {
+  color: #94a3b8;
+  font-size: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.stat {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 6px 8px;
+}
+
+.stat-top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-bottom: 1px solid #edf0f4;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #475569;
+  margin-bottom: 5px;
 }
 
-.drawer-item > span {
-  font-size: 31px;
+.stat-top b {
+  color: #111827;
 }
 
-.drawer-item > div {
-  flex: 1;
+.bar {
+  height: 5px;
+  overflow: hidden;
+  background: #e2e8f0;
+  border-radius: 999px;
 }
 
-.drawer-item b,
-.drawer-item small {
-  display: block;
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg,#8b5cf6,#ec4899);
+  border-radius: inherit;
+  transition: width .3s ease;
 }
 
-.drawer-item small {
-  margin-top: 3px;
-  color: #74798b;
-}
-
-.drawer-item button {
-  border: 0;
-  background: #292e4c;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 10px;
-}
-
-.diary-entry {
-  padding: 14px;
-  margin-bottom: 10px;
-  border-radius: 15px;
-  background: #fff9e8;
-}
-
-.diary-entry p {
-  margin: 6px 0 0;
-  line-height: 1.55;
-}
-
-.npc-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 12px;
-}
-
-.npc-card {
-  border: 1px solid #e8eaf0;
-  border-radius: 18px;
-  padding: 15px;
-  text-align: center;
-}
-
-.big-avatar {
-  font-size: 60px;
-}
-
-.npc-card p {
-  color: #717687;
-  font-size: 12px;
-  min-height: 45px;
-}
-
-.npc-card button {
-  width: 100%;
-  margin-top: 7px;
-  border: 0;
-  background: #292e4c;
-  color: white;
-  border-radius: 11px;
-  padding: 10px;
-  font-weight: 800;
-}
-
-.dialogue {
+.money-card {
   display: flex;
-  gap: 15px;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.dialogue-avatar {
-  font-size: 65px;
+.money-card > span {
+  font-size: 10px;
+  color: #64748b;
 }
 
-.speech {
-  background: #f4f5fa;
-  padding: 14px;
-  border-radius: 17px;
-  flex: 1;
-}
-
-.speech p {
-  line-height: 1.6;
-}
-
-.dialogue-options {
-  display: grid;
-  gap: 8px;
-  margin-top: 15px;
-}
-
-.dialogue-options button {
-  border: 0;
-  background: #f0f1f6;
-  border-radius: 13px;
-  padding: 12px;
-  text-align: left;
-  font-weight: 750;
-}
-
-.competition-summary {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.competition-card {
-  padding: 15px;
-  border-radius: 16px;
-  text-align: center;
-  background: #f5f6fa;
-}
-
-.competition-card span {
-  display: block;
-  font-size: 11px;
-  color: #777c8d;
-}
-
-.competition-card strong {
-  display: block;
-  font-size: 25px;
+.money-card > strong {
+  font-size: 17px;
+  color: #059669;
   margin-top: 4px;
 }
 
-.ranking-list {
+.mini-stats {
   display: flex;
-  flex-direction: column;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+}
+
+.mini-stats span {
+  font-size: 9px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.main-content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  grid-template-rows: minmax(180px, 1fr) auto;
   gap: 9px;
-}
-
-.ranking-row {
-  display: grid;
-  grid-template-columns:
-    48px 45px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 13px;
-  background: #f5f6fa;
-  border-radius: 15px;
-}
-
-.ranking-player {
-  background: #fff6d5;
-  box-shadow:
-    inset 0 0 0 2px #efca56;
-}
-
-.ranking-position {
-  text-align: center;
-  font-size: 18px;
-  font-weight: 950;
-}
-
-.ranking-avatar {
-  font-size: 31px;
-  text-align: center;
-}
-
-.ranking-name strong,
-.ranking-name span {
-  display: block;
-}
-
-.ranking-name span {
-  color: #777c8d;
-  font-size: 10px;
-  margin-top: 3px;
-}
-
-.ranking-score {
-  font-size: 19px;
-  font-weight: 950;
-}
-
-.ranking-score small {
-  font-size: 10px;
-  opacity: .5;
-}
-
-.competition-rule,
-.history-box {
-  margin-top: 15px;
-  padding: 14px;
-  border-radius: 15px;
-  background: #f6f7fa;
-  line-height: 1.55;
-}
-
-.competition-rule p {
-  margin: 7px 0 0;
-  color: #73788a;
-  font-size: 13px;
-}
-
-.history-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid #e5e7ed;
-  font-size: 12px;
-}
-
-.history-row:last-child {
-  border-bottom: 0;
-}
-
-.title-counter {
-  padding: 12px;
-  background: #fff7d9;
-  border-radius: 13px;
-  margin-bottom: 12px;
-}
-
-.title-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(2, 1fr);
-  gap: 11px;
-}
-
-.title-item {
-  display: flex;
-  gap: 13px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 17px;
-  min-height: 100px;
-}
-
-.title-unlocked {
-  background: #fff7d8;
-  border: 1px solid #efd36d;
-}
-
-.title-locked {
-  background: #f2f3f6;
-  opacity: .55;
-}
-
-.title-icon {
-  min-width: 45px;
-  font-size: 34px;
-  text-align: center;
-}
-
-.title-item strong {
-  display: block;
-}
-
-.title-item p {
-  margin: 5px 0;
-  font-size: 11px;
-  color: #74798b;
-  line-height: 1.4;
-}
-
-.title-status {
-  color: #26834d;
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.title-status.locked {
-  color: #858a98;
-}
-
-.quiz-subject {
-  display: inline-block;
-  background: #eeeafd;
-  color: #6855c7;
-  border-radius: 99px;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.quiz-question {
-  font-size: 20px;
-  line-height: 1.5;
-  margin: 15px 0;
-}
-
-.quiz-options {
-  display: grid;
-  gap: 9px;
-}
-
-.quiz-options button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid #e4e6ed;
-  background: #fafbfe;
-  padding: 13px;
-  border-radius: 13px;
-  text-align: left;
-}
-
-.quiz-options button:hover {
-  background: #f0f1fa;
-  border-color: #9c93e9;
-}
-
-.quiz-options button span {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e8e9f3;
-  border-radius: 8px;
-  font-weight: 900;
-}
-
-.quiz-progress {
-  height: 6px;
-  margin-top: 18px;
-  border-radius: 99px;
-  background: #eceef3;
+  padding: 9px;
   overflow: hidden;
 }
 
-.quiz-progress div {
+.scene {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 17px;
+  background:
+    linear-gradient(
+      180deg,
+      #bfdbfe 0%,
+      #dbeafe 55%,
+      #bbf7d0 55%,
+      #86efac 100%
+    );
+  border: 1px solid #bfdbfe;
+}
+
+.scene-background {
   height: 100%;
-  background: #7167df;
+  position: relative;
+  overflow: hidden;
 }
 
-.save-textarea {
-  width: 100%;
-  min-height: 140px;
-  resize: vertical;
-  border: 1px solid #dfe2e9;
-  border-radius: 13px;
-  padding: 12px;
+.scene-cloud {
+  position: absolute;
+  width: 90px;
+  height: 26px;
+  border-radius: 50px;
+  background: rgba(255,255,255,.7);
+}
+
+.cloud1 {
+  top: 25px;
+  left: 50px;
+}
+
+.cloud2 {
+  top: 60px;
+  right: 70px;
+  width: 110px;
+}
+
+.school {
+  position: absolute;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 68px;
+  filter: drop-shadow(0 7px 3px rgba(15,23,42,.15));
+}
+
+.scene-title {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: rgba(255,255,255,.8);
+  backdrop-filter: blur(5px);
   font-size: 11px;
-  line-height: 1.4;
-  margin: 8px 0 12px;
-  outline: none;
+  font-weight: 900;
 }
 
-.save-textarea:focus {
-  border-color: #7568df;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.file-actions {
-  display: grid;
-  grid-template-columns:
-    repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.file-actions button,
-.settings-list button {
-  border: 0;
-  padding: 12px;
-  border-radius: 12px;
-  background: #f0f1f6;
-  font-weight: 750;
-}
-
-.settings-list {
-  display: grid;
-  gap: 9px;
-}
-
-.empty {
-  text-align: center;
-  padding: 50px 20px;
-  color: #777c8d;
-}
-
-.empty div {
+.character-main {
+  position: absolute;
+  bottom: 62px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 50px;
+  filter: drop-shadow(0 7px 3px rgba(15,23,42,.2));
+}
+
+.npc-row {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 7px;
+}
+
+.npc-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 6px;
+  text-align: left;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 11px;
+  background: rgba(255,255,255,.88);
+  color: #172033;
+}
+
+.npc-card:hover {
+  transform: translateY(-2px);
+}
+
+.npc-avatar {
+  grid-row: span 2;
+  font-size: 25px;
+  text-align: center;
+}
+
+.npc-card strong {
+  font-size: 10px;
+}
+
+.npc-card small {
+  font-size: 8px;
+  color: #64748b;
+}
+
+.npc-score {
+  position: absolute;
+  opacity: 0;
+}
+
+.navigation {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 6px;
+}
+
+.nav-btn {
+  min-height: 42px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: .15s;
+}
+
+.nav-btn:hover,
+.nav-btn.active {
+  background: #f3e8ff;
+  border-color: #c084fc;
+  color: #7c3aed;
+}
+
+.nav-btn span {
+  font-size: 16px;
+}
+
+.nav-btn small {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.panel {
+  grid-column: 1 / 3;
+  min-height: 0;
+  max-height: 205px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: white;
+  padding: 9px;
+}
+
+.panel-title {
+  font-weight: 900;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.panel p {
+  font-size: 10px;
+  color: #64748b;
+  margin: 4px 0 8px;
+}
+
+.primary {
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg,#7c3aed,#ec4899);
+  color: white;
+  font-weight: 800;
+  box-shadow: 0 5px 12px rgba(124,58,237,.2);
+}
+
+.primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.quick-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+
+.quick-row button,
+.save-buttons button {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #f8fafc;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(5,1fr);
+  gap: 6px;
+}
+
+.shop-item {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.shop-item:hover {
+  border-color: #c084fc;
+  background: #faf5ff;
+}
+
+.shop-icon {
+  font-size: 23px;
+}
+
+.shop-item strong {
+  font-size: 9px;
+}
+
+.shop-item small {
+  font-size: 8px;
+  color: #059669;
+}
+
+.job-list {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 6px;
+}
+
+.job-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+}
+
+.job-item:hover {
+  background: #faf5ff;
+  border-color: #c084fc;
+}
+
+.job-item.locked {
+  opacity: .5;
+}
+
+.job-item.owned {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.job-icon {
+  font-size: 24px;
+}
+
+.job-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.job-info strong {
+  display: block;
+  font-size: 10px;
+}
+
+.job-info small {
+  display: block;
+  font-size: 8px;
+  color: #64748b;
+}
+
+.job-pay {
+  font-size: 9px;
+  color: #059669;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(5,1fr);
+  gap: 6px;
+}
+
+.property {
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.property:hover {
+  background: #faf5ff;
+  border-color: #c084fc;
+}
+
+.property.owned {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.property-icon {
+  font-size: 25px;
+}
+
+.property strong {
+  font-size: 9px;
+}
+
+.property small {
+  font-size: 7px;
+  color: #64748b;
+}
+
+.property b {
+  font-size: 8px;
+  color: #059669;
+}
+
+.home-panel {
+  text-align: center;
+}
+
+.home-art {
+  font-size: 35px;
+  margin: 5px;
+}
+
+.controls {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: 95px 1fr 95px;
+  gap: 8px;
+  align-items: center;
+}
+
+.dpad {
+  display: flex;
+  gap: 5px;
+}
+
+.dpad button {
+  width: 42px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #f8fafc;
+  font-weight: 900;
+}
+
+.control-main {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rpg-btn {
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.rpg-btn:hover {
+  background: #ede9fe;
+}
+
+.ab-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.ab-buttons button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  color: white;
+  font-size: 15px;
+  font-weight: 900;
+  box-shadow: 0 4px 9px rgba(15,23,42,.18);
+}
+
+.btn-a {
+  background: #ec4899;
+}
+
+.btn-b {
+  background: #7c3aed;
+}
+
+.footer {
+  min-height: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 13px;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 9px;
+  background: #f8fafc;
 }
 
 .toast {
   position: fixed;
+  z-index: 1000;
   left: 50%;
   bottom: 25px;
   transform: translateX(-50%);
-  z-index: 2000;
-  background: #22263f;
+  max-width: min(500px, calc(100vw - 30px));
+  padding: 10px 15px;
+  border-radius: 12px;
   color: white;
-  padding: 12px 18px;
-  border-radius: 99px;
-  box-shadow:
-    0 10px 30px rgba(0,0,0,.25);
-  font-size: 13px;
-  font-weight: 750;
-  max-width: min(90vw, 600px);
+  background: rgba(15,23,42,.94);
+  box-shadow: 0 10px 30px rgba(15,23,42,.25);
+  font-size: 12px;
+  font-weight: 800;
   text-align: center;
 }
 
-.ending-overlay {
+.overlay,
+.drawer-backdrop {
   position: fixed;
+  z-index: 900;
   inset: 0;
-  z-index: 3000;
+  background: rgba(15,23,42,.45);
+  backdrop-filter: blur(4px);
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 20px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(36,30,76,.94),
-      rgba(52,74,120,.94)
-    );
-  overflow-y: auto;
+  justify-content: center;
+  padding: 15px;
 }
 
-.ending-card {
-  width: min(800px, 95vw);
+.modal {
+  width: min(500px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  border-radius: 18px;
   background: white;
-  border-radius: 30px;
-  padding: 35px;
+  padding: 15px;
+  box-shadow: 0 25px 70px rgba(15,23,42,.3);
+}
+
+.modal-head,
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modal-head strong,
+.modal-head span {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.modal-head button,
+.drawer-head button {
+  border: 0;
+  background: #f1f5f9;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.quiz-subject {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #7c3aed;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.modal h2 {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.choice-list {
+  display: grid;
+  gap: 7px;
+}
+
+.choice-list button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  font-size: 12px;
+}
+
+.choice-list button:hover {
+  background: #faf5ff;
+  border-color: #c084fc;
+}
+
+.choice-list button span {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: #ede9fe;
+  color: #7c3aed;
+  font-weight: 900;
+}
+
+.quiz-score,
+.exam-progress {
+  margin-top: 10px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.save-modal textarea {
+  width: 100%;
+  min-height: 130px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px;
+  outline: none;
+  font-size: 10px;
+}
+
+.save-modal textarea:focus {
+  border-color: #8b5cf6;
+}
+
+.save-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.save-help {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.drawer-backdrop {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.drawer {
+  width: min(390px, 92vw);
+  height: 100%;
+  overflow: auto;
+  background: white;
+  box-shadow: -15px 0 50px rgba(15,23,42,.2);
+}
+
+.drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 14px;
+  margin: 0;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drawer-content {
+  padding: 13px;
+}
+
+.profile-avatar {
+  font-size: 55px;
   text-align: center;
-  box-shadow:
-    0 30px 100px rgba(0,0,0,.4);
+}
+
+.drawer-content h2 {
+  text-align: center;
+  font-size: 17px;
+}
+
+.drawer-content h3 {
+  font-size: 12px;
+  margin-top: 18px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2,1fr);
+  gap: 7px;
+}
+
+.profile-grid div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  border-radius: 9px;
+  background: #f8fafc;
+  font-size: 10px;
+}
+
+.title-list {
+  display: grid;
+  gap: 6px;
+}
+
+.title-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.title-card.locked {
+  filter: grayscale(1);
+  opacity: .45;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.title-card > span {
+  font-size: 25px;
+}
+
+.title-card strong {
+  display: block;
+  font-size: 10px;
+}
+
+.title-card small {
+  display: block;
+  font-size: 8px;
+  color: #64748b;
+}
+
+.bag-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  margin-bottom: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.bag-icon {
+  font-size: 28px;
+}
+
+.bag-item div {
+  flex: 1;
+}
+
+.bag-item strong,
+.bag-item small {
+  display: block;
+}
+
+.bag-item strong {
+  font-size: 10px;
+}
+
+.bag-item small {
+  font-size: 8px;
+  color: #64748b;
+}
+
+.bag-item button {
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.bag-item button:disabled {
+  opacity: .4;
+}
+
+.diary-entry {
+  padding: 10px;
+  margin-bottom: 7px;
+  border-left: 3px solid #a78bfa;
+  background: #faf5ff;
+  border-radius: 0 9px 9px 0;
+}
+
+.diary-entry strong {
+  font-size: 10px;
+  color: #7c3aed;
+}
+
+.diary-entry p {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.competition-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.competition-header div {
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.competition-header small,
+.competition-header strong {
+  display: block;
+}
+
+.competition-header small {
+  color: #64748b;
+  font-size: 8px;
+}
+
+.competition-header strong {
+  font-size: 22px;
+  color: #7c3aed;
+}
+
+.ranking-list {
+  display: grid;
+  gap: 6px;
+}
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 28px 35px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 9px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.rank-row.me {
+  background: #faf5ff;
+  border-color: #c084fc;
+}
+
+.rank-number {
+  text-align: center;
+  font-weight: 900;
+}
+
+.rank-avatar {
+  font-size: 24px;
+  text-align: center;
+}
+
+.rank-name strong,
+.rank-name small {
+  display: block;
+}
+
+.rank-name strong {
+  font-size: 10px;
+}
+
+.rank-name small {
+  font-size: 8px;
+  color: #7c3aed;
+}
+
+.rank-row > b {
+  font-size: 12px;
+}
+
+.npc-note {
+  margin-top: 10px;
+  padding: 9px;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #475569;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.ending {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top,#f5d0fe,#ffffff 55%);
 }
 
 .ending-icon {
   font-size: 70px;
 }
 
-.ending-kicker {
-  margin-top: 5px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: #7465d9;
+.ending h1 {
+  margin: 8px 0 4px;
+  color: #7c3aed;
+  font-size: 28px;
 }
 
-.ending-card h1 {
-  font-size: 38px;
-  margin: 8px 0;
+.ending h2 {
+  margin: 0;
+  font-size: 17px;
 }
 
-.ending-card > p {
-  color: #727789;
+.ending p {
+  max-width: 520px;
+  color: #64748b;
+  font-size: 12px;
 }
 
-.ending-stats {
+.ending-grid {
+  width: min(600px,100%);
   display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: 9px;
-  margin: 22px 0;
+  grid-template-columns: repeat(6,1fr);
+  gap: 7px;
+  margin: 15px 0;
 }
 
-.ending-stats div {
-  background: #f5f6fa;
-  border-radius: 14px;
-  padding: 13px;
+.ending-grid div {
+  padding: 9px 4px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid #e2e8f0;
 }
 
-.ending-stats b,
-.ending-stats span {
+.ending-grid b,
+.ending-grid span {
   display: block;
 }
 
-.ending-stats b {
-  font-size: 23px;
+.ending-grid b {
+  font-size: 15px;
+  color: #7c3aed;
 }
 
-.ending-stats span {
+.ending-grid span {
   margin-top: 3px;
-  color: #777c8d;
-  font-size: 10px;
+  font-size: 8px;
+  color: #64748b;
 }
 
-.ending-message {
-  background: #fff7d7;
-  padding: 15px;
-  border-radius: 15px;
+.ending-rank {
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .ending-actions {
-  display: grid;
-  grid-template-columns:
-    repeat(2, 1fr);
-  gap: 9px;
-  margin-top: 15px;
+  display: flex;
+  gap: 7px;
+  margin-top: 14px;
 }
 
-.ending-actions button {
-  border: 0;
-  border-radius: 13px;
-  padding: 12px;
-  background: #292e4c;
-  color: white;
+.ending-actions button:not(.primary) {
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: white;
   font-weight: 800;
 }
 
-.ending-actions .danger-btn {
-  background: #d95367;
-}
-
-@media (max-width: 850px) {
-  .stats {
-    grid-template-columns:
-      repeat(3, 1fr);
+/* TABLET / MOBILE */
+@media (max-width: 900px) {
+  .game-shell {
+    width: 100%;
+    height: 100vh;
+    min-height: 620px;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
   }
 
-  .shop-grid,
-  .cert-grid,
-  .property-grid {
-    grid-template-columns:
-      repeat(2, 1fr);
+  .hud {
+    grid-template-columns: 125px 1fr;
   }
 
-  .npc-grid {
+  .money-card {
+    display: none;
+  }
+
+  .main-content {
     grid-template-columns: 1fr;
+    grid-template-rows: 210px auto minmax(120px,1fr) auto;
+  }
+
+  .navigation {
+    grid-row: 2;
+    grid-template-columns: repeat(6,1fr);
+  }
+
+  .panel {
+    grid-row: 3;
+    grid-column: 1;
+  }
+
+  .controls {
+    grid-row: 4;
+    grid-column: 1;
   }
 }
 
 @media (max-width: 650px) {
+  .game-shell {
+    min-height: 100vh;
+  }
+
   .topbar {
-    padding: 12px;
+    min-height: 54px;
+    padding: 8px 10px;
   }
 
   .brand {
-    font-size: 17px;
+    font-size: 13px;
   }
 
   .subtitle {
-    font-size: 8px;
+    font-size: 9px;
   }
 
-  .game-shell {
-    width: calc(100% - 12px);
-    margin-top: 9px;
+  .icon-btn {
+    width: 32px;
+    height: 32px;
   }
 
   .hud {
-    grid-template-columns:
-      repeat(2, 1fr);
+    padding: 7px;
+    gap: 6px;
   }
 
-  .stats {
-    grid-template-columns:
-      repeat(2, 1fr);
+  .stats-grid {
+    gap: 4px;
   }
 
-  .action-grid {
-    grid-template-columns: 1fr;
+  .stat {
+    padding: 5px;
   }
 
-  .npc-strip {
-    grid-template-columns: 1fr;
+  .stat-top {
+    font-size: 8px;
   }
 
-  .bottom-actions {
-    grid-template-columns:
-      repeat(3, 1fr);
+  .day-big {
+    font-size: 11px;
   }
 
-  .controller {
-    padding: 12px;
+  .time-big {
+    font-size: 20px;
   }
 
-  .controller-info b {
+  .main-content {
+    padding: 6px;
+    gap: 6px;
+    grid-template-rows: 180px auto minmax(120px,1fr) auto;
+  }
+
+  .navigation {
+    gap: 4px;
+  }
+
+  .nav-btn {
+    min-height: 35px;
+    padding: 3px;
+  }
+
+  .nav-btn span {
+    font-size: 13px;
+  }
+
+  .nav-btn small {
+    font-size: 8px;
+  }
+
+  .npc-card {
+    padding: 4px;
+  }
+
+  .npc-avatar {
+    font-size: 20px;
+  }
+
+  .npc-card strong {
+    font-size: 8px;
+  }
+
+  .npc-card small {
     display: none;
   }
 
+  .panel {
+    padding: 7px;
+  }
+
   .shop-grid,
-  .cert-grid,
   .property-grid {
+    grid-template-columns: repeat(3,1fr);
+  }
+
+  .job-list {
     grid-template-columns: 1fr;
   }
 
-  .competition-summary {
-    grid-template-columns: 1fr;
+  .controls {
+    grid-template-columns: 70px 1fr 70px;
   }
 
-  .title-grid {
-    grid-template-columns: 1fr;
+  .control-main {
+    gap: 3px;
   }
 
-  .ending-card {
-    padding: 23px 15px;
+  .rpg-btn {
+    padding: 6px;
+    font-size: 7px;
   }
 
-  .ending-card h1 {
-    font-size: 28px;
+  .dpad button {
+    width: 30px;
+    height: 30px;
   }
 
-  .ending-stats {
-    grid-template-columns:
-      repeat(2, 1fr);
+  .ab-buttons button {
+    width: 34px;
+    height: 34px;
   }
 
-  .ending-actions {
-    grid-template-columns: 1fr;
+  .footer {
+    display: none;
   }
 
-  .file-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .ranking-row {
-    grid-template-columns:
-      35px 38px 1fr auto;
-  }
-
-  .ranking-avatar {
-    font-size: 25px;
-  }
-
-  .ranking-score {
-    font-size: 15px;
+  .ending-grid {
+    grid-template-columns: repeat(3,1fr);
   }
 }
 `;
-
-export default App;
