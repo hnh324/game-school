@@ -1,713 +1,1423 @@
-import React, { useState, useEffect, useRef } from 'react';
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thanh Xuân Rực Rỡ: Nhật Ký Cấp 3</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Be Vietnam Pro', sans-serif; user-select: none; }
+    .font-pixel { font-family: 'Press Start 2P', monospace; }
+    .font-vt { font-family: 'VT323', monospace; }
 
-export default function App() {
-  // --- 1. DỮ LIỆU CỐ ĐỊNH ---
-  const WHOLESALE_ITEMS = [
-    { id: 'banh_trang', name: 'Bánh Tráng Cuộn Bơ', wholesalePrice: 8500, retailPrice: 12000, icon: '🌯' },
-    { id: 'tra_sua_chai', name: 'Trà Sữa Thái Chai', wholesalePrice: 13000, retailPrice: 18000, icon: '🧋' },
-    { id: 'but_cute', name: 'Bút Bi Cute Pastel', wholesalePrice: 5500, retailPrice: 8000, icon: '🖊️' },
-    { id: 'de_cuong', name: 'Đề Cương Ôn Tập', wholesalePrice: 6500, retailPrice: 10000, icon: '📑' }
-  ];
-
-  const CERTIFICATES_DEF = [
-    { id: 'cert_mos', name: 'Tin Học MOS (Word/Excel)', cost: 50000, reqStudy: 60, icon: '💻', desc: 'Thành thạo văn phòng, +10 Uy tín' },
-    { id: 'cert_accounting', name: 'Kế Toán Doanh Nghiệp', cost: 80000, reqStudy: 70, icon: '📊', desc: 'Nắm vững sổ sách, +15% tiền tip' },
-    { id: 'cert_toeic', name: 'TOEIC 650+', cost: 120000, reqStudy: 75, icon: '📘', desc: 'Chuẩn quốc tế, cộng +15 Học tập' },
-    { id: 'cert_ielts', name: 'IELTS Academic 7.0+', cost: 200000, reqStudy: 85, icon: '📕', desc: 'Tuyển thẳng viện đào tạo quốc tế!' }
-  ];
-
-  const SPECIAL_GIFTS = [
-    { id: 'gift_pin', name: 'Kẹp Tóc Ngọc Bích', cost: 45000, loveGain: 12, icon: '🎀', desc: 'Món quà xinh xắn Mẫn rất thích cài lên tóc.' },
-    { id: 'gift_diary', name: 'Sổ Tay Thư Tình', cost: 35000, loveGain: 10, icon: '💌', desc: 'Những dòng tâm sự chân thành gửi lớp phó.' },
-    { id: 'gift_bear', name: 'Gấu Bông Handmade', cost: 65000, loveGain: 16, icon: '🧸', desc: 'Ấm áp những đêm cày đề căng thẳng.' },
-    { id: 'gift_bracelet', name: 'Vòng Tay Bạc Triệu Mẫn', cost: 120000, loveGain: 25, icon: '💍', desc: 'Minh chứng cho lời hẹn ước cùng đỗ đại học.' }
-  ];
-
-  const HOLIDAYS = {
-    10: { name: '20/10 Ngày Phụ Nữ VN', bonus: 1.8 },
-    20: { name: '20/11 Ngày Nhà Giáo VN', bonus: 1.4 },
-    30: { name: '24/12 Lễ Giáng Sinh', bonus: 2.0 },
-    40: { name: '14/02 Lễ Valentine', bonus: 2.5 }
-  };
-
-  const QUIZ_DATABASE = [
-    { subject: 'TOÁN HỌC', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Nếu x + 5 = 12 thì giá trị của biểu thức 2x - 4 bằng bao nhiêu?', opts: ['10', '14', '7', '18'], c: 0, tip: 'x = 7 => 2*(7) - 4 = 10' },
-    { subject: 'TOÁN HỌC', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Hàm số y = x² - 4x + 3 có hoành độ đỉnh Parabol bằng:', opts: ['2', '-2', '4', '1'], c: 0, tip: 'x = -b/(2a) = 4/2 = 2' },
-    { subject: 'VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Trong dao động điều hòa của con lắc lò xo, cơ năng biến thiên thế nào?', opts: ['Bảo toàn không đổi', 'Tăng giảm tuần hoàn', 'Bằng 0', 'Luôn giảm'], c: 0, tip: 'Bỏ qua ma sát, cơ năng luôn bảo toàn.' },
-    { subject: 'HÓA HỌC', teacher: 'Cô Phương', avatar: '👩‍🔬', q: 'Kim loại nào dẫn điện tốt nhất ở điều kiện thường?', opts: ['Bạc (Ag)', 'Đồng (Cu)', 'Vàng (Au)', 'Nhôm (Al)'], c: 0, tip: 'Ag > Cu > Au > Al' },
-    { subject: 'SINH HỌC', teacher: 'Thầy Đức', avatar: '👨‍🏫', q: 'Bào quan nào được ví là “nhà máy năng lượng” của tế bào?', opts: ['Ty thể', 'Ribôxôm', 'Bộ máy Golgi', 'Lizôxôm'], c: 0, tip: 'Ty thể diễn ra hô hấp tổng hợp ATP.' },
-    { subject: 'NGỮ VĂN', teacher: 'Cô Thảo', avatar: '👩‍🏫', q: 'Ai là tác giả của tác phẩm “Vợ Nhặt”?', opts: ['Kim Lân', 'Nam Cao', 'Tô Hoài', 'Nguyễn Tuân'], c: 0, tip: 'Nhà văn Kim Lân viết về nạn đói năm 1945.' },
-    { subject: 'LỊCH SỬ', teacher: 'Thầy Hùng', avatar: '👨‍🏫', q: 'Chiến dịch Điện Biên Phủ toàn thắng vào năm nào?', opts: ['1954', '1945', '1975', '1968'], c: 0, tip: 'Toàn thắng vào ngày 07/05/1954.' },
-    { subject: 'TIẾNG ANH', teacher: 'Cô Jennifer', avatar: '👩‍💼', q: 'She has been studying in this school ___ 2022.', opts: ['since', 'for', 'in', 'at'], c: 0, tip: 'Since + mốc thời gian trong hiện tại hoàn thành.' }
-  ];
-
-  const TIME_PERIODS = [
-    { text: '07:30', name: 'Buổi sáng • Tiết 1-2', canSell: true },
-    { text: '09:15', name: 'Giờ ra chơi 15 phút', canSell: true },
-    { text: '11:30', name: 'Tan trường trưa • Giờ tự học', canSell: false },
-    { text: '14:00', name: 'Buổi chiều • Thư viện / Chính khóa', canSell: false },
-    { text: '17:00', name: 'Chiều muộn sau 17h • Tan trường bán đồ', canSell: true },
-    { text: '20:30', name: 'Buổi tối • Tự học khuya tại nhà', canSell: false }
-  ];
-
-  const DAYS_OF_WEEK = ['THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY', 'CHỦ NHẬT'];
-
-  // --- 2. GAME STATE ---
-  const [playerName, setPlayerName] = useState('Bạn');
-  const [day, setDay] = useState(1);
-  const [timeIndex, setTimeIndex] = useState(0);
-  const [location, setLocation] = useState('class');
-  
-  const [stats, setStats] = useState({
-    hp: 85,
-    energy: 100,
-    mood: 75,
-    study: 50,
-    love: 20,
-    reputation: 15,
-    money: 30000,
-    midtermScore: 0,
-    finalScore: 0,
-    totalBanhTrangSold: 0,
-    totalTipsReceived: 0
-  });
-
-  const [inventory, setInventory] = useState([
-    { id: 'banh_trang', count: 2 },
-    { id: 'tra_sua_chai', count: 1 },
-    { id: 'but_cute', count: 1 },
-    { id: 'de_cuong', count: 1 }
-  ]);
-
-  const [customerOrders, setCustomerOrders] = useState([
-    { id: 1, customer: 'Lan (Bạn Thân)', avatar: '👧', itemId: 'banh_trang', qty: 2, dialogue: 'Đói bụng quá, để cho tao 2 bịch bánh tráng bơ nha!', tip: 2000, stars: 5 },
-    { id: 2, customer: 'Triệu Mẫn (Lớp Phó)', avatar: '👸', itemId: 'tra_sua_chai', qty: 1, dialogue: 'Bạn còn chai trà sữa nào mát lạnh không? Mình đang khát quá!', tip: 6000, stars: 5 }
-  ]);
-
-  const [certsEarned, setCertsEarned] = useState([]);
-  const [unlockedAchievements, setUnlockedAchievements] = useState([]);
-  const [activeModal, setActiveModal] = useState('help'); // Hiện modal hướng dẫn ngay khi vào game
-  const [alertText, setAlertText] = useState('');
-  const [cloudCodeText, setCloudCodeText] = useState('');
-  const [currentQuiz, setCurrentQuiz] = useState(null);
-
-  // Thi cử
-  const [examState, setExamState] = useState({
-    type: 'midterm',
-    step: 0,
-    questions: [],
-    correct: 0
-  });
-
-  const canvasRef = useRef(null);
-
-  // Hiệu ứng pháo hoa
-  const triggerFireworks = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const particles = [];
-    const colors = ['#f43f5e', '#38bdf8', '#fbbf24', '#a855f7', '#34d399'];
-
-    for (let i = 0; i < 80; i++) {
-      particles.push({
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        vx: (Math.random() - 0.5) * 10,
-        vy: (Math.random() - 0.5) * 10,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        alpha: 1
-      });
+    /* CRT Glow & Console Shell */
+    .retro-console-frame {
+      box-shadow: 0 0 0 4px #0f172a, 0 0 0 8px #3b82f6, 0 25px 50px -12px rgba(59, 130, 246, 0.4);
+      background: linear-gradient(145deg, #0f172a, #090d16);
+    }
+    .screen-bezel {
+      background: radial-gradient(circle at center, #1e293b 0%, #030712 100%);
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 0 15px rgba(59, 130, 246, 0.2);
+    }
+    .pixel-box {
+      border: 2px solid #334155;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    .pixel-btn {
+      border: 2px solid #475569;
+      box-shadow: 0 4px 0 #0f172a;
+      transition: all 0.08s ease;
+    }
+    .pixel-btn:hover {
+      filter: brightness(1.1);
+    }
+    .pixel-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #0f172a;
     }
 
-    let frame = 0;
-    const anim = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach((p) => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.alpha -= 0.02;
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, p.alpha);
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
-      frame++;
-      if (frame < 50) requestAnimationFrame(anim);
-      else ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-    anim();
-  };
-
-  const showAlert = (msg) => {
-    setAlertText(msg);
-    setTimeout(() => setAlertText(''), 3000);
-  };
-
-  // Tiến trình thời gian
-  const advanceTime = () => {
-    setTimeIndex((prev) => {
-      if (prev + 1 >= TIME_PERIODS.length) {
-        // Hết ngày
-        setDay((d) => d + 1);
-        setStats((s) => ({ ...s, energy: 100, money: s.money + 15000 }));
-        showAlert('☀️ Thức dậy ngày mới! Năng lượng hồi phục và nhận 15.000đ tiền tiêu vặt.');
-        return 0;
-      }
-      return prev + 1;
-    });
-  };
-
-  // --- 3. ĐỒNG BỘ CLOUD AN TOÀN TUYỆT ĐỐI ---
-  const handleExportCloud = () => {
-    try {
-      const saveData = {
-        playerName,
-        day,
-        timeIndex,
-        stats,
-        inventory,
-        certsEarned,
-        unlockedAchievements
-      };
-      // Mã hóa an toàn không sợ lỗi tiếng Việt
-      const jsonStr = JSON.stringify(saveData);
-      const safeCode = btoa(encodeURIComponent(jsonStr));
-      setCloudCodeText(safeCode);
-      showAlert('📋 Đã tạo mã lưu Game thành công! Hãy copy mã.');
-    } catch (err) {
-      alert('Lỗi tạo mã lưu: ' + err.message);
-    }
-  };
-
-  const handleImportCloud = () => {
-    try {
-      if (!cloudCodeText.trim()) {
-        alert('Vui lòng dán mã lưu vào khung trước!');
-        return;
-      }
-      const jsonStr = decodeURIComponent(atob(cloudCodeText.trim()));
-      const data = JSON.parse(jsonStr);
-
-      if (data && data.stats) {
-        setPlayerName(data.playerName || 'Bạn');
-        setDay(data.day || 1);
-        setTimeIndex(data.timeIndex || 0);
-        setStats(data.stats);
-        if (data.inventory) setInventory(data.inventory);
-        if (data.certsEarned) setCertsEarned(data.certsEarned);
-        if (data.unlockedAchievements) setUnlockedAchievements(data.unlockedAchievements);
-
-        setActiveModal(null);
-        showAlert('🎉 Khôi phục dữ liệu thành công!');
-        triggerFireworks();
-      }
-    } catch (err) {
-      alert('Mã lưu không hợp lệ hoặc bị lỗi định dạng!');
-    }
-  };
-
-  // Giao order
-  const fulfillOrder = (orderId) => {
-    const ord = customerOrders.find((o) => o.id === orderId);
-    if (!ord) return;
-    const invItem = inventory.find((i) => i.id === ord.itemId);
-    const itemDef = WHOLESALE_ITEMS.find((i) => i.id === ord.itemId);
-
-    if (!invItem || invItem.count < ord.qty) {
-      alert('Kho không đủ hàng! Hãy vào Chợ Sỉ để nhập thêm.');
-      return;
+    /* Scanlines */
+    .scanlines {
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
     }
 
-    // Trừ kho & cộng tiền
-    setInventory((prev) =>
-      prev.map((i) => (i.id === ord.itemId ? { ...i, count: i.count - ord.qty } : i))
-    );
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
 
-    const isCrush = ord.customer.includes('Triệu Mẫn');
-    const hasAccounting = certsEarned.includes('cert_accounting');
-    const finalTip = hasAccounting ? Math.round(ord.tip * 1.15) : ord.tip;
-    const profit = itemDef.retailPrice * ord.qty + finalTip;
-
-    setStats((prev) => ({
-      ...prev,
-      money: prev.money + profit,
-      love: isCrush ? Math.min(100, prev.love + 8) : prev.love,
-      energy: Math.max(0, prev.energy - 5),
-      mood: Math.min(100, prev.mood + 5),
-      totalBanhTrangSold: ord.itemId === 'banh_trang' ? prev.totalBanhTrangSold + ord.qty : prev.totalBanhTrangSold,
-      totalTipsReceived: prev.totalTipsReceived + finalTip
-    }));
-
-    setCustomerOrders((prev) => prev.filter((o) => o.id !== orderId));
-    showAlert(`💵 Đã giao đơn cho ${ord.customer}! Thu về +${profit.toLocaleString('vi-VN')}đ`);
-  };
-
-  const buyWholesale = (itemId) => {
-    const item = WHOLESALE_ITEMS.find((i) => i.id === itemId);
-    const cost = item.wholesalePrice * 3;
-    if (stats.money < cost) {
-      alert('Không đủ tiền để nhập 3 phần hàng sỉ!');
-      return;
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
     }
-    setStats((s) => ({ ...s, money: s.money - cost }));
-    setInventory((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, count: i.count + 3 } : i))
-    );
-    showAlert(`📦 Đã nhập 3 phần ${item.name}!`);
-  };
+    .floating-sprite { animation: floatSlow 2.5s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-4 overflow-x-hidden">
 
-  const currentPeriod = TIME_PERIODS[timeIndex];
-  const isSelling = currentPeriod.canSell;
-
-  return (
-    <div className="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-4 font-sans select-none relative overflow-x-hidden">
-      <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-50 w-full h-full"></canvas>
-
-      <div className="bg-slate-900 border-4 border-slate-700 rounded-[32px] p-3 sm:p-5 w-full max-w-4xl shadow-2xl relative z-10">
-        
-        {/* HEADER TOP BAR */}
-        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[10px] font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-sky-400 font-bold">THIẾT KẾ CHO: {playerName.toUpperCase()}</span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button onClick={() => setActiveModal('name')} className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-amber-300">👤 Đổi Tên</button>
-            <button onClick={() => setActiveModal('gift')} className="px-2 py-0.5 bg-pink-900/60 hover:bg-pink-800 rounded text-pink-200">🎁 Tặng Mẫn</button>
-            <button onClick={() => setActiveModal('cert')} className="px-2 py-0.5 bg-blue-900/60 hover:bg-blue-800 rounded text-blue-200">🎓 Chứng Chỉ</button>
-            <button onClick={() => setActiveModal('help')} className="px-2 py-0.5 bg-amber-900/60 hover:bg-amber-800 rounded text-amber-200">📖 Hướng Dẫn</button>
-            <button onClick={() => { setActiveModal('cloud'); handleExportCloud(); }} className="px-2 py-0.5 bg-indigo-900/80 hover:bg-indigo-700 rounded text-indigo-200 font-bold">☁️ CLOUD</button>
-          </div>
-        </div>
-
-        {/* HUD CHỈ SỐ */}
-        <header className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 mb-3 flex flex-wrap items-center justify-between text-xs gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">☀️️</span>
-            <div>
-              <div className="font-extrabold text-amber-300">
-                {DAYS_OF_WEEK[(day - 1) % 7]} • <span className="text-emerald-400 font-mono">{currentPeriod.text}</span> • NGÀY {day}/45
-              </div>
-              <div className="text-[10px] text-slate-400">{currentPeriod.name}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 font-mono text-[11px] flex-wrap">
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-rose-400">❤️ {stats.hp}</span>
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-amber-400">⚡ {stats.energy}</span>
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-yellow-400">😊 {stats.mood}</span>
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-sky-400">📚 {stats.study}</span>
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-pink-400 font-bold">💕 {stats.love}% Mẫn</span>
-            <span className="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-emerald-400 font-bold">💰 {stats.money.toLocaleString('vi-VN')}đ</span>
-          </div>
-        </header>
-
-        {alertText && (
-          <div className="mb-2 p-2 bg-emerald-950 border border-emerald-500 rounded text-emerald-300 text-xs text-center font-bold animate-pulse">
-            {alertText}
-          </div>
-        )}
-
-        {/* KHUNG NỘI DUNG CHÍNH */}
-        <div className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border border-slate-800 rounded-2xl p-4 min-h-[360px] flex flex-col justify-between relative">
-          
-          <div className="flex items-center justify-between text-xs font-bold mb-2">
-            <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-amber-300">
-              🏫 LỚP 12A3 - KHỐI CHUYÊN
-            </span>
-            <div className="flex items-center gap-2">
-              {!isSelling && (
-                <button
-                  onClick={() => {
-                    const caught = Math.random() < 0.35;
-                    if (caught) {
-                      setStats((s) => ({ ...s, mood: Math.max(0, s.mood - 15), study: Math.max(0, s.study - 5) }));
-                      alert('🚨 Bị thầy giám thị Nam tóm sống khi leo tường! Trừ 15 Tâm trạng và ghi sổ đầu bài.');
-                    } else {
-                      setStats((s) => ({ ...s, mood: Math.min(100, s.mood + 20), energy: Math.max(0, s.energy - 10) }));
-                      showAlert('🎉 Trốn học ra quán Cyber leo rank thành công! (+20 😊)');
-                    }
-                    advanceTime();
-                  }}
-                  className="px-2.5 py-1 bg-rose-900 hover:bg-rose-800 text-rose-200 border border-rose-600 rounded text-[11px]"
-                >
-                  🏃 Trèo Tường Trốn Học
-                </button>
-              )}
-              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${isSelling ? 'bg-emerald-950 border border-emerald-500 text-emerald-300' : 'bg-rose-950 border border-rose-600 text-rose-300'}`}>
-                {isSelling ? '🟢 ĐƯỢC BÁN HÀNG' : '🔒 GIỜ HỌC BÀI'}
-              </span>
-            </div>
-          </div>
-
-          {/* AVATAR BẠN BÈ */}
-          <div className="my-auto py-6 flex flex-col items-center justify-center gap-4 text-center">
-            <div className="flex items-center justify-center gap-10">
-              <div onClick={() => { setStats((s) => ({ ...s, friends: s.friends + 5 })); showAlert('👧 Tám chuyện cùng bạn thân Lan!'); advanceTime(); }} className="cursor-pointer hover:scale-110 transition">
-                <div className="text-5xl">👧</div>
-                <span className="text-[10px] text-slate-300 font-bold block mt-1">Lan (Bạn thân)</span>
-              </div>
-              <div onClick={() => { setStats((s) => ({ ...s, love: Math.min(100, s.love + 5), study: s.study + 2 })); showAlert('💕 Triệu Mẫn chia sẻ bí quyết học tốt!'); advanceTime(); }} className="cursor-pointer hover:scale-110 transition">
-                <div className="text-5xl">👸</div>
-                <span className="text-[10px] text-pink-300 font-bold block mt-1">Triệu Mẫn 💕</span>
-              </div>
-              <div onClick={() => { setStats((s) => ({ ...s, mood: Math.min(100, s.mood + 10) })); showAlert('🏀 Ném bóng rổ cùng Tuấn!'); advanceTime(); }} className="cursor-pointer hover:scale-110 transition">
-                <div className="text-5xl">🏀</div>
-                <span className="text-[10px] text-sky-300 font-bold block mt-1">Tuấn (Bóng rổ)</span>
-              </div>
-            </div>
-            <div className="bg-slate-900 px-4 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 italic max-w-md">
-              "Sáng sớm, ra chơi và sau 17:00 nhận order trả khách. Giờ học chính khóa hãy học bài hoặc trốn học đi chơi!"
-            </div>
-          </div>
-
-          {/* ACTION BUTTONS DƯỚI KHUNG */}
-          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800">
-            <button
-              onClick={() => {
-                if (!isSelling) {
-                  alert('⛔ Bây giờ là giờ học! Chỉ nhận order vào buổi sáng, ra chơi hoặc sau 17:00.');
-                  return;
-                }
-                setActiveModal('order');
-              }}
-              className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1 shadow-lg"
-            >
-              <span>🛎️</span> Nhận Order
-            </button>
-            <button
-              onClick={() => {
-                const q = QUIZ_DATABASE[Math.floor(Math.random() * QUIZ_DATABASE.length)];
-                setCurrentQuiz(q);
-                setActiveModal('quiz');
-              }}
-              className="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1"
-            >
-              <span>✍️</span> Học Trên Lớp
-            </button>
-            <button
-              onClick={() => {
-                if (stats.energy < 15) { alert('Bạn quá mệt để cày đề!'); return; }
-                setStats((s) => ({ ...s, study: s.study + 12, energy: Math.max(0, s.energy - 18) }));
-                showAlert('📚 Cày xong 1 đề đại học ở thư viện! (+12 📚)');
-                advanceTime();
-              }}
-              className="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1"
-            >
-              <span>📚</span> Tự Học Thư Viện
-            </button>
-            <button
-              onClick={() => setActiveModal('leaderboard')}
-              className="py-2.5 bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1 shadow-lg"
-            >
-              <span>🏆</span> Bảng Thi Đua
-            </button>
-          </div>
-        </div>
-
-        {/* CÁC CỬA SỔ POPUP (MODAL) */}
-
-        {/* 1. MODAL ĐỒNG BỘ CLOUD */}
-        {activeModal === 'cloud' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-indigo-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-indigo-300">☁️ ĐỒNG BỘ CLOUD (CHƠI TRÊN MÁY KHÁC)</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <p className="text-[11px] text-slate-300">Sao chép mã này để đem sang điện thoại hoặc máy tính khác dán vào để tải lại:</p>
-              <textarea
-                value={cloudCodeText}
-                onChange={(e) => setCloudCodeText(e.target.value)}
-                className="w-full h-24 bg-slate-950 border border-slate-700 rounded-xl p-2 text-[10px] font-mono text-emerald-300 select-all"
-              />
-              <div className="flex gap-2">
-                <button onClick={handleExportCloud} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold">📋 Tạo Mã Hiện Tại</button>
-                <button onClick={handleImportCloud} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">📥 Tải Từ Mã Này</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 2. MODAL NHẬN ORDER */}
-        {activeModal === 'order' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-emerald-400">🛎️ QUẦY ORDER HỌC ĐƯỜNG</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <div className="grid grid-cols-4 gap-1 text-[10px] font-mono bg-slate-950 p-2 rounded-xl text-center">
-                {inventory.map((inv) => (
-                  <span key={inv.id} className="text-slate-300">{inv.id === 'banh_trang' ? '🌯' : inv.id === 'tra_sua_chai' ? '🧋' : inv.id === 'but_cute' ? '🖊️' : '📑'}: <b>{inv.count}</b></span>
-                ))}
-              </div>
-              <div className="space-y-2 max-h-56 overflow-y-auto">
-                {customerOrders.length === 0 ? (
-                  <div className="text-center py-4 text-xs text-slate-500">Đã giao hết đơn order! Bấm gọi khách mới bên dưới.</div>
-                ) : (
-                  customerOrders.map((ord) => {
-                    const invItem = inventory.find((i) => i.id === ord.itemId);
-                    const canFulfill = invItem && invItem.count >= ord.qty;
-                    return (
-                      <div key={ord.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{ord.avatar}</span>
-                          <div>
-                            <div className="font-bold text-slate-200">{ord.customer}</div>
-                            <div className="text-[10px] text-slate-400 italic">"{ord.dialogue}"</div>
-                            <div className="text-[10px] text-amber-400 font-mono mt-0.5">Đặt: {ord.qty}x • Tip: +{ord.tip.toLocaleString('vi-VN')}đ</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => fulfillOrder(ord.id)}
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${canFulfill ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
-                        >
-                          {canFulfill ? 'Giao Đơn' : 'Thiếu Hàng'}
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <div className="flex gap-2 pt-2 border-t border-slate-800">
-                <button onClick={() => setActiveModal('wholesale')} className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg">🚚 Chợ Sỉ Nhập Hàng</button>
-                <button
-                  onClick={() => {
-                    if (stats.energy < 8) { alert('Bạn quá mệt mỏi!'); return; }
-                    const newOrd = { id: Date.now(), customer: 'Tuấn (Bóng rổ)', avatar: '🏀', itemId: 'tra_sua_chai', qty: 1, dialogue: 'Đá bóng khát nước quá, có trà sữa ko?', tip: 3000, stars: 5 };
-                    setCustomerOrders((prev) => [...prev, newOrd]);
-                    setStats((s) => ({ ...s, energy: s.energy - 8 }));
-                    showAlert('🛎️️ Có khách mới đặt order!');
-                  }}
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg"
-                >
-                  📢 Gọi Thêm Khách
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 3. MODAL CHỢ SỈ */}
-        {activeModal === 'wholesale' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-blue-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-blue-300">🚚 CHỢ SỈ ĐẦU MỐI (NHẬP HÀNG)</h3>
-                <button onClick={() => setActiveModal('order')} className="text-slate-400 hover:text-white text-xs">← Quay lại quầy</button>
-              </div>
-              <div className="space-y-2">
-                {WHOLESALE_ITEMS.map((item) => (
-                  <div key={item.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{item.icon}</span>
-                      <div>
-                        <div className="font-bold text-slate-200">{item.name}</div>
-                        <div className="text-[10px] text-slate-400">Giá sỉ: {item.wholesalePrice.toLocaleString('vi-VN')}đ / cái</div>
-                      </div>
-                    </div>
-                    <button onClick={() => buyWholesale(item.id)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-[11px]">
-                      Nhập 3 Cái ({(item.wholesalePrice * 3).toLocaleString('vi-VN')}đ)
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 4. MODAL TRẢ LỜI CÂU HỎI TRÊN LỚP */}
-        {activeModal === 'quiz' && currentQuiz && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-indigo-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <span className="text-xs font-bold text-indigo-300">TIẾT HỌC {currentQuiz.subject}</span>
-                <span className="text-[10px] text-slate-400">{currentQuiz.teacher}</span>
-              </div>
-              <p className="text-xs text-slate-200 font-semibold">{currentQuiz.q}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {currentQuiz.opts.map((opt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      if (idx === currentQuiz.c) {
-                        setStats((s) => ({ ...s, study: s.study + 10, mood: Math.min(100, s.mood + 5), energy: Math.max(0, s.energy - 12) }));
-                        showAlert(`🎉 Đúng rồi! (+10 📚) ${currentQuiz.tip}`);
-                      } else {
-                        setStats((s) => ({ ...s, study: s.study + 3, mood: Math.max(0, s.mood - 5), energy: Math.max(0, s.energy - 12) }));
-                        showAlert(`😭 Sai rồi! Gợi ý: ${currentQuiz.tip}`);
-                      }
-                      setActiveModal(null);
-                      advanceTime();
-                    }}
-                    className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-left text-xs font-bold border border-slate-700 hover:border-amber-400"
-                  >
-                    {String.fromCharCode(65 + idx)}. {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 5. MODAL HƯỚNG DẪN */}
-        {activeModal === 'help' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-amber-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-amber-300">📖 HƯỚNG DẪN LUẬT CHƠI</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <div className="space-y-2 text-[11px] text-slate-300">
-                <p>• <b>Buổi Sáng, Ra Chơi & Sau 17:00</b>: Mở quầy nhận order từ bạn bè kiếm tiền.</p>
-                <p>• <b>Trưa, Chiều & Tối</b>: Quầy đóng cửa. Bạn bắt buộc phải tự học, cày đề hoặc bấm <b>Trèo tường trốn học</b> để giải trí.</p>
-                <p>• <b>Nút CLOUD góc trên</b>: Bấm vào để copy mã lưu game đem sang điện thoại hoặc máy khác dán vào chơi tiếp.</p>
-              </div>
-              <button onClick={() => setActiveModal(null)} className="w-full py-2 bg-amber-500 text-slate-950 font-black rounded-xl text-xs">
-                ĐÃ HIỂU, VÀO CHƠI NGAY! 🌸
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 6. MODAL ĐỔI TÊN */}
-        {activeModal === 'name' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-sky-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-sky-300">👤 ĐỔI TÊN HỌC SINH</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <input
-                type="text"
-                placeholder="Nhập tên của bạn..."
-                defaultValue={playerName}
-                id="nameInputBox"
-                className="w-full p-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-amber-300 font-bold outline-none"
-              />
-              <button
-                onClick={() => {
-                  const val = document.getElementById('nameInputBox').value.trim();
-                  if (val) setPlayerName(val);
-                  setActiveModal(null);
-                  showAlert('Đã đổi tên học sinh thành công!');
-                }}
-                className="w-full py-2 bg-sky-600 text-white font-bold rounded-xl text-xs"
-              >
-                Xác Nhận Tên
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 7. MODAL THI CHỨNG CHỈ */}
-        {activeModal === 'cert' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-blue-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-blue-300">🎓 TRUNG TÂM THI CHỨNG CHỈ QUỐC TẾ</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <div className="space-y-2 max-h-56 overflow-y-auto">
-                {CERTIFICATES_DEF.map((c) => {
-                  const earned = certsEarned.includes(c.id);
-                  return (
-                    <div key={c.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <div className="font-bold text-slate-200">{c.icon} {c.name}</div>
-                        <div className="text-[10px] text-slate-400">{c.desc}</div>
-                        <div className="text-[10px] text-blue-400 font-mono">Lệ phí: {c.cost.toLocaleString('vi-VN')}đ • Yêu cầu: {c.reqStudy} 📚</div>
-                      </div>
-                      <button
-                        disabled={earned}
-                        onClick={() => {
-                          if (stats.money < c.cost) { alert('Không đủ tiền đóng lệ phí thi!'); return; }
-                          if (stats.study < c.reqStudy) { alert(`Cần tối thiểu ${c.reqStudy} điểm Học Tập để thi đỗ!`); return; }
-                          setStats((s) => ({ ...s, money: s.money - c.cost, reputation: s.reputation + 15 }));
-                          setCertsEarned((prev) => [...prev, c.id]);
-                          showAlert(`🎉 Chúc mừng bạn đã thi đỗ ${c.name}!`);
-                          triggerFireworks();
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold ${earned ? 'bg-slate-800 text-slate-500' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-                      >
-                        {earned ? 'ĐÃ ĐẠT' : 'Thi Ngay'}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 8. MODAL TẶNG QUÀ CHO TRIỆU MẪN */}
-        {activeModal === 'gift' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-pink-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-pink-300">🎁 TIỆM QUÀ LƯU NIỆM DÀNH CHO TRIỆU MẪN</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <div className="space-y-2 max-h-56 overflow-y-auto">
-                {SPECIAL_GIFTS.map((g) => (
-                  <div key={g.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-slate-200">{g.icon} {g.name}</div>
-                      <div className="text-[10px] text-slate-400">{g.desc}</div>
-                      <div className="text-[10px] text-pink-400 font-mono">Giá: {g.cost.toLocaleString('vi-VN')}đ • Tăng: +{g.loveGain}% 💕</div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (stats.money < g.cost) { alert('Không đủ tiền mua quà!'); return; }
-                        setStats((s) => ({ ...s, money: s.money - g.cost, love: Math.min(100, s.love + g.loveGain), mood: Math.min(100, s.mood + 10) }));
-                        showAlert(`💕 Đã tặng ${g.name} cho Triệu Mẫn! Mẫn rất vui và cảm động.`);
-                        triggerFireworks();
-                        setActiveModal(null);
-                      }}
-                      className="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-[11px] font-bold"
-                    >
-                      Tặng Mẫn
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 9. MODAL BẢNG THI ĐUA */}
-        {activeModal === 'leaderboard' && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-            <div className="bg-slate-900 border-2 border-yellow-500 rounded-2xl p-4 w-full max-w-md space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-xs font-black text-amber-300">🏆 BẢNG THI ĐUA LỚP 12A3</h3>
-                <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
-              </div>
-              <div className="space-y-1.5 text-xs">
-                <div className="p-2 bg-slate-950 border border-slate-800 rounded-xl flex justify-between">
-                  <span>🥇 Triệu Mẫn (Lớp Phó)</span>
-                  <span className="font-mono text-amber-400 font-bold">92 📚</span>
-                </div>
-                <div className="p-2 bg-sky-950 border border-sky-500 rounded-xl flex justify-between font-bold text-sky-300">
-                  <span>{stats.study > 92 ? '🥇' : '🥈'} {playerName} (Bạn)</span>
-                  <span className="font-mono text-amber-400">{stats.study} 📚</span>
-                </div>
-                <div className="p-2 bg-slate-950 border border-slate-800 rounded-xl flex justify-between">
-                  <span>🥉 Hoàng Nam</span>
-                  <span className="font-mono text-amber-400 font-bold">84 📚</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+  <!-- RETRO CONSOLE FRAME -->
+  <div class="retro-console-frame border-4 rounded-[36px] p-3 sm:p-5 w-full max-w-4xl flex flex-col relative">
+    
+    <!-- TOP CONSOLE HEADER -->
+    <div class="flex items-center justify-between px-3 py-1.5 mb-2 border-b border-slate-800 text-[10px] text-slate-400 font-pixel">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse"></span>
+        <span class="text-sky-400">JRPG SCHOOL TYCOON 4.0</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="btnAudioToggle" class="hover:text-amber-300 transition text-[9px] bg-slate-800 px-2 py-0.5 rounded">🔊 BẬT ÂM</button>
+        <span id="saveStatus" class="text-slate-500 font-mono">ĐÃ LƯU</span>
       </div>
     </div>
-  );
-}
+
+    <!-- MAIN SCREEN BEZEL -->
+    <div class="screen-bezel rounded-2xl p-2 sm:p-4 border-2 border-slate-800/80 flex flex-col flex-1 relative overflow-hidden min-h-[620px]">
+      <div class="scanlines absolute inset-0 z-50"></div>
+
+      <!-- TOP HUD -->
+      <header class="bg-slate-950/95 pixel-box rounded-xl p-2.5 mb-3 flex flex-wrap items-center justify-between gap-2 text-xs relative z-10">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl" id="uiWeatherIcon">☀️</span>
+          <div>
+            <div class="font-extrabold text-amber-300 flex items-center gap-1.5">
+              <span id="uiDayOfWeek">THỨ HAI</span>
+              <span>•</span>
+              <span id="uiTimeText" class="font-mono text-emerald-400">07:30</span>
+              <span class="text-[10px] px-1.5 py-0.5 bg-slate-800 text-sky-300 rounded font-semibold font-mono">NGÀY <b id="uiDayCount">1</b>/45</span>
+            </div>
+            <div id="uiCurrentPeriodText" class="text-[10px] text-slate-400 font-medium">Buổi sáng • Tiết 1-2</div>
+          </div>
+        </div>
+
+        <!-- STAT METRICS -->
+        <div class="flex items-center gap-2 flex-wrap font-mono text-[11px]">
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Sức Khỏe">
+            <span>❤️</span><span id="statHp" class="text-rose-400 font-bold">85</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Năng Lượng">
+            <span>⚡</span><span id="statEnergy" class="text-amber-400 font-bold">100</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tâm Trạng">
+            <span>😊</span><span id="statMood" class="text-yellow-400 font-bold">75</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Điểm Học Tập">
+            <span>📚</span><span id="statStudy" class="text-sky-400 font-bold">50</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tình Cảm Triệu Mẫn">
+            <span>💕</span><span id="statLove" class="text-pink-400 font-bold">20%</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800" title="Tiền Tiết Kiệm">
+            <span>💰</span><span id="statMoney" class="text-emerald-400 font-bold">60.000đ</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN STAGE DISPLAY -->
+      <section id="stageContainer" class="flex-1 flex flex-col justify-between relative bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 pixel-box rounded-xl p-3 sm:p-4 overflow-hidden min-h-[390px]">
+        
+        <!-- HEADER BADGE -->
+        <div class="flex items-center justify-between z-10">
+          <div class="flex items-center gap-2 bg-slate-950/80 px-3 py-1 rounded-lg border border-slate-700/80 text-xs font-bold text-amber-300">
+            <span id="locIcon">🏫</span>
+            <span id="locTitle">LỚP 12A3 - KHỐI CHUYÊN</span>
+          </div>
+          <div id="businessStatusTag" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-950 border border-emerald-500 text-emerald-300">
+            🟢 ĐƯỢC PHÉP BÁN HÀNG
+          </div>
+          <div id="statAlertBox" class="text-[11px] font-mono font-bold text-emerald-400 opacity-0 transition-opacity duration-300 bg-black/80 px-2 py-0.5 rounded">
+            +5 📚 Học tập
+          </div>
+        </div>
+
+        <!-- DYNAMIC CENTER CANVAS -->
+        <div id="centerViewArea" class="flex-1 flex flex-col items-center justify-center relative my-2 z-10">
+          
+          <!-- VIEW 1: SCENERY WITH AVATARS -->
+          <div id="sceneryAvatarGroup" class="flex flex-col items-center justify-center gap-2 text-center w-full">
+            <div class="flex items-center justify-center gap-6 sm:gap-12 my-2">
+              <div class="text-center group cursor-pointer floating-sprite" onclick="interactNPC('lan')">
+                <div class="text-4xl sm:text-5xl filter drop-shadow-[0_4px_8px_rgba(56,189,248,0.3)]">👧</div>
+                <span class="text-[10px] font-bold text-slate-300 bg-slate-900/90 px-2 py-0.5 rounded border border-slate-700 mt-1 block">Lan (Bạn Thân)</span>
+              </div>
+              <div class="text-center group cursor-pointer floating-sprite" style="animation-delay: 0.5s;" onclick="interactNPC('mẫn')">
+                <div class="text-4xl sm:text-5xl filter drop-shadow-[0_4px_8px_rgba(244,114,182,0.4)]">👸</div>
+                <span class="text-[10px] font-bold text-pink-300 bg-slate-900/90 px-2 py-0.5 rounded border border-pink-700 mt-1 block">Triệu Mẫn (Lớp Phó) 💕</span>
+              </div>
+              <div class="text-center group cursor-pointer floating-sprite" style="animation-delay: 1s;" onclick="interactNPC('tuan')">
+                <div class="text-4xl sm:text-5xl filter drop-shadow-[0_4px_8px_rgba(251,191,36,0.3)]">🏀</div>
+                <span class="text-[10px] font-bold text-sky-300 bg-slate-900/90 px-2 py-0.5 rounded border border-slate-700 mt-1 block">Tuấn (Bóng Rổ)</span>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-black px-6 py-1.5 rounded-lg border border-indigo-400 text-xs sm:text-sm tracking-wide shadow-lg">
+              SÁNG + RA CHƠI + SAU 17H: BÁN HÀNG • CÒN LẠI VỀ HỌC
+            </div>
+            <p id="sceneNarrative" class="text-xs text-slate-300 max-w-md italic mt-1 px-4 leading-relaxed">
+              "Kỳ thi Giữa Kỳ (Ngày 22) và Cuối Kỳ (Ngày 45) sắp đến. Vừa kiếm vốn vừa phải leo lên top 1 thi đua để gây ấn tượng với Triệu Mẫn!"
+            </p>
+          </div>
+
+          <!-- VIEW 2: TIẾT HỌC THỰC SỰ (100+ CÂU HỎI) -->
+          <div id="classroomQuizCard" class="hidden w-full max-w-md bg-slate-900 border-2 border-indigo-500/80 rounded-2xl p-4 shadow-2xl flex flex-col space-y-3 z-20">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span id="quizSubjectBadge" class="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 font-bold text-[11px] rounded border border-indigo-500/40">TIẾT TOÁN HỌC</span>
+              <span id="quizTeacherBadge" class="text-xs text-slate-400 font-mono">Thầy Minh</span>
+            </div>
+            <div class="flex gap-3 items-start">
+              <div id="quizTeacherAvatar" class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl shrink-0">
+                👨‍🏫
+              </div>
+              <div class="text-xs text-slate-200">
+                <p id="quizTeacherQuestion" class="font-semibold leading-relaxed">
+                  Câu hỏi...
+                </p>
+              </div>
+            </div>
+
+            <div id="quizOptionsContainer" class="grid grid-cols-2 gap-2 pt-1"></div>
+
+            <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1">
+              <span>⚡ Tốn 15 Năng Lượng</span>
+              <button id="btnSkipClass" class="text-rose-400 hover:underline">Gục đầu ngủ (-5 Sức khỏe, +10 ⚡)</button>
+            </div>
+          </div>
+
+          <!-- VIEW 3: BẢNG XẾP HẠNG THI ĐUA LỚP 12A3 -->
+          <div id="leaderboardCard" class="hidden w-full max-w-md bg-slate-900 border-2 border-yellow-500/80 rounded-2xl p-4 shadow-2xl space-y-3 z-30">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🏆</span>
+                <div>
+                  <h3 class="text-xs font-black text-amber-300 uppercase">BẢNG XẾP HẠNG THI ĐUA LỚP 12A3</h3>
+                  <span class="text-[10px] text-slate-400">Cập nhật theo tuần học tập & hạnh kiểm</span>
+                </div>
+              </div>
+              <button onclick="closeOverlayCard()" class="text-slate-400 hover:text-white text-xs">✕ Đóng</button>
+            </div>
+            <div id="leaderboardList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1 text-xs">
+              <!-- Render Leaderboard -->
+            </div>
+            <p class="text-[10px] text-slate-400 text-center italic">Cố gắng vươn lên Top 1 để được vinh danh và làm Triệu Mẫn tự hào!</p>
+          </div>
+
+          <!-- VIEW 4: BÀI THI GIỮA KỲ / CUỐI KỲ -->
+          <div id="examMinigameCard" class="hidden w-full max-w-md bg-slate-900 border-4 border-yellow-400 rounded-2xl p-4 shadow-2xl space-y-3 z-30">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-2xl animate-bounce">📝</span>
+                <div>
+                  <h3 id="examModalTitle" class="font-black text-xs uppercase text-amber-300">KỲ THI GIỮA KỲ LỚP 12</h3>
+                  <span id="examProgressText" class="text-[10px] text-slate-400 font-mono">CÂU 1 / 10 • THỜI GIAN ĐÃ ĐẾN!</span>
+                </div>
+              </div>
+            </div>
+            <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+              <span id="examSubjectBadge" class="px-2 py-0.5 bg-sky-500/20 text-sky-300 font-bold text-[10px] rounded mb-1 inline-block">MÔN TOÁN</span>
+              <p id="examQuestionText" class="font-bold text-slate-200 mt-1 leading-relaxed">Nội dung câu thi...</p>
+            </div>
+            <div id="examOptionsContainer" class="grid grid-cols-2 gap-2 pt-1"></div>
+            <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1">
+              <span>Đang đúng: <b id="examCorrectCount" class="text-emerald-400 font-bold">0</b>/10</span>
+              <span class="text-amber-400 font-mono">Ảnh hưởng trực tiếp đến Bảng Xếp Hạng!</span>
+            </div>
+          </div>
+
+          <!-- VIEW 5: QUẦY BÁN HÀNG CÁ NHÂN -->
+          <div id="shopSellCard" class="hidden w-full max-w-md bg-slate-900 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl space-y-3 z-20">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-base">💼</span>
+                <h3 class="text-xs font-black text-emerald-400 uppercase">QUẦY BÁN HÀNG CỦA BẠN</h3>
+              </div>
+              <button onclick="closeOverlayCard()" class="text-slate-400 hover:text-white text-xs">✕ Đóng</button>
+            </div>
+            <p class="text-[11px] text-slate-300">
+              Chỉ được bán vào: <b>Sáng (07:30)</b>, <b>Ra Chơi (09:15)</b> và <b>Sau 17:00 Tan Trường</b>!
+            </p>
+
+            <div id="stockListContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+              <button onclick="openWholesaleTab()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold">
+                🚚 Nhập Thêm Hàng Sỉ
+              </button>
+              <button onclick="sellToCrowd()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black">
+                📢 Mời Chào Khắp Sân Trường (-10 ⚡)
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW 6: CHỢ SỈ ĐẦU MỐI -->
+          <div id="wholesaleCard" class="hidden w-full max-w-md bg-slate-900 border-2 border-blue-500/80 rounded-2xl p-4 shadow-2xl space-y-3 z-20">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-base">🚚</span>
+                <h3 class="text-xs font-black text-blue-400 uppercase">CHỢ SỈ ĐẦU MỐI (NHẬP HÀNG)</h3>
+              </div>
+              <button onclick="openShopSellCard()" class="text-slate-400 hover:text-white text-xs">← Quay lại quầy</button>
+            </div>
+            <div id="wholesaleListContainer" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- VIEW 7: CĂN TIN TRƯỜNG -->
+          <div id="canteenMenuCard" class="hidden w-full max-w-md bg-slate-900 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl space-y-3 z-20">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 class="text-xs font-black text-emerald-400 uppercase">🍜 CĂN TIN TRƯỜNG - CÔ NĂM</h3>
+              <button onclick="closeOverlayCard()" class="text-slate-400 hover:text-white text-xs">✕ Đóng</button>
+            </div>
+            <p class="text-[11px] text-slate-300">Nạp lại Năng Lượng & Tâm Trạng, hoặc mua trà sữa tặng Triệu Mẫn!</p>
+            <div id="canteenItemsList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- VIEW 8: DIARY VIEW -->
+          <div id="diaryModalCard" class="hidden w-full max-w-md bg-amber-50 border-4 border-amber-900/60 rounded-2xl p-5 shadow-2xl space-y-3 z-30 text-amber-950">
+            <div class="flex items-center justify-between border-b-2 border-amber-300 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-2xl">📓</span>
+                <div>
+                  <h3 id="diaryTitle" class="font-extrabold text-sm uppercase tracking-wide">NHẬT KÝ — NGÀY 1</h3>
+                  <span id="diaryDateSubtitle" class="text-[10px] text-amber-800">Cân bằng giữa Giảng Đường & Kinh Doanh</span>
+                </div>
+              </div>
+              <button onclick="closeOverlayCard()" class="text-amber-900 hover:text-red-600 font-black text-sm">✕</button>
+            </div>
+            <div id="diaryContentText" class="text-xs font-serif leading-relaxed space-y-2 italic bg-amber-100/60 p-3 rounded-xl border border-amber-200 min-h-[140px] max-h-60 overflow-y-auto"></div>
+            <div class="text-[10px] text-amber-800 font-mono flex justify-between items-center pt-1 border-t border-amber-200">
+              <span id="diaryForecastNextDay">Lịch học ngày mai...</span>
+              <button id="btnContinueFromDiary" class="px-3 py-1.5 bg-amber-800 text-amber-100 font-bold rounded-lg text-xs hover:bg-amber-900">
+                Thức dậy ngày mới ☀️
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW 9: ENDING FINALE SCREEN -->
+          <div id="endingScreenCard" class="hidden w-full max-w-md bg-slate-900 border-4 border-yellow-400 rounded-2xl p-5 shadow-2xl text-center space-y-4 z-40">
+            <div class="text-4xl animate-bounce">🎓</div>
+            <div class="space-y-1">
+              <span class="text-[10px] font-pixel text-amber-400">LỄ TỐT NGHIỆP & CÔNG BỐ KẾT QUẢ ĐẠI HỌC</span>
+              <h2 id="endingTitle" class="text-lg font-black text-white">🏆 THỦ KHOA ĐẠI HỌC</h2>
+              <p id="endingSubtitle" class="text-xs text-yellow-300 font-semibold"></p>
+            </div>
+            <div id="endingDescription" class="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800 text-left"></div>
+            <div class="grid grid-cols-2 gap-2 text-[11px] font-mono bg-slate-800/80 p-2.5 rounded-xl text-slate-300">
+              <div>Điểm học tập: <b id="endStatStudy" class="text-sky-400">0</b></div>
+              <div>Xếp hạng lớp: <b id="endStatRank" class="text-yellow-400">Top 1</b></div>
+              <div>Tổng tài sản: <b id="endStatMoney" class="text-emerald-400">0đ</b></div>
+              <div>Tình cảm Triệu Mẫn: <b id="endStatLove" class="text-pink-400">0%</b></div>
+            </div>
+            <button onclick="restartGame()" class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs transition">
+              CHƠI LẠI VÁN MỚI 🌸
+            </button>
+          </div>
+
+        </div>
+
+        <!-- QUICK LOCATION NAVIGATOR -->
+        <nav class="flex items-center justify-between gap-1 pt-2 border-t border-slate-800 text-[11px] font-bold z-10 flex-wrap">
+          <button onclick="gotoLocation('class')" class="loc-btn flex-1 py-1.5 px-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center justify-center gap-1">
+            <span>🏫</span><span>Lớp Học</span>
+          </button>
+          <button onclick="gotoLocation('canteen')" class="loc-btn flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-center gap-1">
+            <span>🍜</span><span>Căn Tin</span>
+          </button>
+          <button onclick="gotoLocation('library')" class="loc-btn flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-center gap-1">
+            <span>📚</span><span>Thư Viện</span>
+          </button>
+          <button onclick="gotoLocation('yard')" class="loc-btn flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-center gap-1">
+            <span>🌿</span><span>Sân Trường</span>
+          </button>
+          <button onclick="gotoLocation('home')" class="loc-btn flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-center gap-1">
+            <span>🏠</span><span>Về Nhà Học</span>
+          </button>
+        </nav>
+      </section>
+
+      <!-- BOTTOM BAR -->
+      <footer class="mt-3 bg-slate-950 pixel-box rounded-xl p-2 flex items-center justify-between gap-1.5 relative z-10">
+        <button id="btnFooterSell" onclick="openShopSellCard()" class="rpg-btn flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">💼</span><span>Bán Hàng</span>
+        </button>
+        <button onclick="openTabAction('study')" class="rpg-btn flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">📖</span><span>Học Tập</span>
+        </button>
+        <button onclick="openLeaderboard()" class="rpg-btn flex-1 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-slate-950 text-xs font-black pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">🏆</span><span>Thi Đua</span>
+        </button>
+        <button onclick="openTabAction('friends')" class="rpg-btn flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">👥</span><span>Bạn Bè</span>
+        </button>
+        <button onclick="openDiaryManual()" class="rpg-btn flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">📓</span><span>Nhật Ký</span>
+        </button>
+        <button onclick="openInviteRoom()" class="rpg-btn flex-1 py-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-black pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1">
+          <span class="text-sm">🫂</span><span>Mời Bạn</span>
+        </button>
+      </footer>
+
+      <!-- FRIEND ROOM / INVITE MODAL -->
+      <div id="inviteRoomCard" class="hidden absolute inset-3 sm:inset-8 bg-slate-950/98 border-2 border-fuchsia-500 rounded-2xl p-4 shadow-2xl z-[60] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+          <div>
+            <div class="text-[10px] font-pixel text-fuchsia-300">THANH XUÂN RỰC RỠ</div>
+            <h3 class="text-sm font-black text-white mt-1">🫂 PHÒNG BẠN BÈ</h3>
+          </div>
+          <button onclick="closeInviteRoom()" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+            <div class="text-xs font-black text-fuchsia-300 mb-2">🎮 TẠO LỜI MỜI</div>
+            <p class="text-[10px] text-slate-400 leading-relaxed mb-3">Tạo một mã phòng và gửi link cho bạn. Mỗi người vẫn có tiến trình riêng trên thiết bị của mình; đây là chế độ mời/challenge không cần máy chủ.</p>
+            <div class="flex gap-2">
+              <input id="roomCodeInput" maxlength="8" class="min-w-0 flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-center font-mono font-black tracking-[0.25em] text-fuchsia-300 uppercase" placeholder="MÃ PHÒNG" />
+              <button onclick="generateRoomCode()" class="px-3 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 rounded-lg text-[10px] font-black">TẠO MÃ</button>
+            </div>
+            <button onclick="copyInviteLink()" class="w-full mt-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-[10px] font-black">🔗 SAO CHÉP LINK MỜI</button>
+            <button onclick="shareInviteLink()" class="w-full mt-2 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[10px] font-black">📤 CHIA SẺ CHO BẠN</button>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+            <div class="text-xs font-black text-emerald-300 mb-2">🏆 THỬ THÁCH BẠN BÈ</div>
+            <p class="text-[10px] text-slate-400 leading-relaxed mb-3">Gửi link để bạn của bạn cùng chơi. Hai người có thể so sánh điểm học tập, tiền và thành tích cuối game bằng ảnh/chia sẻ kết quả.</p>
+            <div id="roomStatusText" class="p-3 bg-slate-950 rounded-lg border border-slate-800 text-center text-[11px] text-slate-300">Chưa có phòng.</div>
+            <button onclick="copyResultCard()" class="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-[10px] font-black">📋 COPY THÀNH TÍCH CỦA TÔI</button>
+          </div>
+        </div>
+
+        <div class="mt-3 p-2.5 rounded-xl bg-amber-950/30 border border-amber-700/40 text-[10px] text-amber-200 leading-relaxed">
+          💡 <b>Lưu ý:</b> bản HTML một file này chưa có máy chủ nên không thể đồng bộ hai người theo thời gian thực. Tính năng trên là phòng mời/challenge. Nếu muốn <b>2 người cùng nhìn thấy cùng một thế giới, chat và cập nhật điểm theo thời gian thực</b>, cần nối thêm Firebase/Supabase ở bước tiếp theo.
+        </div>
+      </div>
+
+      <!-- ACTION DRAWER PANEL -->
+      <div id="actionDrawerPanel" class="hidden absolute bottom-16 left-3 right-3 bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 shadow-2xl z-30 max-h-64 overflow-y-auto">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <h4 id="drawerTitle" class="text-xs font-black text-amber-300 uppercase">DANH SÁCH HOẠT ĐỘNG</h4>
+          <button onclick="closeDrawer()" class="text-slate-400 hover:text-white text-xs">✕ Đóng</button>
+        </div>
+        <div id="drawerContent" class="space-y-2 text-xs"></div>
+      </div>
+
+    </div>
+
+    <!-- CONSOLE BUTTONS -->
+    <div class="flex items-center justify-between px-6 pt-3 text-[10px] text-slate-500 font-pixel">
+      <div class="flex gap-2 items-center">
+        <span class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs">▲</span>
+        <span class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs">▼</span>
+      </div>
+      <div class="text-center">
+        <span class="tracking-widest text-slate-400">CHINH PHỤC THI ĐẠI HỌC VÀ TRÁI TIM TRIỆU MẪN</span>
+      </div>
+      <div class="flex gap-3">
+        <div class="w-7 h-7 rounded-full bg-rose-700 border border-rose-600 flex items-center justify-center text-[9px] text-white font-bold cursor-pointer" onclick="quickSleep()">B</div>
+        <div class="w-7 h-7 rounded-full bg-emerald-700 border border-emerald-600 flex items-center justify-center text-[9px] text-white font-bold cursor-pointer" onclick="openDiaryManual()">A</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT GAME LOGIC & ENGINE -->
+  <script>
+    class RetroAudio {
+      constructor() { this.ctx = null; this.enabled = true; }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      playTone(freq, type = 'square', duration = 0.15, vol = 0.15) {
+        if (!this.enabled) return; this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + duration);
+      }
+      playSuccess() {
+        if (!this.enabled) return; this.init();
+        [523.25, 659.25, 783.99, 1046.50].forEach((f, idx) => {
+          setTimeout(() => this.playTone(f, 'triangle', 0.2, 0.2), idx * 70);
+        });
+      }
+      playWrong() {
+        if (!this.enabled) return; this.init();
+        [280, 220, 160].forEach((f, idx) => {
+          setTimeout(() => this.playTone(f, 'sawtooth', 0.2, 0.25), idx * 90);
+        });
+      }
+      playCash() {
+        if (!this.enabled) return; this.init();
+        [987, 1318].forEach((f, idx) => {
+          setTimeout(() => this.playTone(f, 'sine', 0.18, 0.2), idx * 80);
+        });
+      }
+      playBell() {
+        if (!this.enabled) return; this.init();
+        [440, 554, 659, 880].forEach((f, i) => {
+          setTimeout(() => this.playTone(f, 'sine', 0.35, 0.18), i * 140);
+        });
+      }
+    }
+    const audio = new RetroAudio();
+
+    const WHOLESALE_ITEMS = [
+      { id: 'banh_trang', name: 'Bánh Tráng Cuộn Bơ', wholesalePrice: 7000, retailPrice: 12000, icon: '🌯', desc: 'Món ăn vặt số 1 giờ ra chơi & lúc tan trường.' },
+      { id: 'tra_sua_chai', name: 'Trà Sữa Thái Đóng Chai', wholesalePrice: 10000, retailPrice: 18000, icon: '🧋', desc: 'Mát lạnh, hút khách nữ sau giờ tan học.' },
+      { id: 'but_cute', name: 'Bút Bi Gel Cute Pastel', wholesalePrice: 4000, retailPrice: 8000, icon: '🖊️', desc: 'Đồ dùng học tập bạn nào cũng cần.' },
+      { id: 'de_cuong', name: 'Tài Liệu & Đề Cương Tóm Tắt', wholesalePrice: 3000, retailPrice: 10000, icon: '📑', desc: 'Siêu đắt hàng trước kỳ thi!' }
+    ];
+
+    /* =============================================================
+       NGÂN HÀNG HỌC TẬP KHỔNG LỒ: 100+ CÂU HỎI TRẮC NGHIỆM ĐA MÔN
+       ============================================================= */
+    const QUIZ_DATABASE = [
+      // TOÁN HỌC
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Nếu x + 5 = 12 thì giá trị của biểu thức 2x - 4 bằng bao nhiêu?', opts: ['10', '14', '7', '18'], c: 0, tip: 'x = 7 => 2(7) - 4 = 10.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Hàm số y = x² - 4x + 3 có hoành độ đỉnh Parabol bằng?', opts: ['2', '-2', '4', '1'], c: 0, tip: 'x = -b/(2a) = 4/2 = 2.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Đạo hàm của hàm số f(x) = x³ - 3x² + 5 là:', opts: ['3x² - 6x', '3x² - 6', 'x² - 3x', '3x² - 6x + 5'], c: 0, tip: '(x³)\'=3x², (-3x²)\'=-6x.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Một khối lập phương cạnh bằng 3 cm có thể tích bằng:', opts: ['27 cm³', '9 cm³', '54 cm³', '18 cm³'], c: 0, tip: 'V = 3³ = 27 cm³.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Nghiệm của phương trình 2^(x - 1) = 8 là:', opts: ['x = 4', 'x = 3', 'x = 5', 'x = 2'], c: 0, tip: '8 = 2³ => x - 1 = 3 => x = 4.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Giá trị của log₂ 32 bằng bao nhiêu?', opts: ['5', '6', '4', '16'], c: 0, tip: '2⁵ = 32 nên log₂ 32 = 5.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Hình chóp tam giác đều có bao nhiêu mặt?', opts: ['4 mặt', '3 mặt', '5 mặt', '6 mặt'], c: 0, tip: '1 đáy + 3 mặt bên = 4 mặt.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Nguyên hàm của f(x) = cos(x) là:', opts: ['sin(x) + C', '-sin(x) + C', 'cos(x) + C', '-cos(x) + C'], c: 0, tip: '(sin x)\' = cos x.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Đường tiệm cận đứng của đồ thị y = (2x + 1)/(x - 3) là:', opts: ['x = 3', 'x = 2', 'y = 2', 'y = 3'], c: 0, tip: 'Mẫu số triệt tiêu tại x = 3.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Tập xác định của hàm số y = √(x - 4) là:', opts: ['[4; +∞)', '(4; +∞)', '(-∞; 4]', 'R \\ {4}'], c: 0, tip: 'x - 4 >= 0 => x >= 4.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Công thức diện tích xung quanh của hình trụ bán kính r, chiều cao h là:', opts: ['2πrh', 'πr²h', 'πrh', '4πr²'], c: 0, tip: 'S_xq = 2πrh.' },
+      { subject: 'MÔN TOÁN', teacher: 'Thầy Minh', avatar: '👨‍🏫', q: 'Số tổ hợp chập 2 của 5 phần tử C(5, 2) bằng:', opts: ['10', '20', '15', '5'], c: 0, tip: '5! / (2! * 3!) = 10.' },
+
+      // VẬT LÝ
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Trong dao động điều hòa của con lắc lò xo, cơ năng biến thiên như thế nào?', opts: ['Bảo toàn không đổi', 'Tăng giảm tuần hoàn', 'Bằng 0', 'Luôn giảm'], c: 0, tip: 'Cơ năng của dao động điều hòa luôn được bảo toàn.' },
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Sóng âm truyền nhanh nhất trong môi trường nào?', opts: ['Chất rắn', 'Chất lỏng', 'Chất khí', 'Chân không'], c: 0, tip: 'V_rắn > V_lỏng > V_khí.' },
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Tần số góc ω của con lắc lò xo độ cứng k, khối lượng m tính bởi công thức:', opts: ['√(k/m)', '√(m/k)', '2π√(m/k)', '√(g/l)'], c: 0, tip: 'ω = √(k/m).' },
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Tia nào sau đây có bản chất là sóng điện từ?', opts: ['Tia X', 'Tia Alpha', 'Tia Beta cộng', 'Tia Beta trừ'], c: 0, tip: 'Tia X và tia gamma là sóng điện từ.' },
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Dòng điện xoay chiều có tần số f = 50Hz thì chu kỳ T bằng:', opts: ['0,02 s', '0,05 s', '0,5 s', '0,2 s'], c: 0, tip: 'T = 1/f = 1/50 = 0,02 s.' },
+      { subject: 'MÔN VẬT LÝ', teacher: 'Thầy Tuấn', avatar: '👨‍🔬', q: 'Tốc độ ánh sáng trong chân không có giá trị xấp xỉ bằng:', opts: ['3.10⁸ m/s', '3.10⁶ m/s', '340 m/s', '1.10⁸ m/s'], c: 0, tip: 'c ≈ 3.10⁸ m/s.' },
+
+      // HÓA HỌC
+      { subject: 'MÔN HÓA HỌC', teacher: 'Cô Lan Phương', avatar: '👩‍🔬', q: 'Kim loại nào dẫn điện tốt nhất ở điều kiện thường?', opts: ['Bạc (Ag)', 'Đồng (Cu)', 'Vàng (Au)', 'Nhôm (Al)'], c: 0, tip: 'Thứ tự dẫn điện: Ag > Cu > Au > Al > Fe.' },
+      { subject: 'MÔN HÓA HỌC', teacher: 'Cô Lan Phương', avatar: '👩‍🔬', q: 'Dung dịch làm quỳ tím hóa đỏ là:', opts: ['HCl', 'NaOH', 'NaCl', 'H₂O'], c: 0, tip: 'Axit làm quỳ tím chuyển sang màu đỏ.' },
+      { subject: 'MÔN HÓA HỌC', teacher: 'Cô Lan Phương', avatar: '👩‍🔬', q: 'Kim loại nào ở trạng thái lỏng tại nhiệt độ phòng?', opts: ['Thủy ngân (Hg)', 'Xesi (Cs)', 'Liti (Li)', 'Chì (Pb)'], c: 0, tip: 'Thủy ngân (Hg) nóng chảy ở -38.83°C.' },
+      { subject: 'MÔN HÓA HỌC', teacher: 'Cô Lan Phương', avatar: '👩‍🔬', q: 'Chất nào là đồng phân của glucozơ?', opts: ['Fructozơ', 'Saccarozơ', 'Mantozơ', 'Tinh bột'], c: 0, tip: 'Glucozơ và Fructozơ cùng có CTPT C₆H₁₂O₆.' },
+      { subject: 'MÔN HÓA HỌC', teacher: 'Cô Lan Phương', avatar: '👩‍🔬', q: 'Khí thoát ra khi cho CaCO₃ tác dụng với dung dịch HCl dư là:', opts: ['CO₂', 'SO₂', 'H₂', 'Cl₂'], c: 0, tip: 'CaCO₃ + 2HCl -> CaCl₂ + CO₂↑ + H₂O.' },
+
+      // SINH HỌC
+      { subject: 'MÔN SINH HỌC', teacher: 'Thầy Đức', avatar: '👨‍🏫', q: 'Bào quan nào là “nhà máy năng lượng” sản xuất ATP của tế bào?', opts: ['Ty thể', 'Ribôxôm', 'Bộ máy Golgi', 'Lizôxôm'], c: 0, tip: 'Ty thể diễn ra hô hấp tế bào tổng hợp ATP.' },
+      { subject: 'MÔN SINH HỌC', teacher: 'Thầy Đức', avatar: '👨‍🏫', q: 'Bộ ba mã mở đầu trên mARN dịch mã cho axit amin Metionin là:', opts: ['5\'AUG3\'', '5\'UAG3\'', '5\'UAA3\'', '5\'UGA3\''], c: 0, tip: '5\'AUG3\' quy định mã mở đầu (Met).' },
+      { subject: 'MÔN SINH HỌC', teacher: 'Thầy Đức', avatar: '👨‍🏫', q: 'Người mắc hội chứng Đao (Down) có bao nhiêu nhiễm sắc thể?', opts: ['47 NST (3 NST số 21)', '45 NST', '46 NST', '48 NST'], c: 0, tip: 'Thể ba ở cặp NST số 21 (2n + 1 = 47).' },
+
+      // NGỮ VĂN
+      { subject: 'MÔN NGỮ VĂN', teacher: 'Cô Thảo', avatar: '👩‍🏫', q: 'Ai là tác giả của tác phẩm “Vợ Nhặt”?', opts: ['Kim Lân', 'Nam Cao', 'Tô Hoài', 'Nguyễn Tuân'], c: 0, tip: 'Kim Lân viết về nạn đói năm 1945 và tình người.' },
+      { subject: 'MÔN NGỮ VĂN', teacher: 'Cô Thảo', avatar: '👩‍🏫', q: 'Hình tượng người lính trong bài thơ “Tây Tiến” nổi bật với vẻ đẹp:', opts: ['Lãng mạn và bi tráng', 'Mộc mạc nông dân', 'U uất bi quan', 'Thần thánh hóa'], c: 0, tip: 'Chất lãng mạn kết hợp cảm hứng bi tráng.' },
+      { subject: 'MÔN NGỮ VĂN', teacher: 'Cô Thảo', avatar: '👩‍🏫', q: 'Nhân vật bà cụ Tứ xuất hiện trong tác phẩm văn học nào?', opts: ['Vợ Nhặt', 'Chí Phèo', 'Vợ chồng A Phủ', 'Rừng xà nu'], c: 0, tip: 'Bà cụ Tứ là mẹ của anh cu Tràng trong Vợ Nhặt.' },
+      { subject: 'MÔN NGỮ VĂN', teacher: 'Cô Thảo', avatar: '👩‍🏫', q: 'Tác phẩm “Chiếc thuyền ngoài xa” là sáng tác của nhà văn nào?', opts: ['Nguyễn Minh Châu', 'Nguyễn Khải', 'Nguyễn Trung Thành', 'Lưu Quang Vũ'], c: 0, tip: 'Nguyễn Minh Châu - người mở đường tinh anh.' },
+
+      // LỊCH SỬ & ĐỊA LÝ
+      { subject: 'MÔN LỊCH SỬ', teacher: 'Thầy Hùng', avatar: '👨‍🏫', q: 'Chiến thắng Điện Biên Phủ diễn ra vào năm nào?', opts: ['1954', '1945', '1975', '1968'], c: 0, tip: 'Toàn thắng ngày 07/05/1954.' },
+      { subject: 'MÔN LỊCH SỬ', teacher: 'Thầy Hùng', avatar: '👨‍🏫', q: 'Bản Tuyên ngôn Độc lập được Bác Hồ đọc vào ngày nào?', opts: ['02/09/1945', '19/08/1945', '30/04/1975', '03/02/1930'], c: 0, tip: 'Ngày 2/9/1945 tại Quảng trường Ba Đình.' },
+      { subject: 'MÔN ĐỊA LÝ', teacher: 'Cô Mai Anh', avatar: '👩‍🏫', q: 'Đỉnh núi nào được mệnh danh là “Nóc nhà Đông Dương”?', opts: ['Fansipan (3.143m)', 'Pu Si Lung', 'Bạch Mộc Lương Tử', 'Tây Côn Lĩnh'], c: 0, tip: 'Fansipan cao 3.143m ở Lào Cai.' },
+      { subject: 'MÔN ĐỊA LÝ', teacher: 'Cô Mai Anh', avatar: '👩‍🏫', q: 'Cây công nghiệp lâu năm được trồng nhiều nhất ở Tây Nguyên là:', opts: ['Cà phê', 'Cao su', 'Chè', 'Hồ tiêu'], c: 0, tip: 'Tây Nguyên là thủ phủ cà phê của Việt Nam.' },
+
+      // TIẾNG ANH
+      { subject: 'MÔN TIẾNG ANH', teacher: 'Cô Jennifer', avatar: '👩‍💼', q: 'She has been studying in this school ___ 2022.', opts: ['since', 'for', 'in', 'at'], c: 0, tip: 'Since + mốc thời gian trong hiện tại hoàn thành.' },
+      { subject: 'MÔN TIẾNG ANH', teacher: 'Cô Jennifer', avatar: '👩‍💼', q: 'If I ___ rich, I would travel around the world.', opts: ['were', 'am', 'will be', 'have been'], c: 0, tip: 'Câu điều kiện loại 2: If + S + were.' },
+      { subject: 'MÔN TIẾNG ANH', teacher: 'Cô Jennifer', avatar: '👩‍💼', q: 'The book ___ by my favorite author last year.', opts: ['was written', 'wrote', 'has written', 'writes'], c: 0, tip: 'Bị động quá khứ đơn: was/were + V3/ed.' }
+    ];
+
+    /* =============================================================
+       GAME STATE
+       ============================================================= */
+    const STATE = {
+      day: 1,
+      totalDays: 45,
+      timeIndex: 0,
+      location: 'class',
+      
+      stats: {
+        hp: 85,
+        energy: 100,
+        mood: 75,
+        study: 50,
+        friends: 40,
+        love: 20, // Tình cảm với Triệu Mẫn
+        reputation: 15,
+        money: 60000,
+        midtermScore: 0,
+        finalScore: 0
+      },
+
+      inventory: [
+        { id: 'banh_trang', count: 4 },
+        { id: 'tra_sua_chai', count: 2 },
+        { id: 'but_cute', count: 3 },
+        { id: 'de_cuong', count: 2 }
+      ],
+
+      bag: [
+        { id: 'math_book', name: 'Sổ Công Thức Toán', icon: '📘', count: 1, desc: 'Dùng khi học bài +8 📚' }
+      ],
+
+      todayEvents: [],
+      diaryEntries: [],
+
+      // Mini-game Kỳ Thi
+      exam: {
+        type: 'midterm', // 'midterm' hoặc 'final'
+        inProgress: false,
+        currentStep: 0,
+        questions: [],
+        correctCount: 0
+      }
+    };
+
+    const TIME_PERIODS = [
+      { text: '07:30', name: 'Buổi sáng • Tiết 1-2', canSell: true },
+      { text: '09:15', name: 'Giờ ra chơi 15 phút', canSell: true },
+      { text: '11:30', name: 'Tan trường trưa • Ăn trưa nghỉ ngơi', canSell: false },
+      { text: '14:00', name: 'Buổi chiều • Thư viện / Tiết học chính', canSell: false },
+      { text: '17:00', name: 'Chiều muộn sau 17h • Tan trường bán đồ', canSell: true },
+      { text: '20:30', name: 'Buổi tối • Tự học khuya tại nhà', canSell: false }
+    ];
+
+    const DAYS_OF_WEEK = ['THỨ HAI', 'THỨ BA', 'THỨ TƯ', 'THỨ NĂM', 'THỨ SÁU', 'THỨ BẢY', 'CHỦ NHẬT'];
+
+    function isSellingAllowed() {
+      const cur = TIME_PERIODS[STATE.timeIndex];
+      return cur && cur.canSell === true;
+    }
+
+    function gotoLocation(loc) {
+      STATE.location = loc;
+      closeOverlayCard();
+      audio.playTone(320, 'sine', 0.08);
+
+      const titleEl = document.getElementById('locTitle');
+      const iconEl = document.getElementById('locIcon');
+      const descEl = document.getElementById('sceneNarrative');
+
+      document.querySelectorAll('.loc-btn').forEach(btn => {
+        btn.className = 'loc-btn flex-1 py-1.5 px-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-center gap-1';
+      });
+
+      if (loc === 'class') {
+        titleEl.textContent = 'LỚP 12A3 - KHỐI CHUYÊN';
+        iconEl.textContent = '🏫';
+        descEl.textContent = isSellingAllowed() 
+          ? 'Đang trong giờ bán hàng! Bạn bè tranh thủ mua bánh tráng, trà sữa và đồ dùng.'
+          : 'Giờ học chính khóa! Cất hết đồ buôn bán vào cặp và tập trung nghe giảng.';
+      } else if (loc === 'canteen') {
+        titleEl.textContent = 'CĂN TIN TRƯỜNG - CÔ NĂM';
+        iconEl.textContent = '🍜';
+        descEl.textContent = 'Căn tin nhộn nhịp, nơi mua đồ ăn ngon hoặc mua trà sữa đãi Triệu Mẫn!';
+        openCanteenMenu();
+      } else if (loc === 'library') {
+        titleEl.textContent = 'THƯ VIỆN YÊN TĨNH';
+        iconEl.textContent = '📚';
+        descEl.textContent = 'Không gian tĩnh mịch ngập tràn sách vở. Triệu Mẫn cũng thường hay ngồi đọc sách ở góc bàn cạnh cửa sổ.';
+      } else if (loc === 'yard') {
+        titleEl.textContent = 'SÂN TRƯỜNG & CÂY BÀNG';
+        iconEl.textContent = '🌿';
+        descEl.textContent = isSellingAllowed()
+          ? 'Sau 17:00 học sinh ùa ra sân trường, cơ hội tuyệt vời để chào bán trà sữa và đồ ăn vặt!'
+          : 'Sân trường rợp bóng mát, nơi bạn bè tụ tập thư giãn giữa các ca học.';
+      } else if (loc === 'home') {
+        titleEl.textContent = 'PHÒNG NGỦ & BÀN HỌC Ở NHÀ';
+        iconEl.textContent = '🏠';
+        descEl.textContent = 'Góc học tập ban đêm. Ngồi ôn lại bài, chuẩn bị đề thi ngày mai và đi ngủ đúng giờ.';
+      }
+      updateHUD();
+    }
+
+    /* =============================================================
+       BẢNG XẾP HẠNG THI ĐUA LỚP 12A3
+       ============================================================= */
+    function openLeaderboard() {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const card = document.getElementById('leaderboardCard');
+      card.classList.remove('hidden');
+
+      // Danh sách học sinh lớp 12A3
+      const students = [
+        { name: 'Triệu Mẫn (Lớp Phó Học Tập)', baseScore: 92, avatar: '👸', title: 'Học bá toàn diện' },
+        { name: 'Bạn (Người Chơi)', baseScore: STATE.stats.study, avatar: '😎', title: 'Vừa học vừa kinh doanh' },
+        { name: 'Lan (Bạn Thân)', baseScore: 68, avatar: '👧', title: 'Chuyên gia hỗ trợ' },
+        { name: 'Tuấn (Bóng Rổ)', baseScore: 55, avatar: '🏀', title: 'Ngôi sao thể thao' },
+        { name: 'Hoàng Nam', baseScore: 84, avatar: '🤓', title: 'Cần cù bù thông minh' },
+        { name: 'Bảo Trân', baseScore: 78, avatar: '✨', title: 'Cán sự văn thể' }
+      ];
+
+      // Sắp xếp theo điểm học tập
+      students.sort((a, b) => b.baseScore - a.baseScore);
+
+      const list = document.getElementById('leaderboardList');
+      list.innerHTML = '';
+
+      students.forEach((st, idx) => {
+        const isPlayer = st.name.includes('Bạn');
+        const isCrush = st.name.includes('Triệu Mẫn');
+        const badgeColor = idx === 0 ? 'bg-amber-500 text-slate-950 font-black' : (idx === 1 ? 'bg-slate-300 text-slate-950 font-bold' : (idx === 2 ? 'bg-amber-700 text-white font-bold' : 'bg-slate-800 text-slate-400 font-mono'));
+
+        const row = document.createElement('div');
+        row.className = `p-2 rounded-xl flex items-center justify-between border ${isPlayer ? 'bg-sky-950/70 border-sky-500/80 shadow-[0_0_10px_rgba(56,189,248,0.2)]' : (isCrush ? 'bg-pink-950/40 border-pink-700/50' : 'bg-slate-950 border-slate-800')}`;
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${badgeColor}">#${idx + 1}</span>
+            <span class="text-base">${st.avatar}</span>
+            <div>
+              <div class="font-bold ${isPlayer ? 'text-sky-300' : (isCrush ? 'text-pink-300' : 'text-slate-200')}">${st.name}</div>
+              <div class="text-[10px] text-slate-400">${st.title}</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="font-mono font-bold text-amber-400 text-xs">${st.baseScore} 📚</div>
+            <div class="text-[9px] text-slate-500">Điểm thi đua</div>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    /* =============================================================
+       BÁN HÀNG CÁ NHÂN & CHỢ SỈ
+       ============================================================= */
+    function openShopSellCard() {
+      closeOverlayCard();
+
+      if (!isSellingAllowed()) {
+        audio.playWrong();
+        showStatAlert('⛔ Bây giờ là giờ học! Chỉ được bán lúc 07:30, 09:15 hoặc sau 17:00.', 'text-rose-400');
+        alert('⛔ QUY TẮC: Khung giờ này (' + TIME_PERIODS[STATE.timeIndex].text + ') bắt buộc phải tập trung học!\nKhung giờ bán hàng: Buổi sáng (07:30), Giờ ra chơi (09:15) và Chiều muộn (Sau 17:00).');
+        return;
+      }
+
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const shopCard = document.getElementById('shopSellCard');
+      shopCard.classList.remove('hidden');
+
+      renderStockList();
+    }
+
+    function renderStockList() {
+      const container = document.getElementById('stockListContainer');
+      container.innerHTML = '';
+      let totalStock = 0;
+
+      WHOLESALE_ITEMS.forEach(item => {
+        const inv = STATE.inventory.find(i => i.id === item.id);
+        const count = inv ? inv.count : 0;
+        totalStock += count;
+
+        const row = document.createElement('div');
+        row.className = 'bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xl">${item.icon}</span>
+            <div>
+              <div class="font-bold text-slate-200">${item.name} <span class="text-amber-400 font-mono">(Còn ${count})</span></div>
+              <div class="text-[10px] text-slate-400">Giá bán lẻ: <b class="text-emerald-400">${item.retailPrice.toLocaleString('vi-VN')}đ</b> • Giá sỉ: ${item.wholesalePrice.toLocaleString('vi-VN')}đ</div>
+            </div>
+          </div>
+          <button ${count <= 0 ? 'disabled' : ''} onclick="sellSingleItem('${item.id}')" class="px-2.5 py-1.5 ${count > 0 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'} font-bold rounded-lg text-[11px] transition">
+            Bán 1 Cái
+          </button>
+        `;
+        container.appendChild(row);
+      });
+
+      if (totalStock === 0) {
+        container.innerHTML += `<div class="p-3 text-center text-rose-400 text-[11px] italic bg-rose-950/20 rounded-xl border border-rose-900/50">Hết sạch hàng trong cặp rồi! Bấm "Nhập Thêm Hàng Sỉ" bên dưới để lấy thêm hàng nhé.</div>`;
+      }
+    }
+
+    function sellSingleItem(itemId) {
+      if (!isSellingAllowed()) { showStatAlert('⛔ Đã hết giờ bán hàng!', 'text-rose-400'); return; }
+      if (STATE.stats.energy < 8) { showStatAlert('⚡ Bạn quá mệt mỏi để chào bán hàng!', 'text-amber-400'); audio.playWrong(); return; }
+
+      const inv = STATE.inventory.find(i => i.id === itemId);
+      const itemInfo = WHOLESALE_ITEMS.find(i => i.id === itemId);
+
+      if (!inv || inv.count <= 0) { showStatAlert('Món này đã hết hàng!', 'text-rose-400'); return; }
+
+      inv.count--;
+      const profit = itemInfo.retailPrice;
+      modifyStats({ money: +profit, energy: -8, mood: +3, rep: +2 });
+      audio.playCash();
+      showStatAlert(`💵 Bán được 1 ${itemInfo.name}! Thu về +${profit.toLocaleString('vi-VN')}đ`, 'text-emerald-400');
+      STATE.todayEvents.push(`Bán lẻ 1 ${itemInfo.name}, thu về ${profit.toLocaleString('vi-VN')}đ.`);
+      renderStockList();
+    }
+
+    function sellToCrowd() {
+      if (!isSellingAllowed()) { showStatAlert('⛔ Hết giờ bán rồi, vào tiết học bài thôi!', 'text-rose-400'); return; }
+      if (STATE.stats.energy < 15) { showStatAlert('⚡ Cần ít nhất 15 Năng Lượng!', 'text-amber-400'); audio.playWrong(); return; }
+
+      let totalSold = 0;
+      let totalMoney = 0;
+
+      STATE.inventory.forEach(inv => {
+        if (inv.count > 0) {
+          const sellCount = Math.min(inv.count, Math.floor(Math.random() * 2) + 1);
+          inv.count -= sellCount;
+          totalSold += sellCount;
+          const info = WHOLESALE_ITEMS.find(i => i.id === inv.id);
+          if (info) totalMoney += sellCount * info.retailPrice;
+        }
+      });
+
+      if (totalSold === 0) { showStatAlert('Cặp rỗng túi! Hãy nhập hàng sỉ trước đã.', 'text-rose-400'); return; }
+
+      modifyStats({ money: +totalMoney, energy: -15, mood: +5, rep: +5 });
+      audio.playSuccess();
+      showStatAlert(`🎉 Đợt bán đại thành công! Bán vèo ${totalSold} món, thu về +${totalMoney.toLocaleString('vi-VN')}đ!`, 'text-emerald-400');
+      STATE.todayEvents.push(`Đợt bán hàng nhộn nhịp thu về ${totalMoney.toLocaleString('vi-VN')}đ.`);
+      renderStockList();
+      advanceTime();
+    }
+
+    function openWholesaleTab() {
+      document.getElementById('shopSellCard').classList.add('hidden');
+      const wCard = document.getElementById('wholesaleCard');
+      wCard.classList.remove('hidden');
+
+      const container = document.getElementById('wholesaleListContainer');
+      container.innerHTML = '';
+
+      WHOLESALE_ITEMS.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs';
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xl">${item.icon}</span>
+            <div>
+              <div class="font-bold text-slate-200">${item.name}</div>
+              <div class="text-[10px] text-slate-400">Giá sỉ: <b class="text-blue-400">${item.wholesalePrice.toLocaleString('vi-VN')}đ</b> • Giá bán: ${item.retailPrice.toLocaleString('vi-VN')}đ</div>
+            </div>
+          </div>
+          <button onclick="buyWholesaleStock('${item.id}')" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-[11px]">
+            Nhập 3 Cái
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function buyWholesaleStock(itemId) {
+      const item = WHOLESALE_ITEMS.find(i => i.id === itemId);
+      const cost = item.wholesalePrice * 3;
+
+      if (STATE.stats.money < cost) {
+        showStatAlert('💸 Tiền trong ví không đủ để nhập gói sỉ này!', 'text-rose-400');
+        audio.playWrong();
+        return;
+      }
+
+      let inv = STATE.inventory.find(i => i.id === itemId);
+      if (!inv) {
+        inv = { id: itemId, count: 0 };
+        STATE.inventory.push(inv);
+      }
+      inv.count += 3;
+
+      modifyStats({ money: -cost });
+      audio.playTone(550, 'triangle', 0.15);
+      showStatAlert(`📦 Đã nhập 3 phần ${item.name} (-${cost.toLocaleString('vi-VN')}đ)`, 'text-sky-400');
+      STATE.todayEvents.push(`Bỏ ra ${cost.toLocaleString('vi-VN')}đ lấy 3 phần sỉ ${item.name}.`);
+    }
+
+    /* =============================================================
+       TIẾT HỌC TRÊN LỚP
+       ============================================================= */
+    function startClassroomLesson() {
+      if (STATE.stats.energy < 15) {
+        showStatAlert('⚠️ Bạn quá kiệt sức! Hãy nghỉ ngơi hoặc ăn uống.', 'text-rose-400');
+        audio.playWrong();
+        return;
+      }
+
+      const q = QUIZ_DATABASE[Math.floor(Math.random() * QUIZ_DATABASE.length)];
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      
+      const quizCard = document.getElementById('classroomQuizCard');
+      quizCard.classList.remove('hidden');
+
+      document.getElementById('quizSubjectBadge').textContent = q.subject;
+      document.getElementById('quizTeacherBadge').textContent = q.teacher;
+      document.getElementById('quizTeacherAvatar').textContent = q.avatar || '👨‍🏫';
+      document.getElementById('quizTeacherQuestion').textContent = q.q;
+
+      const optsBox = document.getElementById('quizOptionsContainer');
+      optsBox.innerHTML = '';
+
+      q.opts.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-amber-400 text-left text-xs font-semibold text-slate-200 transition active:scale-95 flex items-center gap-1.5';
+        btn.innerHTML = `<span class="w-5 h-5 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px] text-amber-400 font-bold">${String.fromCharCode(65 + idx)}</span> <span class="truncate">${opt}</span>`;
+        btn.onclick = () => answerQuiz(q, idx);
+        optsBox.appendChild(btn);
+      });
+    }
+
+    function answerQuiz(q, selectedIdx) {
+      document.getElementById('classroomQuizCard').classList.add('hidden');
+      document.getElementById('sceneryAvatarGroup').classList.remove('hidden');
+
+      if (selectedIdx === q.c) {
+        modifyStats({ study: +10, mood: +5, energy: -15, rep: +2 });
+        audio.playSuccess();
+        showStatAlert(`🎉 Đúng rồi! ${q.tip} (+10 📚, +5 😊)`, 'text-emerald-400');
+        STATE.todayEvents.push(`Trả lời xuất sắc câu hỏi ${q.subject} của ${q.teacher}, Triệu Mẫn khẽ gật đầu khen ngợi.`);
+      } else {
+        modifyStats({ study: +3, mood: -5, energy: -15 });
+        audio.playWrong();
+        showStatAlert(`😭 Sai rồi! Gợi ý: ${q.tip} (+3 📚, -5 😊)`, 'text-rose-400');
+        STATE.todayEvents.push(`Lúng túng trước câu hỏi ${q.subject}, quyết tâm tối về cày đề thêm.`);
+      }
+      advanceTime();
+    }
+
+    document.getElementById('btnSkipClass')?.addEventListener('click', () => {
+      document.getElementById('classroomQuizCard').classList.add('hidden');
+      document.getElementById('sceneryAvatarGroup').classList.remove('hidden');
+      modifyStats({ energy: +10, study: -5, hp: -2 });
+      audio.playTone(180, 'sawtooth', 0.2);
+      showStatAlert('😴 Ngủ gục trong giờ học! (+10 ⚡, -5 📚)', 'text-amber-400');
+      STATE.todayEvents.push('Mệt quá gục đầu xuống bàn ngủ suốt tiết học, suýt bị lớp phó Triệu Mẫn ghi tên.');
+      advanceTime();
+    });
+
+    function selfStudyAction(isNight = false) {
+      if (STATE.stats.energy < 15) {
+        showStatAlert('Bạn quá kiệt sức để học bài! Hãy ăn hoặc đi ngủ.', 'text-rose-400');
+        audio.playWrong();
+        return;
+      }
+
+      const gain = isNight ? 14 : 12;
+      modifyStats({ study: +gain, energy: -18, mood: -3 });
+      audio.playTone(520, 'sine', 0.15);
+      showStatAlert(`📚 Đã hoàn thành 1 đề ôn luyện! (+${gain} 📚, -18 ⚡)`, 'text-sky-400');
+      
+      if (isNight) {
+        STATE.todayEvents.push('Buổi tối sau khi ăn cơm xong, ngồi vào bàn học cày đề đại học đến khuya.');
+      } else {
+        STATE.todayEvents.push('Buổi chiều không bán hàng, lên thư viện ngồi yên tĩnh đọc thêm tài liệu nâng cao.');
+      }
+      advanceTime();
+    }
+
+    /* =============================================================
+       KỲ THI GIỮA KỲ (NGÀY 22) & CUỐI KỲ (NGÀY 45)
+       ============================================================= */
+    function triggerExam(type) {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const examCard = document.getElementById('examMinigameCard');
+      examCard.classList.remove('hidden');
+
+      const shuffled = [...QUIZ_DATABASE].sort(() => 0.5 - Math.random());
+      STATE.exam.type = type;
+      STATE.exam.questions = shuffled.slice(0, 10);
+      STATE.exam.currentStep = 0;
+      STATE.exam.correctCount = 0;
+      STATE.exam.inProgress = true;
+
+      document.getElementById('examModalTitle').textContent = type === 'midterm' ? '📝 KỲ THI KHẢO SÁT GIỮA KỲ LỚP 12' : '🎓 KỲ THI TỐT NGHIỆP & ĐẠI HỌC QUỐC GIA';
+      renderExamStep();
+    }
+
+    function renderExamStep() {
+      const q = STATE.exam.questions[STATE.exam.currentStep];
+      document.getElementById('examProgressText').textContent = `CÂU ${STATE.exam.currentStep + 1} / 10 • ${STATE.exam.type === 'midterm' ? 'GIỮA KỲ' : 'TỐT NGHIỆP'}`;
+      document.getElementById('examSubjectBadge').textContent = q.subject;
+      document.getElementById('examQuestionText').textContent = q.q;
+      document.getElementById('examCorrectCount').textContent = STATE.exam.correctCount;
+
+      const container = document.getElementById('examOptionsContainer');
+      container.innerHTML = '';
+
+      q.opts.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-yellow-400 text-left text-xs font-semibold text-slate-200 transition active:scale-95 flex items-center gap-1.5';
+        btn.innerHTML = `<span class="w-5 h-5 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px] text-yellow-400 font-bold">${String.fromCharCode(65 + idx)}</span> <span class="truncate">${opt}</span>`;
+        btn.onclick = () => answerExamQuestion(idx);
+        container.appendChild(btn);
+      });
+    }
+
+    function answerExamQuestion(idx) {
+      const q = STATE.exam.questions[STATE.exam.currentStep];
+      if (idx === q.c) {
+        STATE.exam.correctCount++;
+        audio.playSuccess();
+      } else {
+        audio.playWrong();
+      }
+
+      STATE.exam.currentStep++;
+      if (STATE.exam.currentStep < 10) {
+        renderExamStep();
+      } else {
+        document.getElementById('examMinigameCard').classList.add('hidden');
+        if (STATE.exam.type === 'midterm') {
+          STATE.stats.midtermScore = STATE.exam.correctCount;
+          modifyStats({ study: STATE.exam.correctCount * 3, mood: +10 });
+          alert(`🎉 KẾT QUẢ GIỮA KỲ: Đúng ${STATE.exam.correctCount}/10 câu!\nĐiểm thi đã được cộng vào chỉ số Học tập và Bảng Xếp Hạng Lớp 12A3!`);
+          STATE.todayEvents.push(`Hoàn thành xuất sắc kỳ thi giữa kỳ với số điểm ${STATE.exam.correctCount}/10.`);
+          closeOverlayCard();
+        } else {
+          STATE.stats.finalScore = STATE.exam.correctCount;
+          triggerGraduationEnding();
+        }
+      }
+    }
+
+    /* =============================================================
+       CĂN TIN & TƯƠNG TÁC CRUSH TRIỆU MẪN
+       ============================================================= */
+    const CANTEEN_FOODS = [
+      { name: 'Bánh Mì Kẹp Thịt Nóng Giòn', cost: 15000, energy: +30, mood: +10, hp: +5, icon: '🥖' },
+      { name: 'Xôi Mặn Thập Cẩm Cô Năm', cost: 15000, energy: +35, mood: +12, hp: +5, icon: '🍙' },
+      { name: 'Nước Mía Siêu Sạch', cost: 10000, energy: +20, mood: +15, hp: +5, icon: '🥤' },
+      { name: 'Bao Triệu Mẫn Ăn Trưa Căn Tin', cost: 35000, energy: +15, mood: +30, love: +15, icon: '💕' }
+    ];
+
+    function openCanteenMenu() {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const c = document.getElementById('canteenMenuCard');
+      c.classList.remove('hidden');
+
+      const list = document.getElementById('canteenItemsList');
+      list.innerHTML = '';
+      CANTEEN_FOODS.forEach(food => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs hover:border-emerald-500/50 transition';
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-xl">${food.icon}</span>
+            <div>
+              <div class="font-bold text-slate-200">${food.name}</div>
+              <div class="text-[10px] text-slate-400 font-mono">Giá: <span class="text-emerald-400">${food.cost.toLocaleString('vi-VN')}đ</span></div>
+            </div>
+          </div>
+          <button class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[11px]" onclick="buyFood('${food.name}', ${food.cost}, ${food.energy}, ${food.mood}, ${food.love || 0})">
+            Ăn Ngay
+          </button>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function buyFood(name, cost, eGain, mGain, loveGain) {
+      if (STATE.stats.money < cost) { showStatAlert('💸 Tiền tiêu vặt không đủ!', 'text-rose-400'); audio.playWrong(); return; }
+      modifyStats({ money: -cost, energy: eGain, mood: mGain, love: loveGain });
+      audio.playCash();
+      showStatAlert(`😋 Đã ăn ${name}! (+${eGain} ⚡, +${mGain} 😊)`, 'text-emerald-400');
+      if (loveGain > 0) {
+        STATE.todayEvents.push(`Bao Triệu Mẫn ăn trưa tại căn tin, nhìn nụ cười duyên dáng của Mẫn mà lòng xao xuyến.`);
+      } else {
+        STATE.todayEvents.push(`Ghé căn tin làm một phần ${name} ngon lành nạp lại sức.`);
+      }
+      advanceTime();
+    }
+
+    function interactNPC(who) {
+      audio.playTone(450, 'triangle', 0.1);
+      if (who === 'mẫn') {
+        if (STATE.stats.energy < 10) { showStatAlert('Bạn quá mệt để bắt chuyện với Triệu Mẫn!', 'text-amber-400'); return; }
+        modifyStats({ energy: -10, mood: +15, love: +7, study: +3 });
+        showStatAlert('💕 Triệu Mẫn chia sẻ bí quyết học tốt và cười dịu dàng! (+7 💕, +3 📚)', 'text-pink-400');
+        STATE.todayEvents.push('Cùng Triệu Mẫn đứng trao đổi phương pháp giải đề Toán bên hành lang lớp học.');
+        advanceTime();
+      } else if (who === 'lan') {
+        modifyStats({ energy: -10, mood: +10, friends: +8, study: +4 });
+        showStatAlert('👧 Mượn vở Lan chép bài & cùng ăn quà (+8 👥, +4 📚)', 'text-sky-400');
+        STATE.todayEvents.push('Ngồi trao đổi bài vở với nhỏ bạn thân Lan, hai đứa vừa học vừa tính chuyện bán hàng.');
+        advanceTime();
+      } else if (who === 'tuan') {
+        modifyStats({ energy: -15, hp: +10, mood: +10, friends: +8 });
+        showStatAlert('🏀 Ra sân ném bóng rổ với Tuấn (+10 ❤️, +10 😊)', 'text-amber-400');
+        STATE.todayEvents.push('Ném bóng rổ cùng Tuấn xả stress sau các tiết học căng thẳng.');
+        advanceTime();
+      }
+    }
+
+    /* =============================================================
+       TIẾN TRÌNH THỜI GIAN & NHẬT KÝ
+       ============================================================= */
+    function modifyStats(changes) {
+      if (changes.hp !== undefined) STATE.stats.hp = Math.max(0, Math.min(100, STATE.stats.hp + changes.hp));
+      if (changes.energy !== undefined) STATE.stats.energy = Math.max(0, Math.min(100, STATE.stats.energy + changes.energy));
+      if (changes.mood !== undefined) STATE.stats.mood = Math.max(0, Math.min(100, STATE.stats.mood + changes.mood));
+      if (changes.study !== undefined) STATE.stats.study = Math.max(0, STATE.stats.study + changes.study);
+      if (changes.friends !== undefined) STATE.stats.friends = Math.max(0, Math.min(100, STATE.stats.friends + changes.friends));
+      if (changes.love !== undefined) STATE.stats.love = Math.max(0, Math.min(100, STATE.stats.love + changes.love));
+      if (changes.rep !== undefined) STATE.stats.reputation = Math.max(0, Math.min(100, STATE.stats.reputation + changes.rep));
+      if (changes.money !== undefined) STATE.stats.money = Math.max(0, STATE.stats.money + changes.money);
+      updateHUD();
+      saveGame();
+    }
+
+    function advanceTime() {
+      STATE.timeIndex++;
+      if (STATE.timeIndex >= TIME_PERIODS.length) {
+        triggerEndOfDayDiary();
+      } else {
+        updateHUD();
+      }
+    }
+
+    function quickSleep() {
+      if (confirm('Bạn có muốn đi ngủ kết thúc ngày hôm nay để hồi phục toàn bộ năng lượng?')) {
+        triggerEndOfDayDiary();
+      }
+    }
+
+    function triggerEndOfDayDiary() {
+      audio.playBell();
+      closeOverlayCard();
+
+      STATE.stats.energy = 100;
+      STATE.stats.money += 20000;
+
+      let diaryStory = [];
+      diaryStory.push(`Hôm nay là Ngày thứ ${STATE.day} lớp 12.`);
+
+      if (STATE.todayEvents.length > 0) {
+        diaryStory.push(STATE.todayEvents.join(' '));
+      } else {
+        diaryStory.push('Một ngày học tập và sắp xếp buôn bán trôi qua trọn vẹn.');
+      }
+
+      if (STATE.stats.love >= 60) {
+        diaryStory.push('Dạo này Triệu Mẫn hay quan tâm đến việc học và sức khỏe của mình hơn trước. Có lẽ nào Mẫn cũng có tình cảm với mình? 💕');
+      } else if (STATE.stats.study >= 85) {
+        diaryStory.push('Điểm rèn luyện thi đua đang bám sát top đầu của lớp. Kỳ thi sắp tới nhất định sẽ bùng nổ! 📚');
+      }
+
+      const fullDiaryText = diaryStory.join('\n\n');
+      STATE.diaryEntries.push({ day: STATE.day, text: fullDiaryText });
+      STATE.todayEvents = [];
+
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const diaryCard = document.getElementById('diaryModalCard');
+      diaryCard.classList.remove('hidden');
+
+      document.getElementById('diaryTitle').textContent = `NHẬT KÝ — NGÀY ${STATE.day}`;
+      document.getElementById('diaryContentText').innerText = fullDiaryText;
+      
+      let forecast = `Ngày ${STATE.day + 1}: Lịch học bình thường`;
+      if (STATE.day === 21) forecast = 'NGÀY MAI: KỲ THI GIỮA KỲ ĐANG CHỜ ĐÓN!';
+      else if (STATE.day === 44) forecast = 'NGÀY MAI: KỲ THI TỐT NGHIỆP & ĐẠI HỌC QUỐC GIA!';
+      document.getElementById('diaryForecastNextDay').textContent = forecast;
+
+      document.getElementById('btnContinueFromDiary').onclick = () => {
+        closeOverlayCard();
+        STATE.day++;
+        STATE.timeIndex = 0;
+        gotoLocation('class');
+
+        // Sự kiện Ngày 22: Thi Giữa Kỳ
+        if (STATE.day === 22) {
+          triggerExam('midterm');
+        }
+        // Sự kiện Ngày 45: Thi Cuối Kỳ
+        else if (STATE.day >= STATE.totalDays) {
+          triggerExam('final');
+        }
+      };
+    }
+
+    function openDiaryManual() {
+      closeOverlayCard();
+      const diaryCard = document.getElementById('diaryModalCard');
+      diaryCard.classList.remove('hidden');
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+
+      const latest = STATE.diaryEntries[STATE.diaryEntries.length - 1];
+      document.getElementById('diaryTitle').textContent = `NHẬT KÝ (NGÀY ${latest ? latest.day : STATE.day})`;
+      document.getElementById('diaryContentText').innerText = latest ? latest.text : 'Chưa có trang nhật ký nào. Hãy hoàn thành ngày học đầu tiên!';
+      document.getElementById('btnContinueFromDiary').onclick = () => closeOverlayCard();
+    }
+
+    /* =============================================================
+       KẾT THÚC DỰA TRÊN ĐIỂM THI & ĐIỂM TÍCH LŨY
+       ============================================================= */
+    function triggerGraduationEnding() {
+      closeOverlayCard();
+      document.getElementById('sceneryAvatarGroup').classList.add('hidden');
+      const endCard = document.getElementById('endingScreenCard');
+      endCard.classList.remove('hidden');
+      audio.playSuccess();
+
+      let title = '';
+      let sub = '';
+      let desc = '';
+
+      const s = STATE.stats;
+      const totalScore = s.study + (s.finalScore * 10);
+
+      if (totalScore >= 160 && s.love >= 70) {
+        title = '🏆 THỦ KHOA SONG HÀNH CÙNG TRIỆU MẪN';
+        sub = 'Cùng bước vào cánh cổng Đại Học Ngoại Thương & Lời hẹn ước trăm năm';
+        desc = `Một cái kết hoàn hảo như phim! Bạn đạt điểm số thi tốt nghiệp kỷ lục, vượt qua cả lớp phó Triệu Mẫn để giành vị trí Thủ khoa toàn trường. Trong buổi lễ bế giảng, Triệu Mẫn đã chủ động trao cho bạn chiếc kẹp tóc kỷ vật và đồng ý cùng bạn viết tiếp chuyện tình thời sinh viên!`;
+      } else if (totalScore >= 150) {
+        title = '🎓 HỌC BÁ ĐẠI HỌC QUỐC GIA';
+        sub = 'Bảng vàng ghi danh, vươn lên Top 1 thi đua';
+        desc = `Với sự nỗ lực vượt bậc ở các ca học chiều và tối, bạn đã thi đỗ vào ngành công nghệ / kinh tế mũi nhọn với số điểm cao ngất ngưởng. Bạn là niềm tự hào của lớp 12A3!`;
+      } else if (s.money >= 400000) {
+        title = '💼 TỔNG TÀI KHỞI NGHIỆP TRẺ TUỔI';
+        sub = 'Triệu Mẫn làm trợ lý tài chính tài ba';
+        desc = `Số vốn tích lũy từ buôn bán học đường cùng tư duy nhạy bén đã biến bạn thành một startup trẻ đầy triển vọng ngay sau khi ra trường!`;
+      } else {
+        title = '🌸 KỶ NIỆM THANH XUÂN RỰC RỠ';
+        sub = 'Những năm tháng áo trắng khó phai mờ';
+        desc = `Hoàn thành bài thi và quãng đời học sinh với muôn vàn cảm xúc: từng gói bánh tráng giờ ra chơi, nụ cười của Triệu Mẫn và những buổi chiều ôn thi miệt mài sẽ mãi là ký ức đẹp nhất.`;
+      }
+
+      document.getElementById('endingTitle').textContent = title;
+      document.getElementById('endingSubtitle').textContent = sub;
+      document.getElementById('endingDescription').textContent = desc;
+
+      document.getElementById('endStatStudy').textContent = s.study;
+      document.getElementById('endStatRank').textContent = totalScore >= 150 ? '#1 Toàn Khối' : '#2 Lớp 12A3';
+      document.getElementById('endStatMoney').textContent = `${s.money.toLocaleString('vi-VN')}đ`;
+      document.getElementById('endStatLove').textContent = `${s.love}%`;
+    }
+
+    function restartGame() {
+      localStorage.removeItem('thanh_xuan_business_save');
+      location.reload();
+    }
+
+    /* =============================================================
+       DRAWER & GIAO DIỆN
+       ============================================================= */
+    function openTabAction(tab) {
+      const drawer = document.getElementById('actionDrawerPanel');
+      const title = document.getElementById('drawerTitle');
+      const content = document.getElementById('drawerContent');
+      drawer.classList.remove('hidden');
+
+      if (tab === 'study') {
+        title.textContent = '📖 HOẠT ĐỘNG HỌC TẬP (100+ CÂU HỎI TRẮC NGHIỆM)';
+        content.innerHTML = `
+          <div class="space-y-2">
+            <button onclick="startClassroomLesson()" class="w-full p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 flex justify-between items-center text-left">
+              <span>✍️ Trả lời câu hỏi trên lớp (Toán, Lý, Hóa, Sinh, Văn, Sử, Địa, Anh)</span>
+              <span class="text-amber-400 font-mono">-15 ⚡</span>
+            </button>
+            <button onclick="selfStudyAction(false)" class="w-full p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 flex justify-between items-center text-left">
+              <span>📚 Tự học / Ôn đề ở thư viện (+12 📚)</span>
+              <span class="text-sky-400 font-mono">-18 ⚡</span>
+            </button>
+            <button onclick="selfStudyAction(true)" class="w-full p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 flex justify-between items-center text-left">
+              <span>🌙 Cày đề khuya tại phòng ngủ (+14 📚)</span>
+              <span class="text-purple-400 font-mono">-18 ⚡</span>
+            </button>
+          </div>
+        `;
+      } else if (tab === 'friends') {
+        title.textContent = '👥 BẠN BÈ & TRIỆU MẪN';
+        content.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex items-center justify-between p-2 bg-slate-800/80 rounded-xl border border-slate-700">
+              <div class="flex items-center gap-2"><span>👸</span><div><b>Triệu Mẫn</b> <span class="text-[10px] text-pink-400">Lớp phó & Crush 💕</span></div></div>
+              <button onclick="interactNPC('mẫn')" class="px-2.5 py-1 bg-pink-600 rounded text-[11px] font-bold">Hỏi bài</button>
+            </div>
+            <div class="flex items-center justify-between p-2 bg-slate-800/80 rounded-xl border border-slate-700">
+              <div class="flex items-center gap-2"><span>👧</span><div><b>Lan</b> <span class="text-[10px] text-slate-400">Bạn thân</span></div></div>
+              <button onclick="interactNPC('lan')" class="px-2.5 py-1 bg-sky-600 rounded text-[11px] font-bold">Tám chuyện</button>
+            </div>
+            <div class="flex items-center justify-between p-2 bg-slate-800/80 rounded-xl border border-slate-700">
+              <div class="flex items-center gap-2"><span>🏀</span><div><b>Tuấn</b> <span class="text-[10px] text-amber-400">Bóng Rổ</span></div></div>
+              <button onclick="interactNPC('tuan')" class="px-2.5 py-1 bg-amber-600 rounded text-[11px] font-bold">Ném bóng</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function closeDrawer() {
+      document.getElementById('actionDrawerPanel').classList.add('hidden');
+    }
+
+    function closeOverlayCard() {
+      document.getElementById('classroomQuizCard').classList.add('hidden');
+      document.getElementById('leaderboardCard').classList.add('hidden');
+      document.getElementById('examMinigameCard').classList.add('hidden');
+      document.getElementById('shopSellCard').classList.add('hidden');
+      document.getElementById('wholesaleCard').classList.add('hidden');
+      document.getElementById('canteenMenuCard').classList.add('hidden');
+      document.getElementById('diaryModalCard').classList.add('hidden');
+      document.getElementById('sceneryAvatarGroup').classList.remove('hidden');
+      closeDrawer();
+    }
+
+    function updateHUD() {
+      const curPeriod = TIME_PERIODS[STATE.timeIndex] || TIME_PERIODS[0];
+      const dayOfWeekIdx = (STATE.day - 1) % 7;
+
+      document.getElementById('uiDayOfWeek').textContent = DAYS_OF_WEEK[dayOfWeekIdx];
+      document.getElementById('uiTimeText').textContent = curPeriod.text;
+      document.getElementById('uiCurrentPeriodText').textContent = curPeriod.name;
+      document.getElementById('uiDayCount').textContent = STATE.day;
+
+      document.getElementById('statHp').textContent = STATE.stats.hp;
+      document.getElementById('statEnergy').textContent = STATE.stats.energy;
+      document.getElementById('statMood').textContent = STATE.stats.mood;
+      document.getElementById('statStudy').textContent = STATE.stats.study;
+      document.getElementById('statLove').textContent = `${STATE.stats.love}%`;
+      document.getElementById('statMoney').textContent = `${STATE.stats.money.toLocaleString('vi-VN')}đ`;
+
+      const statusTag = document.getElementById('businessStatusTag');
+      const btnSell = document.getElementById('btnFooterSell');
+
+      if (curPeriod.canSell) {
+        statusTag.textContent = '🟢 ĐƯỢC PHÉP BÁN HÀNG';
+        statusTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-950 border border-emerald-500 text-emerald-300';
+        btnSell.className = 'rpg-btn flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1';
+      } else {
+        statusTag.textContent = '🔒 GIỜ HỌC / ĐÓNG CỬA HÀNG';
+        statusTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-rose-950 border border-rose-600 text-rose-300';
+        btnSell.className = 'rpg-btn flex-1 py-2 rounded-lg bg-slate-800 text-slate-500 text-xs font-bold pixel-btn flex flex-col sm:flex-row items-center justify-center gap-1 opacity-70';
+      }
+    }
+
+    function showStatAlert(text, colorClass = 'text-emerald-400') {
+      const box = document.getElementById('statAlertBox');
+      box.textContent = text;
+      box.className = `text-[11px] font-mono font-bold ${colorClass} opacity-100 transition-opacity duration-200 bg-black/80 px-2.5 py-1 rounded border border-slate-700`;
+      setTimeout(() => {
+        box.classList.remove('opacity-100');
+        box.classList.add('opacity-0');
+      }, 3000);
+    }
+
+    function saveGame() {
+      try {
+        localStorage.setItem('thanh_xuan_business_save', JSON.stringify(STATE));
+        document.getElementById('saveStatus').textContent = 'ĐÃ LƯU';
+      } catch (e) {}
+    }
+
+    function loadGame() {
+      try {
+        const raw = localStorage.getItem('thanh_xuan_business_save');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          Object.assign(STATE, parsed);
+        }
+      } catch (e) {}
+    }
+
+    document.getElementById('btnAudioToggle')?.addEventListener('click', (e) => {
+      audio.enabled = !audio.enabled;
+      e.target.textContent = audio.enabled ? '🔊 BẬT ÂM' : '🔇 TẮT ÂM';
+    });
+
+    /* =============================================================
+       PHÒNG BẠN BÈ / CHIA SẺ CHALLENGE
+       ============================================================= */
+    function randomRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
+
+    function getRoomCode() {
+      const params = new URLSearchParams(location.search);
+      return (params.get('room') || localStorage.getItem('thanh_xuan_room') || '').toUpperCase();
+    }
+
+    function setRoomCode(code) {
+      code = String(code || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase();
+      if (!code) return;
+      localStorage.setItem('thanh_xuan_room', code);
+      const url = new URL(location.href);
+      url.searchParams.set('room', code);
+      history.replaceState({}, '', url.toString());
+      const input = document.getElementById('roomCodeInput');
+      if (input) input.value = code;
+      const status = document.getElementById('roomStatusText');
+      if (status) status.innerHTML = `🟣 <b>PHÒNG ${code}</b><br><span class="text-slate-400 text-[10px]">Bạn đã sẵn sàng mời bạn bè!</span>`;
+    }
+
+    function generateRoomCode() {
+      setRoomCode(randomRoomCode());
+      showStatAlert('🫂 Đã tạo phòng! Gửi link cho bạn nhé.', 'text-fuchsia-300');
+    }
+
+    function buildInviteUrl() {
+      let code = getRoomCode();
+      if (!code) { code = randomRoomCode(); setRoomCode(code); }
+      return location.href;
+    }
+
+    async function copyInviteLink() {
+      const url = buildInviteUrl();
+      try {
+        await navigator.clipboard.writeText(url);
+        showStatAlert('🔗 Đã copy link mời bạn!', 'text-emerald-400');
+      } catch (e) {
+        window.prompt('Copy link này để gửi cho bạn:', url);
+      }
+    }
+
+    async function shareInviteLink() {
+      const url = buildInviteUrl();
+      const title = 'Thanh Xuân Rực Rỡ: Nhật Ký Cấp 3';
+      const textShare = `Vào chơi Thanh Xuân Rực Rỡ với mình! Phòng ${getRoomCode()}`;
+      if (navigator.share) {
+        try { await navigator.share({ title, text: textShare, url }); return; } catch (e) {}
+      }
+      await copyInviteLink();
+    }
+
+    function copyResultCard() {
+      const s = STATE.stats;
+      const result = `🌸 THANH XUÂN RỰC RỠ 🌸\n📚 Học tập: ${s.study}\n💕 Tình cảm Triệu Mẫn: ${s.love}%\n💰 Tài sản: ${Number(s.money || 0).toLocaleString('vi-VN')}đ\n🏆 Ngày: ${STATE.day}/45\n\nChơi cùng mình nhé!`;
+      navigator.clipboard?.writeText(result).then(() => {
+        showStatAlert('📋 Đã copy thành tích!', 'text-emerald-400');
+      }).catch(() => window.prompt('Copy thành tích:', result));
+    }
+
+    function openInviteRoom() {
+      closeOverlayCard();
+      closeDrawer();
+      const card = document.getElementById('inviteRoomCard');
+      card.classList.remove('hidden');
+      const code = getRoomCode();
+      if (code) setRoomCode(code);
+      else generateRoomCode();
+    }
+
+    function closeInviteRoom() {
+      document.getElementById('inviteRoomCard')?.classList.add('hidden');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadGame();
+      gotoLocation('class');
+      updateHUD();
+      const code = getRoomCode();
+      if (code) {
+        localStorage.setItem('thanh_xuan_room', code);
+      }
+    });
+  </script>
+</body>
+</html>
