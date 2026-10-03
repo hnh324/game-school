@@ -5,12 +5,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    Deluxe Career & Fashion Edition
    - 1 file App.jsx
    - 23 mốc thời gian / ngày
-   - 100 ngày chơi
-   - Mỗi mốc 30 giây
-   - Mỗi mốc tối đa 2 hoạt động chính
+   - Mỗi mốc 45 giây
+   - Mỗi mốc tối đa 1 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
-   - kho câu hỏi ôn tập hiện có + 260 câu mới (100 HSK 4-5 + 160 tiếng Anh B1-B2) + 200 câu hỏi thi học kỳ/THPT
+   - 460 câu hỏi (180 câu cũ + 100 HSK + 180 English B1-B2)
    - NPC
    - Nghề
    - Chứng chỉ
@@ -18,147 +17,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Nhật ký
    - Thi đua
    - Save code
-   - Tên nhân vật + bảng xếp hạng người chơi online real-time
-   - Supabase Auth anonymous + Postgres REST polling (không cần SDK)
 ========================================================= */
 
-const GAME_SEASON = "season_2";
-const GAME_VERSION = 27;
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_season_2";
-
-/* =========================================================
-   MULTIPLAYER ONLINE — SUPABASE
-   Set these in .env.local:
-   VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
-========================================================= */
-const SUPABASE_URL = String(
-  import.meta.env?.VITE_SUPABASE_URL || ""
-).replace(/\/$/, "");
-const SUPABASE_KEY = String(
-  import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env?.VITE_SUPABASE_ANON_KEY ||
-  ""
-);
-
-const ONLINE_TABLE = "player_scores";
-const ONLINE_SESSION_KEY = "thanh_xuan_ruc_ro_supabase_session_season_2";
-const ONLINE_HEARTBEAT_MS = 10000;
-const ONLINE_POLL_MS = 5000;
-const hasOnlineConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
-
-async function onlineRequest(path, options = {}) {
-  if (!hasOnlineConfig) {
-    throw new Error("Chưa cấu hình Supabase URL / publishable key.");
-  }
-
-  const headers = {
-    apikey: SUPABASE_KEY,
-    "Content-Type": "application/json",
-    ...(options.headers || {})
-  };
-
-  const response = await fetch(`${SUPABASE_URL}${path}`, {
-    ...options,
-    headers
-  });
-
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-
-  if (!response.ok) {
-    const message =
-      data?.msg ||
-      data?.message ||
-      data?.error_description ||
-      data?.hint ||
-      `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-
-  return data;
-}
-
-function readOnlineSession() {
-  try {
-    return JSON.parse(localStorage.getItem(ONLINE_SESSION_KEY) || "null");
-  } catch {
-    return null;
-  }
-}
-
-function writeOnlineSession(session) {
-  try {
-    localStorage.setItem(ONLINE_SESSION_KEY, JSON.stringify(session));
-  } catch {}
-}
-
-function clearOnlineSession() {
-  try {
-    localStorage.removeItem(ONLINE_SESSION_KEY);
-  } catch {}
-}
-
-const onlineAuthHeaders = (accessToken) =>
-  accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-
-async function createAnonymousSession() {
-  const data = await onlineRequest("/auth/v1/signup", {
-    method: "POST",
-    body: JSON.stringify({ data: { app: "thanh-xuan-ruc-ro" } })
-  });
-
-  if (!data?.access_token || !data?.user?.id) {
-    throw new Error(
-      "Không tạo được tài khoản ẩn danh. Hãy bật Anonymous Sign-Ins trong Supabase."
-    );
-  }
-
-  const session = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token || null,
-    user: data.user
-  };
-  writeOnlineSession(session);
-  return session;
-}
-
-async function refreshAnonymousSession(session) {
-  if (!session?.refresh_token) return null;
-
-  try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: session.refresh_token
-      })
-    });
-
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!response.ok || !data?.access_token) return null;
-
-    const next = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token || session.refresh_token,
-      user: session.user
-    };
-    writeOnlineSession(next);
-    return next;
-  } catch {
-    return null;
-  }
-}
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v8";
+const SLOT_SECONDS = 45;
 
 /* =========================================================
    THỜI GIAN
@@ -208,21 +70,7 @@ const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
 const addStat = (g, key, amount) => {
   const max = key === "skill" ? 500 : 100;
-  g.stats[key] = Math.max(0, Math.min(max, (Number(g.stats[key]) || 0) + (Number(amount) || 0)));
-};
-
-const addAchievement = (g, amount) => {
-  g.achievementPoints = Math.max(
-    0,
-    Math.round((Number(g.achievementPoints) || 0) + (Number(amount) || 0))
-  );
-};
-
-const addKnowledge = (g, amount) => {
-  g.knowledgePoints = Math.max(
-    0,
-    Math.round((Number(g.knowledgePoints) || 0) + (Number(amount) || 0))
-  );
+  g.stats[key] = clamp(g.stats[key] + amount, 0, max);
 };
 
 const addMoney = (g, amount) => {
@@ -230,8 +78,8 @@ const addMoney = (g, amount) => {
 };
 
 const addCompetition = (g, amount) => {
-  const n = Math.max(0, Math.round(amount || 0));
-  g.competitionPoints += n;
+  const n = Math.round(Number(amount) || 0);
+  g.competitionPoints = Math.max(0, g.competitionPoints + n);
   g.dailyCompetition.player += n;
 };
 
@@ -240,8 +88,8 @@ const addRelationship = (g, id, amount) => {
 };
 
 /* =========================================================
-   280 CÂU HỎI ÔN TẬP
-   180 CÂU CŨ + TOÁN 10-11 + 150 TOÁN 11 + 50 VẬT LÝ 10-11
+   180 CÂU HỎI
+   9 MÔN × 20 CÂU
 ========================================================= */
 
 const VAN_QUESTIONS = [
@@ -289,10 +137,6 @@ const LY_QUESTIONS = [
   ["Sóng", "Quan hệ giữa vận tốc, bước sóng và tần số là?", ["v = λf", "v = λ/f", "v = f/λ", "v = λ+f"], 0, "Công thức sóng v = λf."],
   ["Âm thanh", "Âm thanh không truyền được trong môi trường nào?", ["Chân không", "Không khí", "Nước", "Kim loại"], 0, "Âm thanh cần môi trường vật chất để truyền."],
 ];
-
-const TOAN_10_11_QUESTIONS = [["Lớp 10 • Tập hợp","Cho A={1,2,3} và B={2,3,4}. A∩B bằng? ",["{1,2}","{2,3}","{1,2,3,4}","{4}"],1,"Giao của hai tập hợp gồm các phần tử chung của A và B."],["Lớp 10 • Mệnh đề","Mệnh đề 'Nếu n là số chẵn thì n² là số chẵn' có dạng nào?",["Mệnh đề phủ định","Mệnh đề kéo theo","Mệnh đề tương đương","Mệnh đề hội"],1,"Đây là mệnh đề có cấu trúc 'Nếu P thì Q', tức mệnh đề kéo theo."],["Lớp 10 • Hàm số","Hàm số y=2x+1 có hệ số góc bằng?",["1","2","-1","3"],1,"Trong y=ax+b, hệ số góc là a=2."],["Lớp 10 • Hàm số","Giá trị của f(3) với f(x)=x²-2x+1 là?",["4","1","2","10"],0,"f(3)=9-6+1=4."],["Lớp 10 • Bậc hai","Phương trình x²-5x+6=0 có nghiệm là?",["x=1 và x=6","x=2 và x=3","x=-2 và x=-3","x=0 và x=6"],1,"x²-5x+6=(x-2)(x-3), nên x=2 hoặc x=3."],["Lớp 10 • Bất phương trình","Nghiệm của 2x-3>5 là?",["x>1","x>4","x<4","x≥4"],1,"2x-3>5 ⇔ 2x>8 ⇔ x>4."],["Lớp 10 • Định lý Viète","Với x²-7x+10=0, tổng hai nghiệm bằng?",["10","7","-7","-10"],1,"Theo Viète, tổng nghiệm bằng -b/a=7."],["Lớp 10 • Định lý Viète","Với x²-4x+3=0, tích hai nghiệm bằng?",["-3","4","3","-4"],2,"Theo Viète, tích nghiệm bằng c/a=3."],["Lớp 10 • Hàm số bậc hai","Đỉnh của parabol y=x²-4x+1 có hoành độ là?",["-2","2","4","1"],1,"Hoành độ đỉnh là x=-b/(2a)=4/2=2."],["Lớp 10 • Tọa độ","Khoảng cách giữa A(1,2) và B(4,6) bằng?",["4","5","6","7"],1,"AB=√[(4-1)²+(6-2)²]=√25=5."],["Lớp 10 • Tọa độ","Trung điểm của đoạn AB với A(2,-1), B(6,3) là?",["(4,1)","(2,1)","(8,2)","(4,-1)"],0,"Trung điểm là ((2+6)/2,(-1+3)/2)=(4,1)."],["Lớp 10 • Đường thẳng","Đường thẳng đi qua A(0,2) và có hệ số góc 3 có phương trình là?",["y=3x","y=3x+2","y=2x+3","y=-3x+2"],1,"Dạng y=ax+b, đi qua (0,2) nên y=3x+2."],["Lớp 10 • Vectơ","Nếu a=(2,3) và b=(1,-1) thì a+b bằng?",["(1,4)","(3,2)","(2,2)","(3,4)"],1,"Cộng theo từng tọa độ: (2+1,3-1)=(3,2)."],["Lớp 10 • Vectơ","Hai vectơ (2,4) và (1,2) là?",["Vuông góc","Bằng nhau","Cùng phương","Đối nhau"],2,"(2,4)=2(1,2), nên hai vectơ cùng phương."],["Lớp 10 • Tích vô hướng","Với a=(1,2), b=(3,4), a·b bằng?",["5","10","11","12"],2,"a·b=1·3+2·4=11."],["Lớp 10 • Tích vô hướng","Hai vectơ a=(1,0), b=(0,2) có vuông góc không?",["Không, vì cùng phương","Có","Chỉ khi cùng độ dài","Không xác định"],1,"Tích vô hướng bằng 1·0+0·2=0 nên hai vectơ vuông góc."],["Lớp 10 • Hệ thức lượng","Trong tam giác, định lý cos cho cạnh a là?",["a²=b²+c²+2bc cos A","a²=b²+c²-2bc cos A","a=b+c-cos A","a²=b²-c²-2bc cos A"],1,"Định lý cos: a²=b²+c²-2bc cos A."],["Lớp 10 • Tam giác","Tam giác có ba cạnh 3,4,5 là tam giác gì?",["Đều","Cân","Vuông","Tù"],2,"3²+4²=5² nên tam giác vuông."],["Lớp 10 • Diện tích","Diện tích tam giác có đáy 8 cm và chiều cao 5 cm bằng?",["20 cm²","40 cm²","13 cm²","30 cm²"],0,"S=1/2·8·5=20 cm²."],["Lớp 10 • Thống kê","Trung bình cộng của 4,6,8,10 là?",["6","7","8","9"],1,"(4+6+8+10)/4=7."],["Lớp 10 • Thống kê","Trung vị của dãy 2,5,7,9,12 là?",["5","7","9","12"],1,"Dãy đã sắp xếp, giá trị ở giữa là 7."],["Lớp 10 • Xác suất","Một đồng xu cân đối được tung một lần. Xác suất xuất hiện mặt ngửa là?",["0","1","1/2","2"],2,"Hai kết quả đồng khả năng nên xác suất là 1/2."],["Lớp 10 • Tổ hợp","Số cách chọn 2 học sinh từ 5 học sinh là?",["5","8","10","20"],2,"C(5,2)=5·4/2=10."],["Lớp 10 • Quy tắc cộng","Có 3 loại bút xanh và 2 loại bút đỏ khác nhau. Chọn một cây bút có bao nhiêu cách?",["5","6","1","4"],0,"Chọn một trong tổng số 3+2=5 loại."],["Lớp 10 • Nhị thức","Hệ số của x trong (x+2)^2 là?",["2","4","6","8"],1,"(x+2)^2=x²+4x+4 nên hệ số x là 4."],["Lớp 11 • Lượng giác","sin²x+cos²x bằng?",["0","1","2","sin x"],1,"Hệ thức lượng giác cơ bản: sin²x+cos²x=1."],["Lớp 11 • Lượng giác","Nghiệm của sin x=0 là?",["x=π/2+kπ","x=kπ","x=2kπ+π/2","x=π/4+kπ"],1,"sin x=0 khi x=kπ, k∈Z."],["Lớp 11 • Lượng giác","Giá trị của cos 0 bằng?",["0","-1","1","1/2"],2,"cos 0=1."],["Lớp 11 • Hàm lượng giác","Hàm số y=sin x là hàm số?",["Tuần hoàn với chu kỳ 2π","Không tuần hoàn","Tuần hoàn với chu kỳ π/2","Đồng biến trên R"],0,"sin x có chu kỳ 2π."],["Lớp 11 • Dãy số","Dãy 2,5,8,11,... là cấp số cộng với công sai?",["2","3","5","8"],1,"Mỗi số sau hơn số trước 3 đơn vị nên d=3."],["Lớp 11 • Cấp số cộng","Số hạng thứ 10 của cấp số cộng u1=4, d=3 là?",["28","30","31","34"],2,"u10=u1+9d=4+27=31."],["Lớp 11 • Cấp số nhân","Dãy 3,6,12,24,... là cấp số nhân với công bội?",["2","3","6","4"],0,"Mỗi số sau gấp đôi số trước nên q=2."],["Lớp 11 • Cấp số nhân","Số hạng thứ 5 của cấp số nhân u1=2, q=3 là?",["18","54","162","81"],2,"u5=2·3^4=162 — ồ, đáp án đúng là C. Đây là câu kiểm tra nội dung."],["Lớp 11 • Giới hạn","lim(x→2) (x+3) bằng?",["2","3","5","6"],2,"Hàm đa thức liên tục nên thay x=2 được 5."],["Lớp 11 • Giới hạn","lim(n→∞) 1/n bằng?",["1","∞","0","-1"],2,"Khi n tăng vô hạn, 1/n tiến về 0."],["Lớp 11 • Đạo hàm","Đạo hàm của f(x)=x² là?",["x","2x","x²","2"],1,"(x²)'=2x."],["Lớp 11 • Đạo hàm","Đạo hàm của f(x)=3x+5 là?",["3","5","3x","8"],0,"Đạo hàm của ax+b là a, nên bằng 3."],["Lớp 11 • Tiếp tuyến","Hệ số góc tiếp tuyến của y=x² tại x=2 là?",["2","4","6","8"],1,"y'=2x, tại x=2 được y'=4."],["Lớp 11 • Đơn điệu","Hàm y=x³ có đạo hàm trên R là?",["3x²","x²","3x","x³"],0,"(x³)'=3x²."],["Lớp 11 • Mũ","2^3 bằng?",["6","8","9","12"],1,"2³=8."],["Lớp 11 • Logarit","log₂8 bằng?",["2","3","4","8"],1,"2³=8 nên log₂8=3."],["Lớp 11 • Lũy thừa","a^m·a^n bằng?",["a^(m-n)","a^(mn)","a^(m+n)","(a+b)^(m+n)"],2,"Cùng cơ số thì cộng số mũ."],["Lớp 11 • Tổ hợp","Số cách sắp xếp 4 học sinh thành một hàng là?",["8","12","16","24"],3,"Có 4!=24 hoán vị."],["Lớp 11 • Xác suất","Gieo một xúc xắc cân đối. Xác suất ra số lớn hơn 4 là?",["1/6","1/3","1/2","2/3"],1,"Các mặt 5,6 thuận lợi: 2/6=1/3."],["Lớp 11 • Xác suất","Hai biến cố A và B độc lập thì P(A∩B) bằng?",["P(A)+P(B)","P(A)-P(B)","P(A)P(B)","P(A)/P(B)"],2,"Với biến cố độc lập, P(A∩B)=P(A)P(B)."],["Lớp 11 • Hình học không gian","Hai đường thẳng trong không gian có thể?",["Chỉ cắt nhau","Chỉ song song","Cắt nhau, song song hoặc chéo nhau","Luôn trùng nhau"],2,"Trong không gian có ba vị trí cơ bản: cắt, song song, chéo nhau."],["Lớp 11 • Hình học không gian","Hai mặt phẳng song song có bao nhiêu điểm chung?",["0 điểm","1 điểm","2 điểm","Vô số điểm"],0,"Hai mặt phẳng phân biệt song song không có điểm chung."],["Lớp 11 • Vector","Nếu a=(2,-1,3) thì |a| bằng?",["√12","√14","√10","6"],1,"|a|=√(2²+(-1)²+3²)=√14."],["Lớp 11 • Phương trình","Phương trình 2x+1=7 có nghiệm?",["x=2","x=3","x=4","x=5"],1,"2x=6 nên x=3."],["Lớp 11 • Hình học","Nếu hai đường thẳng vuông góc trong không gian thì góc giữa chúng bằng?",["30°","45°","90°","180°"],2,"Theo định nghĩa, hai đường thẳng vuông góc tạo góc 90°."]];
-
-const LY_10_11_QUESTIONS = [["Lớp 10 • Chuyển động thẳng","Một xe đi đều với tốc độ 15 m/s trong 20 s. Quãng đường xe đi được là?",["300 m","35 m","75 m","150 m"],0,"s=vt=15·20=300 m."],["Lớp 10 • Vận tốc","Đổi 72 km/h ra m/s bằng?",["10 m/s","20 m/s","25 m/s","30 m/s"],1,"72 km/h = 72/3,6 = 20 m/s."],["Lớp 10 • Gia tốc","Một vật tăng vận tốc từ 5 m/s lên 17 m/s trong 4 s. Gia tốc trung bình là?",["2 m/s²","3 m/s²","4 m/s²","5 m/s²"],1,"a=(17-5)/4=3 m/s²."],["Lớp 10 • Rơi tự do","Bỏ qua lực cản không khí, vật rơi tự do gần mặt đất có gia tốc hướng?",["Ngang","Thẳng đứng xuống dưới","Thẳng đứng lên trên","Theo phương bất kỳ"],1,"Gia tốc trọng trường hướng thẳng đứng xuống dưới."],["Lớp 10 • Newton","Định luật I Newton còn gọi là định luật?",["Hấp dẫn","Quán tính","Bảo toàn năng lượng","Archimedes"],1,"Định luật I là định luật quán tính."],["Lớp 10 • Newton","Một lực 12 N tác dụng lên vật khối lượng 3 kg. Gia tốc của vật là?",["2 m/s²","3 m/s²","4 m/s²","36 m/s²"],2,"Theo F=ma, a=12/3=4 m/s²."],["Lớp 10 • Trọng lực","Trọng lượng của vật khối lượng 2 kg, lấy g=10 m/s², là?",["5 N","10 N","20 N","30 N"],2,"P=mg=2·10=20 N."],["Lớp 10 • Ma sát","Lực ma sát trượt có phương như thế nào so với vận tốc tương đối của hai bề mặt?",["Cùng chiều","Vuông góc","Ngược chiều","Không xác định"],2,"Ma sát trượt có phương tiếp tuyến và ngược chiều chuyển động tương đối."],["Lớp 10 • Công","Một lực 10 N cùng hướng chuyển động làm vật dịch chuyển 5 m. Công của lực là?",["2 J","15 J","50 J","100 J"],2,"A=Fs=10·5=50 J."],["Lớp 10 • Công suất","Một máy thực hiện công 600 J trong 20 s. Công suất là?",["20 W","30 W","40 W","120 W"],1,"P=A/t=600/20=30 W."],["Lớp 10 • Động năng","Vật m=2 kg chuyển động với v=3 m/s. Động năng bằng?",["3 J","6 J","9 J","18 J"],2,"Wđ=1/2·2·3²=9 J."],["Lớp 10 • Thế năng","Vật m=2 kg ở độ cao 5 m, g=10 m/s². Thế năng trọng trường là?",["10 J","50 J","100 J","200 J"],2,"Wt=mgh=2·10·5=100 J."],["Lớp 10 • Cơ năng","Nếu bỏ qua lực cản, cơ năng của vật trong trường trọng lực bảo toàn. Phát biểu này đúng vì?",["Động năng luôn bằng 0","Chỉ có lực thế thực hiện công","Khối lượng thay đổi","Gia tốc bằng 0"],1,"Trong trường hợp chỉ có lực thế như trọng lực, cơ năng được bảo toàn."],["Lớp 10 • Động lượng","Động lượng của vật khối lượng 4 kg chuyển động với 2 m/s là?",["2 kg·m/s","4 kg·m/s","6 kg·m/s","8 kg·m/s"],3,"p=mv=4·2=8 kg·m/s."],["Lớp 10 • Xung lượng","Xung lượng của lực không đổi được tính bằng?",["F/t","Ft","F+s","F/t²"],1,"Xung lượng của lực không đổi có độ lớn I=Ft."],["Lớp 10 • Bảo toàn động lượng","Hai vật va chạm trong hệ kín. Đại lượng nào được bảo toàn?",["Cơ năng trong mọi trường hợp","Động lượng của hệ","Động năng của từng vật","Tốc độ của từng vật"],1,"Trong hệ kín, tổng động lượng của hệ được bảo toàn."],["Lớp 10 • Chuyển động tròn","Trong chuyển động tròn đều, vectơ vận tốc có phương?",["Tiếp tuyến quỹ đạo","Hướng vào tâm","Hướng ra xa tâm","Luôn thẳng đứng"],0,"Vận tốc tức thời có phương tiếp tuyến với quỹ đạo."],["Lớp 10 • Chuyển động tròn","Công thức độ lớn gia tốc hướng tâm là?",["aht=v/r","aht=v²/r","aht=vr","aht=r/v²"],1,"Gia tốc hướng tâm aht=v²/r."],["Lớp 10 • Trọng lực","Gia tốc rơi tự do gần mặt đất có giá trị xấp xỉ?",["0,98 m/s²","9,8 m/s²","98 m/s²","980 m/s²"],1,"Gần mặt đất, g≈9,8 m/s²."],["Lớp 10 • Áp suất","Áp suất được định nghĩa là?",["Lực tác dụng trên một đơn vị diện tích","Khối lượng trên một đơn vị thể tích","Công trong một đơn vị thời gian","Vận tốc trên một đơn vị thời gian"],0,"p=F/S là áp lực trên một đơn vị diện tích."],["Lớp 10 • Khối lượng riêng","Một vật có khối lượng 2 kg và thể tích 0,5 m³. Khối lượng riêng là?",["1 kg/m³","2 kg/m³","4 kg/m³","8 kg/m³"],2,"ρ=m/V=2/0,5=4 kg/m³."],["Lớp 10 • Lực đẩy","Một vật nhúng trong chất lỏng chịu lực đẩy hướng nào?",["Thẳng đứng xuống","Nằm ngang","Thẳng đứng lên","Theo hướng chuyển động"],2,"Lực đẩy Archimedes có phương thẳng đứng, chiều từ dưới lên."],["Lớp 10 • Cân bằng","Một vật chịu hai lực cân bằng khi hai lực?",["Cùng chiều, khác độ lớn","Cùng độ lớn, cùng chiều","Cùng độ lớn, ngược chiều trên cùng đường tác dụng","Vuông góc nhau"],2,"Hai lực cân bằng có cùng độ lớn, ngược chiều và cùng đường tác dụng."],["Lớp 10 • Mômen","Mômen của lực đối với trục quay được tính bởi?",["M=F/d","M=Fd","M=F+d","M=F²d"],1,"Mômen lực có độ lớn M=F·d, với d là cánh tay đòn."],["Lớp 10 • Đòn bẩy","Muốn dùng đòn bẩy nâng vật nặng với lực nhỏ hơn, nên?",["Giảm cánh tay đòn của lực","Tăng cánh tay đòn của lực","Tăng trọng lượng vật","Đặt hai lực cùng chiều"],1,"Tăng cánh tay đòn của lực giúp giảm lực cần thiết khi mômen cân bằng."],["Lớp 11 • Điện tích","Hai điện tích cùng dấu đặt gần nhau sẽ?",["Hút nhau","Đẩy nhau","Không tương tác","Luôn đứng yên"],1,"Hai điện tích cùng dấu đẩy nhau."],["Lớp 11 • Định luật Coulomb","Độ lớn lực Coulomb giữa hai điện tích điểm trong chân không tỉ lệ với?",["Tích độ lớn hai điện tích và nghịch với bình phương khoảng cách","Tổng hai điện tích","Khoảng cách","Khối lượng điện tích"],0,"F=k|q1q2|/r²."],["Lớp 11 • Cường độ điện trường","Đơn vị SI của cường độ điện trường là?",["V","N/C","C/N","J"],1,"Cường độ điện trường có thể đo bằng N/C, tương đương V/m."],["Lớp 11 • Hiệu điện thế","Hiệu điện thế giữa hai điểm được liên hệ với công của lực điện theo công thức?",["U=A/q","U=Aq","U=q/A","U=F/q"],0,"U=A/q với A là công di chuyển điện tích q giữa hai điểm."],["Lớp 11 • Tụ điện","Điện dung của tụ điện được định nghĩa bởi?",["C=q/U","C=U/q","C=qU","C=q+U"],0,"C=q/U."],["Lớp 11 • Dòng điện","Cường độ dòng điện được tính bằng?",["I=qt","I=q/t","I=t/q","I=q+t"],1,"I=q/t, điện lượng qua tiết diện trong một đơn vị thời gian."],["Lớp 11 • Ohm","Định luật Ohm cho đoạn mạch chỉ chứa điện trở R là?",["I=UR","U=IR","R=UI","U=I/R"],1,"U=IR."],["Lớp 11 • Mạch nối tiếp","Trong mạch gồm các điện trở mắc nối tiếp, đại lượng nào giống nhau qua mọi điện trở?",["Hiệu điện thế","Cường độ dòng điện","Công suất","Điện trở"],1,"Mạch nối tiếp có cùng cường độ dòng điện qua các phần tử."],["Lớp 11 • Mạch song song","Trong mạch gồm các nhánh song song, đại lượng nào như nhau ở hai đầu mỗi nhánh?",["Cường độ dòng điện","Điện trở","Hiệu điện thế","Công suất"],2,"Các nhánh song song có cùng hiệu điện thế giữa hai đầu."],["Lớp 11 • Công suất điện","Công suất điện của thiết bị có hiệu điện thế U và dòng điện I là?",["P=U/I","P=UI","P=I/U","P=U+I"],1,"P=UI."],["Lớp 11 • Điện năng","Điện năng tiêu thụ của thiết bị công suất P hoạt động trong thời gian t là?",["A=Pt","A=P/t","A=t/P","A=P+t"],0,"Điện năng A=Pt."],["Lớp 11 • Nguồn điện","Nguồn điện có tác dụng chính là?",["Duy trì hiệu điện thế và cung cấp năng lượng cho mạch","Làm điện tích biến mất","Làm điện trở bằng 0","Chỉ làm dây nóng lên"],0,"Nguồn điện duy trì sự chênh lệch điện thế và cung cấp năng lượng cho mạch."],["Lớp 11 • Suất điện động","Đơn vị của suất điện động là?",["Ampere","Ohm","Volt","Coulomb"],2,"Suất điện động có đơn vị volt (V)."],["Lớp 11 • Từ trường","Từ trường tác dụng lực rõ rệt lên?",["Điện tích đứng yên trong mọi trường hợp","Nam châm và dòng điện","Chỉ vật cách điện","Chỉ chất lỏng"],1,"Từ trường tác dụng lực lên nam châm, dòng điện và điện tích chuyển động."],["Lớp 11 • Lực từ","Lực từ tác dụng lên đoạn dây có dòng điện trong từ trường có hướng thế nào?",["Song song với dây trong mọi trường hợp","Vuông góc với cả dòng điện và từ trường (khi không song song)","Luôn hướng theo dòng điện","Luôn hướng theo B"],1,"Lực từ vuông góc với phương dòng điện và cảm ứng từ trong cấu hình vuông góc."],["Lớp 11 • Cảm ứng điện từ","Hiện tượng xuất hiện dòng điện cảm ứng khi từ thông qua mạch biến thiên gọi là?",["Cảm ứng điện từ","Quang điện","Điện phân","Đối lưu"],0,"Đó là hiện tượng cảm ứng điện từ."],["Lớp 11 • Faraday","Suất điện động cảm ứng có độ lớn tỉ lệ với?",["Tốc độ biến thiên của từ thông qua mạch","Khối lượng vật","Điện trở bằng 0","Nhiệt độ phòng"],0,"Theo định luật Faraday, độ lớn suất điện động cảm ứng tỉ lệ với tốc độ biến thiên từ thông."],["Lớp 11 • Sóng cơ","Bước sóng λ liên hệ với vận tốc v và tần số f bởi?",["λ=vf","λ=v/f","λ=f/v","λ=v+f"],1,"v=λf nên λ=v/f."],["Lớp 11 • Giao thoa","Hai nguồn kết hợp muốn tạo giao thoa ổn định cần có?",["Cùng tần số và độ lệch pha không đổi theo thời gian","Khác tần số rất lớn","Biên độ luôn bằng 0","Không cần liên hệ pha"],0,"Hai nguồn kết hợp có cùng tần số và độ lệch pha không đổi."],["Lớp 11 • Dao động","Trong dao động điều hòa, tại vị trí cân bằng, tốc độ của vật có giá trị?",["Bằng 0","Lớn nhất","Không đổi bằng biên độ","Luôn âm"],1,"Tốc độ đạt giá trị lớn nhất khi vật qua vị trí cân bằng."],["Lớp 11 • Dao động","Chu kỳ dao động là?",["Thời gian thực hiện một dao động toàn phần","Số dao động trong một giây","Quãng đường đi trong một chu kỳ","Biên độ dao động"],0,"Chu kỳ T là thời gian để thực hiện một dao động toàn phần."],["Lớp 11 • Nhiệt học","Nhiệt lượng vật thu vào khi tăng nhiệt độ (không chuyển thể) được tính bởi?",["Q=mcΔt","Q=m/cΔt","Q=c/(mΔt)","Q=mc/t"],0,"Q=mcΔt."],["Lớp 11 • Chất khí","Ở thể tích không đổi, với một lượng khí xác định, áp suất tỉ lệ với?",["Nhiệt độ tuyệt đối","Khối lượng riêng của vật rắn","Diện tích bình","Màu sắc khí"],0,"V không đổi thì p/T là hằng số với lượng khí xác định."],["Lớp 11 • Bài tập điện","Một điện trở 6 Ω mắc vào nguồn 12 V. Cường độ dòng điện qua điện trở là?",["0,5 A","1 A","2 A","72 A"],2,"I=U/R=12/6=2 A."],["Lớp 11 • Bài tập công suất","Một thiết bị 220 V dùng dòng điện 2 A. Công suất điện của thiết bị là?",["110 W","220 W","440 W","880 W"],2,"P=UI=220·2=440 W."]];
 
 const HOA_QUESTIONS = [
   ["pH", "Dung dịch có pH < 7 thường có tính gì?", ["Axit", "Bazơ", "Trung tính", "Muối"], 0, "pH nhỏ hơn 7 thường biểu thị môi trường axit."],
@@ -455,466 +299,341 @@ const MEO_QUESTIONS = [
   ["Câu đố", "Càng lấy đi nhiều thì nó càng lớn là gì?", ["Cái hố", "Cái túi", "Cái hộp", "Đống sách"], 0, "Càng đào lấy đất thì cái hố càng lớn."],
 ];
 
-const varyQuestionChoices = (choices, answer, seed=0) => {
-  const list = [...choices];
-  const shift = ((seed % list.length) + list.length) % list.length;
-  const reordered = list.map((_, idx) => list[(idx - shift + list.length) % list.length]);
-  return {
-    choices: reordered,
-    answer: (answer + shift) % list.length
-  };
-};
 
-const toQuestions = (subject, key, rows) =>
-  rows.map((r, i) => {
-    const varied = varyQuestionChoices(r[2], r[3], i + key.length);
-    return {
-      id: `${key}${String(i + 1).padStart(2, "0")}`,
-      subject,
-      topic: r[0],
-      q: r[1],
-      choices: varied.choices,
-      answer: varied.answer,
-      explanation: r[4],
-    };
-  });
-
-const MODAL_VERB_QUESTIONS = [
-  ["Modal Verbs • can","I ___ swim when I was five.",["can","could","may","must"],1,"Use 'could' to talk about a general ability in the past."],
-  ["Modal Verbs • can","___ you help me carry these books?",["Can","Must","Should","Might"],0,"'Can you...?' is a common way to make a request."],
-  ["Modal Verbs • can","You ___ use my laptop if you need it.",["can","must","should","would"],0,"'Can' can express permission."],
-  ["Modal Verbs • can","It ___ be very cold here in winter.",["can","must","has to","ought"],0,"'Can' can describe a general possibility."],
-  ["Modal Verbs • can't","You ___ park here; it is for buses only.",["can't","should","may","would"],0,"'Can't' expresses prohibition."],
-  ["Modal Verbs • could","When I was young, I ___ run 10 km without stopping.",["could","can","may","must"],0,"'Could' expresses past ability."],
-  ["Modal Verbs • could","___ I borrow your pen, please?",["Could","Must","Need","Shall"],0,"'Could I...?' is a polite request for permission."],
-  ["Modal Verbs • could","The problem ___ be solved with a simpler method.",["could","must","has to","ought"],0,"'Could' can express a possible solution."],
-  ["Modal Verbs • could","We ___ go to the museum this afternoon if it stops raining.",["could","must","need","shall"],0,"'Could' can express a possible plan."],
-  ["Modal Verbs • could have","She ___ have missed the train; she arrived very late.",["could","must","should","shall"],0,"'Could have' can express a past possibility."],
-  ["Modal Verbs • may","___ I come in, teacher?",["May","Must","Would","Ought"],0,"'May I...?' is a formal request for permission."],
-  ["Modal Verbs • may","Students ___ use calculators in this test.",["may","must","should","would"],0,"'May' can give permission."],
-  ["Modal Verbs • may","It ___ rain tonight, so take an umbrella.",["may","must","has to","ought"],0,"'May' expresses possibility."],
-  ["Modal Verbs • may","You ___ be right about the answer.",["may","must","need","shall"],0,"'May' can show that something is possible."],
-  ["Modal Verbs • might","We ___ be late because of the traffic.",["might","must","can","shall"],0,"'Might' expresses a weaker possibility."],
-  ["Modal Verbs • might","He ___ come to the party, but he is not sure.",["might","has to","must","should"],0,"'Might' expresses uncertainty."],
-  ["Modal Verbs • might","I thought you ___ know the answer.",["might","must","have to","shall"],0,"'Might' can express a tentative possibility."],
-  ["Modal Verbs • might have","They ___ have taken the wrong road.",["might","should","must","can"],0,"'Might have + past participle' expresses a past possibility."],
-  ["Modal Verbs • must","You ___ wear a seat belt in a car.",["must","might","could","would"],0,"'Must' expresses strong obligation."],
-  ["Modal Verbs • must","I ___ finish this report before 5 p.m.",["must","may","could","would"],0,"'Must' expresses a strong requirement."],
-  ["Modal Verbs • must","You ___ not touch that wire; it is dangerous.",["must","could","would","might"],0,"'Must not' expresses a strong prohibition."],
-  ["Modal Verbs • must","She ___ be exhausted after working all night.",["must","can","may","would"],0,"'Must' can express a strong deduction."],
-  ["Modal Verbs • must have","The lights are on, so they ___ be at home.",["must","could","might","should"],0,"'Must be' expresses a strong present deduction."],
-  ["Modal Verbs • must have","He left at 6 a.m., so he ___ have arrived by now.",["must","can","might","would"],0,"'Must have + past participle' expresses a strong deduction about the past."],
-  ["Modal Verbs • have to","I ___ go to school tomorrow because we have an exam.",["have to","might","could","would"],0,"'Have to' expresses external obligation."],
-  ["Modal Verbs • have to","She ___ wear a uniform at her school.",["has to","may","could","would"],0,"'Has to' expresses an obligation."],
-  ["Modal Verbs • have to","Do we ___ bring our own food?",["have to","must to","should to","can to"],0,"After 'do', use 'have to' to express obligation."],
-  ["Modal Verbs • don't have to","You ___ bring a towel; the hotel provides one.",["don't have to","mustn't","couldn't","can't"],0,"'Don't have to' means it is not necessary."],
-  ["Modal Verbs • doesn't have to","Tom ___ work on Sundays.",["doesn't have to","mustn't","can't","shouldn't to"],0,"'Doesn't have to' means there is no obligation."],
-  ["Modal Verbs • had to","We ___ leave early because the last bus was at 9 p.m.",["had to","must","could","may"],0,"'Had to' is the past form of 'have to' for past obligation."],
-  ["Modal Verbs • had to","She ___ cancel the trip because she was ill.",["had to","might","would","can"],0,"'Had to' expresses a past necessity."],
-  ["Modal Verbs • should","You ___ drink more water every day.",["should","mustn't","can","would"],0,"'Should' is used to give advice."],
-  ["Modal Verbs • should","We ___ leave now if we want to catch the train.",["should","may","could","would"],0,"'Should' can give advice or a recommendation."],
-  ["Modal Verbs • should","You ___ apologize for being rude.",["should","might","can","shall"],0,"'Should' expresses what is advisable."],
-  ["Modal Verbs • should","The package ___ arrive tomorrow.",["should","mustn't","can't","wouldn't"],0,"'Should' can express an expectation."],
-  ["Modal Verbs • shouldn't","You ___ eat so much fast food.",["shouldn't","must","may","can"],0,"'Shouldn't' gives negative advice."],
-  ["Modal Verbs • shouldn't","We ___ ignore the teacher's instructions.",["shouldn't","could","might","will"],0,"'Shouldn't' means something is not advisable."],
-  ["Modal Verbs • should have","You ___ have told me earlier.",["should","can","must","may"],0,"In 'should have + past participle', 'should' expresses past advice or regret."],
-  ["Modal Verbs • should have","He ___ have studied more for the test.",["should","might","can","will"],0,"'Should have studied' expresses what was advisable in the past but did not happen."],
-  ["Modal Verbs • ought to","You ___ respect your parents.",["ought to","can","might","mustn't"],0,"'Ought to' is used for advice or moral duty."],
-  ["Modal Verbs • ought to","We ___ be more careful next time.",["ought to","would","may","can't"],0,"'Ought to' means something is advisable or expected."],
-  ["Modal Verbs • ought to","The students ___ arrive before 7:30.",["ought to","could","might","would"],0,"'Ought to' can express expectation."],
-  ["Modal Verbs • would","___ you like some tea?",["Would","Must","Need","Could to"],0,"'Would you like...?' is a polite offer."],
-  ["Modal Verbs • would","When we were children, we ___ play outside every evening.",["would","must","may","can"],0,"'Would' can describe repeated past habits."],
-  ["Modal Verbs • would","I ___ help you if I had more time.",["would","must","may","can"],0,"'Would' is used in the main clause of a second conditional."],
-  ["Modal Verbs • would","___ you mind closing the window?",["Would","Must","Shall","Need"],0,"'Would you mind...?' is a polite request."],
-  ["Modal Verbs • wouldn't","My old computer ___ start this morning.",["wouldn't","mustn't","shouldn't","can't"],0,"'Wouldn't' can describe refusal or failure to operate in the past."],
-  ["Modal Verbs • will","I ___ call you when I arrive.",["will","might","mustn't","could"],0,"'Will' expresses a future decision or promise."],
-  ["Modal Verbs • will","Don't worry. I ___ help you with the project.",["will","may","could","shouldn't"],0,"'Will' can express a willingness to help."],
-  ["Modal Verbs • will","If it rains, the match ___ be cancelled.",["will","could have","mustn't","would have"],0,"In the first conditional, use 'will' in the result clause."],
-  ["Modal Verbs • won't","The door ___ open. It must be locked.",["won't","shouldn't","may not","couldn't"],0,"'Won't' can describe something refusing or failing to operate."],
-  ["Modal Verbs • shall","___ we start the meeting now?",["Shall","Must","Could to","May not"],0,"'Shall we...?' is used to make a suggestion."],
-  ["Modal Verbs • shall","___ I carry that bag for you?",["Shall","Would","Must","Ought"],0,"'Shall I...?' can offer help or ask for instructions."],
-  ["Modal Verbs • need","You ___ bring a pen; there are plenty here.",["needn't","mustn't","can't","couldn't"],0,"'Needn't' means something is not necessary."],
-  ["Modal Verbs • needn't","You ___ worry about the results yet.",["needn't","must","should to","can to"],0,"'Needn't' expresses lack of necessity."],
-  ["Modal Verbs • needn't have","You ___ have bought more food; we already had enough.",["needn't","mustn't","can't","wouldn't"],0,"'Needn't have + past participle' means the action was unnecessary but happened."],
-  ["Modal Verbs • be able to","After months of practice, she ___ play the piano very well.",["is able to","must to","may to","should to"],0,"'Be able to' expresses ability."],
-  ["Modal Verbs • be able to","Will you ___ finish the work by Friday?",["be able to","must","can to","should"],0,"After 'will', use 'be able to' for future ability."],
-  ["Modal Verbs • be able to","He wasn't ___ attend the meeting yesterday.",["able to","can","could to","must to"],0,"After 'wasn't', use 'able to' to express inability."],
-  ["Modal Verbs • permission","Visitors ___ not enter this area without a badge.",["may","could","would","should"],0,"'May not' can express a formal prohibition."],
-  ["Modal Verbs • permission","You ___ leave early today if you finish your work.",["may","must","shouldn't","wouldn't"],0,"'May' can give permission."],
-  ["Modal Verbs • prohibition","Employees ___ use their phones during the safety briefing.",["mustn't","might","could","would"],0,"'Mustn't' expresses prohibition."],
-  ["Modal Verbs • prohibition","You ___ tell anyone this password.",["mustn't","may","should","can"],0,"'Mustn't' means you are not allowed to do it."],
-  ["Modal Verbs • possibility","It ___ snow in the mountains tonight.",["might","must","has to","shouldn't"],0,"'Might' expresses possibility."],
-  ["Modal Verbs • possibility","Anyone ___ make a mistake sometimes.",["can","must","shall","would"],0,"'Can' can describe a general possibility."],
-  ["Modal Verbs • deduction","The ground is wet. It ___ have rained.",["must","can","shouldn't","would"],0,"'Must have + past participle' expresses a strong deduction about the past."],
-  ["Modal Verbs • deduction","She isn't answering her phone. She ___ be asleep.",["might","mustn't","can't to","would"],0,"'Might be' expresses a possible explanation."],
-  ["Modal Verbs • deduction","That ___ be John's car; he sold his car last week.",["can't","should","may","would"],0,"'Can't be' expresses a strong belief that something is impossible."],
-  ["Modal Verbs • can't have","They arrived at 10:00. They ___ have seen the announcement at 9:30.",["couldn't","must","should","may"],0,"'Couldn't have + past participle' expresses an impossible past situation."],
-  ["Modal Verbs • advice","If you have a headache, you ___ rest.",["should","mustn't","couldn't","would"],0,"'Should' is commonly used for advice."],
-  ["Modal Verbs • advice","You ___ see a doctor if the pain continues.",["should","may","can","would"],0,"'Should' gives advice."],
-  ["Modal Verbs • advice","We ___ leave a little earlier to avoid traffic.",["should","might","mustn't","can't"],0,"'Should' suggests a sensible action."],
-  ["Modal Verbs • obligation","All passengers ___ show their tickets before boarding.",["must","could","might","would"],0,"'Must' expresses a strong rule or obligation."],
-  ["Modal Verbs • obligation","You ___ submit the form by Friday.",["have to","may","could","would"],0,"'Have to' expresses an obligation."],
-  ["Modal Verbs • obligation","We ___ wear helmets on this construction site.",["have to","might","can","would"],0,"'Have to' expresses an external safety requirement."],
-  ["Modal Verbs • no necessity","You ___ pay now; payment can be made next week.",["don't have to","mustn't","can't","shouldn't"],0,"'Don't have to' means payment is not necessary now."],
-  ["Modal Verbs • no necessity","She ___ come with us if she is busy.",["doesn't have to","mustn't","can't","shouldn't to"],0,"'Doesn't have to' expresses lack of obligation."],
-  ["Modal Verbs • past ability","Before the accident, he ___ drive for eight hours without a break.",["could","can","may","must"],0,"'Could' expresses ability in the past."],
-  ["Modal Verbs • past permission","When I was a child, I ___ stay up late on Saturdays.",["could","must","should","may"],0,"'Could' can describe past permission in context."],
-  ["Modal Verbs • polite request","___ you please send me the file again?",["Could","Must","Shall","Need"],0,"'Could you...?' is a polite request."],
-  ["Modal Verbs • polite request","___ you mind opening the door?",["Would","Must","May","Shall"],0,"'Would you mind...?' is a polite request."],
-  ["Modal Verbs • offer","___ I get you a glass of water?",["Shall","Must","Should to","Might not"],0,"'Shall I...?' can be used to offer help."],
-  ["Modal Verbs • suggestion","___ we order pizza tonight?",["Shall","Must","Need","Could to"],0,"'Shall we...?' is a common suggestion."],
-  ["Modal Verbs • conditional","If I were you, I ___ study a little every day.",["would","must","can","may"],0,"'Would' is used in the second conditional."],
-  ["Modal Verbs • conditional","If she had more time, she ___ learn another language.",["would","must","can","shall"],0,"'Would' is the usual result-clause modal in a second conditional."],
-  ["Modal Verbs • conditional","If you ask him, he ___ help you.",["may","mustn't","would have","shouldn't"],0,"'May' expresses a possible result."],
-  ["Modal Verbs • conditional","If we leave now, we ___ catch the 7:00 train.",["can","mustn't","would have","might not to"],0,"'Can' can express possibility or opportunity in a conditional sentence."],
-  ["Modal Verbs • past regret","I ___ have listened to your advice.",["should","must","can","may"],0,"'Should have + past participle' can express regret."],
-  ["Modal Verbs • past possibility","He ___ have left before we arrived.",["may","mustn't","should to","can"],0,"'May have + past participle' expresses a past possibility."],
-  ["Modal Verbs • past possibility","She ___ have forgotten the meeting.",["might","mustn't","can to","shall"],0,"'Might have + past participle' expresses a past possibility."],
-  ["Modal Verbs • past deduction","The exam was easy, so they ___ have finished early.",["must","can't","shouldn't","wouldn't"],0,"'Must have finished' is a strong deduction about the past."],
-  ["Modal Verbs • past impossibility","He was in London that day, so he ___ have attended the meeting in Hanoi.",["couldn't","must","should","may"],0,"'Couldn't have + past participle' expresses an impossible past event."],
-  ["Modal Verbs • grammar","Which sentence is correct?",["She can sings.","She can sing.","She cans sing.","She can to sing."],1,"A modal verb is followed by the base form of the verb: 'can sing'."],
-  ["Modal Verbs • grammar","Which sentence is correct?",["He must to leave now.","He must leaves now.","He must leave now.","He must leaving now."],2,"After 'must', use the base form: 'must leave'."],
-  ["Modal Verbs • grammar","Which sentence is correct?",["You should to study.","You should studying.","You should studied.","You should study."],3,"After 'should', use the base form: 'should study'."],
-  ["Modal Verbs • grammar","Which sentence is correct?",["They might come later.","They might comes later.","They might to come later.","They might coming later."],0,"After 'might', use the base form: 'might come'."],
-  ["Modal Verbs • grammar","Choose the correct negative form: 'He ___ drive because he is too young.'",["mustn't","mustn't to","doesn't must","must not to"],0,"The correct negative modal form is 'mustn't'."],
-  ["Modal Verbs • grammar","Choose the correct question: '___ I open the window?'",["May","May to","Am may","Do may"],0,"Use 'May I + base verb?' to ask for permission."],
-  ["Modal Verbs • grammar","Choose the correct sentence.",["Does she can swim?","Can she swim?","Can she swims?","Can does she swim?"],1,"Questions with 'can' use inversion: 'Can she swim?'"],
-  ["Modal Verbs • grammar","Choose the correct sentence.",["Do you should go now?","Should you to go now?","Should you go now?","Should do you go now?"],2,"With 'should', form the question as 'Should + subject + base verb?'"]
+const HSK4_QUESTIONS = [
+  ["词汇", "“安排”最接近下面哪个意思？", ["计划并确定", "马上离开", "认真批评", "突然发现"], 0, "安排表示对事情进行计划、布置和确定。"],
+  ["词汇", "“丰富”最接近下面哪个意思？", ["内容多、种类多", "速度很慢", "价格很低", "距离很远"], 0, "丰富表示种类、内容或数量很多。"],
+  ["词汇", "“适合”最接近下面哪个意思？", ["合适、符合需要", "特别便宜", "马上完成", "非常危险"], 0, "适合表示符合某人的情况或需要。"],
+  ["词汇", "“负责”最接近下面哪个意思？", ["承担责任", "得到奖励", "改变计划", "提出问题"], 0, "负责表示承担某项工作或责任。"],
+  ["词汇", "“及时”最接近下面哪个意思？", ["在需要的时候马上做", "每天重复做", "提前很多年", "慢慢地做"], 0, "及时强调在合适、需要的时候迅速处理。"],
+  ["词汇", "“耐心”最接近下面哪个意思？", ["能够不着急地坚持", "非常喜欢竞争", "容易感到害怕", "总是改变意见"], 0, "耐心表示做事不急躁，能够坚持。"],
+  ["词汇", "“顺便”最接近下面哪个意思？", ["做一件事时另外做另一件相关的事", "专门花很多时间做", "完全不想做", "重新开始做"], 0, "顺便表示在做主要事情时同时做另一件事。"],
+  ["词汇", "“估计”最接近下面哪个意思？", ["根据情况推测", "亲自证明", "完全忘记", "马上拒绝"], 0, "估计表示根据已有情况进行推测。"],
+  ["词汇", "“提供”最接近下面哪个意思？", ["给别人需要的东西或条件", "把东西藏起来", "拒绝帮助别人", "把东西弄坏"], 0, "提供表示把需要的东西、信息或条件给别人。"],
+  ["词汇", "“区别”最接近下面哪个意思？", ["不同之处", "共同目标", "最后结果", "工作机会"], 0, "区别表示两个或多个事物之间的不同。"],
+  ["语法", "我已经等了你半个小时，你怎么还____？", ["没来", "不来过", "没有来着", "来不了过"], 0, "表示到现在仍然没有来，用“还没来”最自然。"],
+  ["语法", "他每天____七点开始上班。", ["在", "从", "到", "把"], 0, "“在七点开始上班”表示动作开始的时间。"],
+  ["语法", "如果明天下雨，我们____在家学习。", ["就", "才", "再", "又"], 0, "“如果……就……”表示条件关系。"],
+  ["语法", "这件衣服太贵了，____便宜一点儿？", ["能不能", "是不是", "有没有", "会不会"], 0, "“能不能便宜一点儿”用于礼貌地询问能否降价。"],
+  ["语法", "她不仅会说汉语，____会说英语。", ["还", "才", "就", "又"], 0, "“不仅……还……”表示递进关系。"],
+  ["语法", "我把作业____老师了。", ["交给", "经过", "来自", "关于"], 0, "“把作业交给老师”是常见搭配。"],
+  ["语法", "会议____下午三点开始。", ["将在", "已经是", "刚才把", "一直被"], 0, "“将在”表示将来的时间或安排。"],
+  ["语法", "他汉语说得____流利。", ["非常", "很地", "得很地", "是地"], 0, "“说得非常流利”中“非常”修饰“流利”。"],
+  ["语法", "我昨天买____一本很有意思的小说。", ["了", "着", "过", "得"], 0, "“买了一本”表示动作已经完成。"],
+  ["语法", "她一边听音乐，____做作业。", ["一边", "又", "才", "只"], 0, "“一边……一边……”表示两个动作同时进行。"],
+  ["阅读", "小王每天坐地铁上班。他觉得坐地铁很方便，因为不用担心堵车。根据短文，小王为什么喜欢坐地铁？", ["因为比较方便", "因为可以开车", "因为票很贵", "因为离公司很远"], 0, "短文直接说明坐地铁方便，而且不用担心堵车。"],
+  ["阅读", "李老师周末喜欢做饭。星期六上午，他去市场买了鱼、蔬菜和水果，下午在家做了一顿晚饭。李老师星期六下午做什么？", ["在家做饭", "去学校上课", "去旅行", "去看电影"], 0, "短文说下午他在家做了一顿晚饭。"],
+  ["阅读", "小张最近工作很忙，所以每天晚上都会提前安排第二天的事情。这样做让他觉得工作更有条理。提前安排有什么好处？", ["让工作更有条理", "让工作更困难", "让每天睡得更晚", "让事情越来越少"], 0, "短文最后指出这样做让工作更有条理。"],
+  ["阅读", "王老师提醒学生，考试前不要只看书，还应该保证充足的睡眠。根据这句话，考试前学生还应该注意什么？", ["睡眠", "买新书", "减少吃饭", "每天旅行"], 0, "王老师特别提醒要保证充足的睡眠。"],
+  ["阅读", "这家餐厅中午十二点开始营业，晚上九点结束营业。小陈晚上八点半到餐厅吃饭，他还能进去吗？", ["可以", "不可以", "只有周末可以", "只有老板同意才可以"], 0, "晚上八点半还没有到九点，餐厅仍在营业。"],
+  ["阅读", "小美搬到新城市以后，主动参加社区活动，很快认识了很多新朋友。她是怎么认识新朋友的？", ["参加社区活动", "每天待在家里", "换了工作", "买了新房子"], 0, "短文明确说她主动参加社区活动，因此认识了很多朋友。"],
+  ["阅读", "医生告诉小赵，感冒以后应该多喝水、多休息。如果发烧严重，就应该及时去医院。根据医生的建议，发烧严重时应该怎么办？", ["及时去医院", "继续熬夜", "少喝水", "马上运动"], 0, "医生建议发烧严重时及时去医院。"],
+  ["阅读", "小刘原来每天开车上班，后来为了保护环境，他开始骑自行车。虽然路上花的时间多了一点，但是他觉得身体更健康了。小刘为什么开始骑自行车？", ["为了保护环境", "为了买新车", "因为公司要求", "因为自行车更快"], 0, "短文明确说明他为了保护环境开始骑自行车。"],
+  ["阅读", "学校下周举办中文演讲比赛，报名截止时间是星期五下午五点。小林星期五下午四点半报名，他能参加比赛吗？", ["能", "不能", "只能明年参加", "必须星期四报名"], 0, "四点半还早于五点，仍在报名截止时间之前。"],
+  ["阅读", "天气预报说明天上午有大雨，因此学校把户外活动改到了体育馆。学校为什么改变活动地点？", ["因为可能下大雨", "因为体育馆关闭", "因为学生太少", "因为天气很热"], 0, "天气预报说明上午有大雨，所以活动改到室内。"],
+  ["词汇", "“建议”最接近下面哪个意思？", ["提出意见供别人参考", "命令别人必须做", "忘记以前的事情", "拒绝别人帮助"], 0, "建议是提出意见或办法供别人参考。"],
+  ["词汇", "“继续”最接近下面哪个意思？", ["接着做下去", "马上停止", "重新购买", "提前结束"], 0, "继续表示不中断，接着进行。"],
+  ["词汇", "“准确”最接近下面哪个意思？", ["正确而没有明显误差", "速度非常快", "声音很大", "价格很高"], 0, "准确表示正确、没有明显误差。"],
+  ["词汇", "“复杂”最接近下面哪个意思？", ["内容多而不简单", "非常容易", "距离很近", "颜色很淡"], 0, "复杂表示情况或结构比较多，不简单。"],
+  ["语法", "你吃完饭____给我打电话吧。", ["以后", "以前", "之间", "附近"], 0, "“……以后”表示某个动作完成之后。"],
+  ["语法", "他跑得太快了，我____不上他。", ["追", "被", "把", "向"], 0, "“追不上”表示无法追到。"],
+  ["语法", "这本书____我借给你的，你看完了吗？", ["是", "被", "把", "让"], 0, "“这本书是我借给你的”使用“是……的”结构说明动作关系。"],
+  ["语法", "虽然今天很冷，____他还是去跑步了。", ["但是", "所以", "因为", "或者"], 0, "“虽然……但是……”表示转折关系。"],
+  ["语法", "只要你认真学习，____一定会有进步。", ["就", "才", "又", "再"], 0, "“只要……就……”表示条件关系。"],
+  ["词汇", "“经历”通常指什么？", ["亲身经历过的事情", "未来的计划", "别人送的礼物", "没有发生的故事"], 0, "经历可以指亲身体验过的事情，也可作动词表示亲身经过。"],
+  ["词汇", "“熟悉”最接近下面哪个意思？", ["了解得比较多", "完全不知道", "特别害怕", "马上忘记"], 0, "熟悉表示对人或事物了解得比较多。"],
+  ["词汇", "“减少”最接近下面哪个意思？", ["变少", "变大", "变快", "变亮"], 0, "减少表示数量、程度等变少。"],
+  ["词汇", "“及时”与哪个词意思相反？", ["拖延", "马上", "按时", "尽快"], 0, "拖延表示把事情往后推，与及时相反。"],
+  ["语法", "他已经三年没有____北京了。", ["去过", "去着", "去得", "去了过"], 0, "“三年没有去过北京”表示过去到现在没有这样的经历。"],
+  ["语法", "老师让我们____教室里安静地读书。", ["在", "从", "被", "把"], 0, "地点“教室里”前使用“在”。"],
+  ["语法", "请你____这件事告诉我。", ["把", "被", "从", "向"], 0, "“把这件事告诉我”是典型的把字句。"],
+  ["语法", "他今天没有来，____生病了。", ["可能", "一定是", "只要", "虽然"], 0, "“可能”表示推测，语气比“一定”弱。"],
+  ["阅读", "小陈发现自己的汉字写得不太好，所以每天晚上练习二十分钟。一个月以后，他的字明显漂亮了。小陈为什么每天练字？", ["因为汉字写得不太好", "因为考试已经结束", "因为朋友要求", "因为没有别的事情"], 0, "他发现自己的汉字写得不好，所以坚持练习。"],
+  ["阅读", "公司规定员工上班时间是上午九点。小王今天八点四十分到公司，先喝了一杯咖啡，然后开始工作。他是否迟到？", ["没有迟到", "迟到了", "下午才知道", "无法判断"], 0, "八点四十分早于九点，因此没有迟到。"],
+  ["阅读", "小周准备旅行时，不但带了衣服，还提前查了天气和交通情况。这样可以让旅行更加顺利。小周为什么提前查这些信息？", ["让旅行更加顺利", "为了取消旅行", "为了买更多衣服", "为了晚一点出发"], 0, "提前了解天气和交通有助于顺利旅行。"],
 ];
+
+const HSK5_QUESTIONS = [
+  ["词汇", "“承担”最接近下面哪个意思？", ["接受并负责某项任务或责任", "把事情完全忘记", "拒绝所有帮助", "马上离开某地"], 0, "承担表示接受并负责某项责任、任务或费用。"],
+  ["词汇", "“促进”最接近下面哪个意思？", ["推动某事发展", "阻止某事发生", "隐藏重要信息", "降低所有价格"], 0, "促进表示推动事物向前发展。"],
+  ["词汇", "“维持”最接近下面哪个意思？", ["使某种状态继续保持", "彻底改变", "马上结束", "重新开始"], 0, "维持表示使某种状态继续存在。"],
+  ["词汇", "“逐渐”最接近下面哪个意思？", ["慢慢地发生变化", "突然发生", "从来没有发生", "故意停止"], 0, "逐渐表示变化一步一步地发生。"],
+  ["词汇", "“显著”最接近下面哪个意思？", ["明显而突出", "非常隐蔽", "完全相同", "没有意义"], 0, "显著表示非常明显、突出。"],
+  ["词汇", "“忽视”最接近下面哪个意思？", ["不注意、不重视", "认真研究", "积极帮助", "及时发现"], 0, "忽视表示没有注意或没有重视。"],
+  ["词汇", "“采取措施”中的“措施”最接近什么？", ["为解决问题而采取的办法", "天气变化", "个人爱好", "旅行路线"], 0, "措施是为解决问题或达到目的而采取的方法。"],
+  ["词汇", "“具备”最接近下面哪个意思？", ["具有某种条件或能力", "暂时失去", "主动放弃", "马上借给别人"], 0, "具备表示已经具有某种条件、能力或资格。"],
+  ["词汇", "“稳定”最接近下面哪个意思？", ["保持相对平稳、不容易变化", "变化特别快", "完全无法控制", "突然消失"], 0, "稳定表示状态平稳，不容易发生大的变化。"],
+  ["词汇", "“现象”最接近下面哪个意思？", ["可以观察到的事情或表现", "秘密计划", "个人姓名", "未来收入"], 0, "现象指可以观察到的事情、状态或表现。"],
+  ["语法", "他明明知道答案，____故意不说。", ["却", "因此", "否则", "于是"], 0, "“明明……却……”表示事实与预期相反。"],
+  ["语法", "这项工作看起来很简单，实际上比我们想象的____复杂。", ["要", "才", "被", "向"], 0, "“比……要……”可以表示比较中的程度。"],
+  ["语法", "____天气不好，比赛还是按计划举行了。", ["尽管", "由于", "既然", "只要"], 0, "“尽管……还是……”表示让步关系。"],
+  ["语法", "他为了提高效率，____每天早上提前半小时到办公室。", ["宁可", "索性", "干脆", "决定"], 3, "“决定每天早到”表示作出决定。"],
+  ["语法", "与其坐在这里抱怨，____想办法解决问题。", ["不如", "否则", "甚至", "以免"], 0, "“与其……不如……”用于比较两种选择。"],
+  ["语法", "他不仅完成了任务，____主动帮助了其他同事。", ["而且", "反而", "否则", "尽管"], 0, "“不仅……而且……”表示递进。"],
+  ["语法", "为了避免____误会，我们最好把情况解释清楚。", ["产生", "得到", "接受", "通过"], 0, "“产生误会”是常见搭配。"],
+  ["语法", "这件事一旦决定下来，____不能轻易改变。", ["就", "才", "再", "又"], 0, "“一旦……就……”表示条件一出现，结果随之发生。"],
+  ["语法", "他把报告修改了好几遍，____达到要求。", ["直到", "由于", "即使", "除非"], 0, "“直到达到要求”表示动作持续到某个结果出现。"],
+  ["语法", "她宁愿自己辛苦一点儿，____给别人增加麻烦。", ["也不", "而且", "所以", "甚至"], 0, "“宁愿……也不……”表示选择前者而拒绝后者。"],
+  ["阅读", "近年来，越来越多的人选择线上学习。它不受地点限制，学生可以根据自己的时间安排课程。不过，线上学习也要求学生有较强的自律能力。根据短文，线上学习有什么要求？", ["需要较强的自律能力", "必须每天去学校", "不能自己安排时间", "只能在晚上学习"], 0, "短文最后指出线上学习要求学生有较强的自律能力。"],
+  ["阅读", "某公司调查发现，员工午休后工作效率通常会有所提高。因此，公司决定适当延长午休时间。公司为什么这样决定？", ["因为午休有助于提高工作效率", "因为员工不愿意工作", "因为公司没有工作", "因为下午不用上班"], 0, "调查发现午休后工作效率提高，因此公司延长午休。"],
+  ["阅读", "研究人员发现，城市绿地不仅能够改善空气质量，还能为居民提供休闲空间。因此，一些城市开始增加公园和公共绿地。根据短文，城市为什么增加绿地？", ["因为绿地有多种作用", "因为绿地会减少休闲活动", "因为居民不喜欢公园", "因为空气质量不重要"], 0, "绿地可以改善空气质量并提供休闲空间，因此城市增加绿地。"],
+  ["阅读", "小赵毕业后没有马上找工作，而是花了半年时间学习数据分析。半年后，他成功进入一家互联网公司。根据短文，小赵为什么花时间学习数据分析？", ["为了提高就业能力", "为了推迟毕业", "因为公司要求他辞职", "为了减少学习时间"], 0, "结合结果可以看出，他通过学习数据分析提升就业能力。"],
+  ["阅读", "虽然这家书店面积不大，但是书籍分类非常清楚，而且工作人员服务热情，所以每天都有不少顾客。书店为什么有不少顾客？", ["分类清楚且服务热情", "面积非常大", "书籍特别少", "工作人员很少"], 0, "短文列出了书籍分类清楚和服务热情两个原因。"],
+  ["阅读", "专家指出，运动并不一定要进行很长时间，关键是保持规律。每周进行几次适量运动，也能给身体带来积极影响。专家强调什么？", ["运动应该保持规律", "运动必须持续几个小时", "只有高强度运动才有效", "运动次数越少越好"], 0, "专家强调的重点是规律运动，而不是一次运动很长时间。"],
+  ["阅读", "由于今年夏天气温较高，城市用电量明显增加。为了保证居民正常用电，当地电力部门呼吁大家合理使用空调。根据短文，电力部门为什么提出建议？", ["因为高温导致用电量增加", "因为居民没有空调", "因为冬天气温下降", "因为电价完全不变"], 0, "高温导致用电量增加，因此电力部门呼吁合理用电。"],
+  ["阅读", "小林原本计划周末去爬山，但出发前发现天气预报有暴雨，于是改成去博物馆。他改变计划的主要原因是什么？", ["天气可能有暴雨", "博物馆距离更远", "朋友不喜欢爬山", "他忘了带鞋"], 0, "暴雨预报使他放弃户外爬山，改去博物馆。"],
+  ["阅读", "一项调查显示，人们在购买电子产品时越来越重视售后服务，而不仅仅关注价格。这说明消费者的需求正在发生变化。根据调查，消费者越来越重视什么？", ["售后服务", "产品颜色", "广告数量", "包装大小"], 0, "调查直接指出消费者越来越重视售后服务。"],
+  ["阅读", "为了减少塑料垃圾，学校在食堂推广可重复使用的餐具。刚开始有些学生不习惯，但一段时间后，大多数学生都接受了这种方式。根据短文，学校推广餐具的目的是什么？", ["减少塑料垃圾", "增加塑料使用", "让学生少吃饭", "提高餐具价格"], 0, "学校推广可重复使用餐具是为了减少塑料垃圾。"],
+  ["词汇", "“趋势”最接近下面哪个意思？", ["事物发展的方向", "突然发生的错误", "个人的秘密", "固定不变的价格"], 0, "趋势表示事物发展变化的方向。"],
+  ["词汇", "“逐步”与哪个词意思最接近？", ["逐渐", "突然", "完全", "立刻"], 0, "逐步和逐渐都表示一步一步地发生变化。"],
+  ["词汇", "“妨碍”最接近下面哪个意思？", ["阻碍事情顺利进行", "帮助事情完成", "提前安排工作", "认真总结经验"], 0, "妨碍表示阻碍、影响某件事情正常进行。"],
+  ["词汇", "“充分”最接近下面哪个意思？", ["足够、充足", "完全没有", "非常突然", "不太准确"], 0, "充分表示数量或程度足够。"],
+  ["词汇", "“针对”最接近下面哪个意思？", ["对准某个对象或问题", "离开某个地方", "忘记某件事情", "取消所有计划"], 0, "针对表示对准某个对象、情况或问题采取行动。"],
+  ["词汇", "“逐渐改善”中的“改善”最接近什么？", ["使情况变得更好", "让问题变严重", "完全停止工作", "把东西藏起来"], 0, "改善表示使原来的情况变得更好。"],
+  ["语法", "无论遇到什么困难，他____没有放弃。", ["都", "才", "再", "又"], 0, "“无论……都……”表示在任何条件下结果都相同。"],
+  ["语法", "除非你提前预约，____不能参加这次活动。", ["否则", "虽然", "即使", "于是"], 0, "“除非……否则……”表示必要条件。"],
+  ["语法", "他刚到家，电话____响了起来。", ["就", "才", "再", "却"], 0, "“刚……就……”表示两个动作发生时间非常接近。"],
+  ["语法", "她忙____连午饭都没有时间吃。", ["得", "地", "的", "着"], 0, "“忙得连午饭都没有时间吃”使用“形容词/动词+得+结果”结构。"],
+  ["语法", "这个问题不是你想象的____简单。", ["那么", "怎么", "哪里", "多少"], 0, "“不是……那么……”表示程度没有想象中那么高。"],
+  ["语法", "经过几个月的训练，他终于____了比赛。", ["适应", "适合", "适当", "适量"], 0, "“适应比赛”表示逐渐能够适应比赛环境和要求。"],
+  ["阅读", "为了提高会议效率，经理要求大家提前阅读材料，并把问题写下来。这样开会时就可以直接讨论重点。经理这样安排的目的是什么？", ["提高会议效率", "延长会议时间", "减少会议内容", "取消讨论"], 0, "提前准备材料可以让会议直接讨论重点，从而提高效率。"],
+  ["阅读", "这项新政策实施以后，小企业获得了更多培训机会。许多企业负责人表示，这些培训帮助他们解决了经营中的实际问题。培训带来了什么作用？", ["帮助解决实际经营问题", "增加企业税收", "减少培训机会", "让企业停止经营"], 0, "企业负责人表示培训帮助他们解决实际经营问题。"],
+  ["阅读", "很多人认为阅读纸质书和电子书各有优点。纸质书阅读体验比较稳定，而电子书方便携带、查找和保存。根据短文，电子书的优点之一是什么？", ["方便携带和查找", "一定比纸质书便宜", "不能保存", "阅读体验一定更差"], 0, "短文明确提到电子书方便携带、查找和保存。"],
+  ["阅读", "某社区发现老人独居的情况越来越多，于是建立了志愿者联系制度。志愿者会定期打电话或上门了解老人的情况。社区建立这一制度的主要目的是什么？", ["加强对独居老人的关心", "增加老人独居人数", "减少志愿者活动", "让老人搬家"], 0, "志愿者通过联系和探访关心独居老人。"],
+  ["阅读", "研究表明，学习一门新语言需要长期积累。每天学习一点儿，比偶尔一次学习很长时间更容易形成稳定的学习习惯。根据短文，怎样学习更容易形成习惯？", ["每天坚持一点儿", "偶尔学习很长时间", "完全不做计划", "只在考试前学习"], 0, "短文强调每天坚持一点儿更容易形成稳定习惯。"],
+  ["词汇", "“实施”最接近下面哪个意思？", ["正式执行某项计划或政策", "讨论但不行动", "取消已经制定的计划", "把问题隐藏起来"], 0, "实施表示把计划、政策等正式执行起来。"],
+  ["词汇", "“意识到”最接近下面哪个意思？", ["认识到某件事情", "故意忘记某件事情", "马上解决问题", "拒绝接受建议"], 0, "意识到表示认识、察觉到某种情况。"],
+  ["词汇", "“效率”通常指什么？", ["完成事情的速度和效果", "物品的颜色", "一个人的身高", "天气的温度"], 0, "效率通常表示完成工作所达到的效果与所花时间、资源之间的关系。"],
+];
+
 
 
 /* =========================================================
-   TIẾNG TRUNG HSK 4 + HSK 5
-   50 câu mỗi cấp
+   ENGLISH B1-B2 QUESTION BANKS
+   9 CATEGORIES × 20 QUESTIONS = 180 QUESTIONS
 ========================================================= */
-const HSK4_QUESTIONS = [
-    ["HSK4 • 语法", "他___去过北京两次。", ["已经", "正在", "马上", "如果"], 0, "“已经”表示某个动作已经发生。"],
-    ["HSK4 • 词汇", "“提高”的意思最接近：", ["增加、提升", "减少", "停止", "忘记"], 0, "提高表示使水平、数量等上升。"],
-    ["HSK4 • 阅读", "因为下雨，比赛___了。", ["取消", "参加", "通过", "准备"], 0, "下雨导致比赛被取消。"],
-    ["HSK4 • 词汇", "“准时”最接近：", ["按规定时间到达", "很早到达", "经常迟到", "提前离开"], 0, "准时就是按照规定的时间。"],
-    ["HSK4 • 语法", "如果明天下雨，我们___在家学习。", ["就", "才", "又", "越"], 0, "如果……就……表示条件关系。"],
-    ["HSK4 • 词汇", "“适合”最接近：", ["合适", "困难", "浪费", "拒绝"], 0, "适合表示合适、相宜。"],
-    ["HSK4 • 语法", "我对中国历史___感兴趣。", ["非常", "已经", "马上", "虽然"], 0, "“非常”修饰形容词或心理状态。"],
-    ["HSK4 • 阅读", "他每天坚持跑步，所以身体越来越___。", ["健康", "安静", "复杂", "严格"], 0, "坚持运动有助于身体健康。"],
-    ["HSK4 • 词汇", "“估计”最接近：", ["推测", "证明", "忘记", "命令"], 0, "估计表示根据情况进行推测。"],
-    ["HSK4 • 语法", "她一边听音乐，___做作业。", ["一边", "虽然", "因为", "于是"], 0, "一边……一边……表示两个动作同时进行。"],
-    ["HSK4 • 词汇", "“经验”是指：", ["从实践中得到的认识", "一种考试", "一件衣服", "一种天气"], 0, "经验通常来自实践和经历。"],
-    ["HSK4 • 阅读", "这家饭店的菜不但便宜，而且___。", ["好吃", "迟到", "安静地", "如果"], 0, "不但……而且……连接两个积极特点。"],
-    ["HSK4 • 语法", "他昨天晚上十点___回家。", ["才", "又", "越", "被"], 0, "“才”表示动作发生得晚。"],
-    ["HSK4 • 词汇", "“复杂”的反义词是：", ["简单", "热闹", "重要", "认真"], 0, "复杂与简单相对。"],
-    ["HSK4 • 阅读", "为了提高汉语水平，她每天都___生词。", ["复习", "关闭", "邀请", "搬"], 0, "复习生词有助于提高语言水平。"],
-    ["HSK4 • 语法", "这本书___我借给你的。", ["是", "在", "把", "从"], 0, "“是……的”可用于强调过去动作的相关信息。"],
-    ["HSK4 • 词汇", "“及时”最接近：", ["在适当的时候", "很久以后", "从来没有", "完全相反"], 0, "及时表示在需要的时候迅速做出反应。"],
-    ["HSK4 • 阅读", "虽然工作很忙，但是他___每天学习汉语。", ["仍然", "已经", "马上", "只要"], 0, "虽然……但是……表示转折，“仍然”表示继续。"],
-    ["HSK4 • 语法", "请你把这份文件___我。", ["交给", "经过", "超过", "由于"], 0, "把字句中“交给我”表示递交对象。"],
-    ["HSK4 • 词汇", "“熟悉”的反义表达最接近：", ["陌生", "准确", "方便", "热情"], 0, "熟悉与陌生相对。"],
-    ["HSK4 • 词汇", "“安排”最接近：", ["计划并确定时间或顺序", "拒绝别人", "忘记事情", "改变天气"], 0, "安排表示计划并确定事情的顺序或时间。"],
-    ["HSK4 • 词汇", "“发现”最接近：", ["察觉到", "丢掉", "借给", "等待"], 0, "发现表示察觉或找到原来不知道的事情。"],
-    ["HSK4 • 语法", "他已经吃完饭了，___去散步。", ["准备", "如果", "虽然", "因为"], 0, "“准备”表示打算做某事。"],
-    ["HSK4 • 词汇", "“压力”最接近：", ["精神或生活上的负担", "假期", "奖励", "天气"], 0, "压力指让人感到负担或紧张的因素。"],
-    ["HSK4 • 阅读", "为了身体健康，他决定___早睡早起。", ["养成", "取消", "打扰", "拒绝"], 0, "养成习惯是固定搭配。"],
-    ["HSK4 • 语法", "我___没想到他会这么快回来。", ["完全", "正在", "如果", "于是"], 0, "完全可以修饰没想到，表示程度。"],
-    ["HSK4 • 词汇", "“邀请”的反义表达最接近：", ["拒绝", "参加", "准备", "联系"], 0, "邀请和拒绝在语境中相对。"],
-    ["HSK4 • 阅读", "这件衣服太贵了，我买不起，___看看别的吧。", ["还是", "已经", "如果", "虽然"], 0, "“还是”可用于提出另一选择。"],
-    ["HSK4 • 语法", "他___努力，成绩就越好。", ["越", "才", "被", "把"], 0, "越……越……表示程度随条件变化。"],
-    ["HSK4 • 词汇", "“丰富”的反义词是：", ["贫乏", "热闹", "准确", "认真"], 0, "丰富与贫乏相对。"],
-    ["HSK4 • 阅读", "她把房间打扫得___干净。", ["非常", "从来", "如果", "虽然"], 0, "非常修饰形容词干净。"],
-    ["HSK4 • 语法", "我不知道他___什么时候回来。", ["究竟", "已经", "如果", "虽然"], 0, "究竟可用于疑问宾语从句，表示追究答案。"],
-    ["HSK4 • 词汇", "“耐心”最接近：", ["不急躁地等待或处理事情", "速度很快", "容易生气", "完全安静"], 0, "耐心指不急躁、有耐性。"],
-    ["HSK4 • 阅读", "请你___我介绍一下这座城市。", ["给", "被", "从", "向"], 0, "给某人介绍是常用结构。"],
-    ["HSK4 • 语法", "他昨天没有来，___生病了。", ["可能", "必须", "虽然", "只要"], 0, "可能表示推测。"],
-    ["HSK4 • 词汇", "“顺利”的反义表达最接近：", ["困难", "准确", "热情", "及时"], 0, "顺利与困难重重的状态相对。"],
-    ["HSK4 • 阅读", "这项活动不仅有趣，___能学到很多东西。", ["还", "才", "却", "否则"], 0, "不仅……还……表示递进。"],
-    ["HSK4 • 语法", "我建议你___休息一下。", ["先", "被", "把", "越"], 0, "先表示首先做某事。"],
-    ["HSK4 • 词汇", "“通知”可以理解为：", ["告诉别人有关事情的信息", "借钱给别人", "改变价格", "离开城市"], 0, "通知表示把消息告诉有关的人。"],
-    ["HSK4 • 阅读", "天气越来越冷，大家___穿上了外套。", ["纷纷", "究竟", "仍然", "从来"], 0, "纷纷表示许多人相继做某事。"],
-    ["HSK4 • 语法", "他一到家___开始做饭。", ["就", "才", "越", "被"], 0, "一……就……表示两个动作紧接发生。"],
-    ["HSK4 • 词汇", "“误会”是指：", ["对事情产生错误理解", "提前完成工作", "认真学习", "正确判断"], 0, "误会是错误的理解或判断。"],
-    ["HSK4 • 阅读", "因为堵车，我们___迟到了十分钟。", ["所以", "但是", "虽然", "如果"], 0, "因为……所以……表示因果。"],
-    ["HSK4 • 语法", "___你有时间，欢迎来我家。", ["如果", "虽然", "否则", "于是"], 0, "如果引导条件。"],
-    ["HSK4 • 词汇", "“尊重”的反义词最接近：", ["轻视", "帮助", "理解", "信任"], 0, "尊重与轻视相对。"],
-    ["HSK4 • 阅读", "他每天听中文新闻，___自己的听力。", ["提高", "关闭", "减少", "拒绝"], 0, "提高听力是自然搭配。"],
-    ["HSK4 • 语法", "这道题没有我想象的___难。", ["那么", "已经", "马上", "如果"], 0, "没有……那么……表示比较。"],
-    ["HSK4 • 词汇", "“普通”的反义词最接近：", ["特殊", "简单", "方便", "及时"], 0, "普通与特殊相对。"],
-    ["HSK4 • 阅读", "她对中国文化非常___，经常参加相关活动。", ["感兴趣", "感动", "感谢", "感冒"], 0, "对……感兴趣是固定搭配。"],
-    ["HSK4 • 语法", "请把你的意见___大家说一说。", ["跟", "被", "从", "向着"], 0, "跟大家说表示向大家表达。"],
 
-];
-const HSK5_QUESTIONS = [
-    ["HSK5 • 词汇", "“逐渐”最接近：", ["慢慢地", "突然地", "故意地", "完全地"], 0, "逐渐表示变化慢慢发生。"],
-    ["HSK5 • 语法", "他不仅完成了任务，___提出了新的方案。", ["还", "才", "却", "否则"], 0, "不仅……还……表示递进。"],
-    ["HSK5 • 阅读", "经过长期训练，她的汉语表达能力有了明显___。", ["提高", "打扰", "拒绝", "浪费"], 0, "能力有了明显提高是自然搭配。"],
-    ["HSK5 • 词汇", "“承担责任”的意思是：", ["负责并接受应有的责任", "逃避问题", "拒绝帮助", "改变计划"], 0, "承担责任就是负责并接受责任。"],
-    ["HSK5 • 语法", "无论遇到什么困难，他都___放弃。", ["不会", "已经", "正在", "因为"], 0, "无论……都……表示条件不影响结果。"],
-    ["HSK5 • 词汇", "“普遍”的反义词最接近：", ["特殊", "普通", "常见", "广泛"], 0, "普遍与特殊在范围上相对。"],
-    ["HSK5 • 阅读", "这项措施旨在___交通拥堵问题。", ["缓解", "制造", "扩大", "隐藏"], 0, "缓解问题表示减轻其严重程度。"],
-    ["HSK5 • 词汇", "“维护”最接近：", ["保护并使其保持正常", "破坏", "转移", "取消"], 0, "维护有保护、保持正常状态之意。"],
-    ["HSK5 • 语法", "与其坐在这里担心，___马上采取行动。", ["不如", "虽然", "即使", "由于"], 0, "与其……不如……表示比较取舍。"],
-    ["HSK5 • 阅读", "由于准备充分，他___顺利通过了面试。", ["因此", "否则", "尽管", "而且"], 0, "由于……因此……表示因果。"],
-    ["HSK5 • 词汇", "“克服困难”是指：", ["设法战胜困难", "制造困难", "逃避困难", "重复错误"], 0, "克服表示战胜、解决。"],
-    ["HSK5 • 语法", "他所提出的建议___得到了大家的认可。", ["得到了", "正在", "因为", "如果"], 0, "“所+动词”构成名词性结构，后面可接谓语。"],
-    ["HSK5 • 词汇", "“显著”最接近：", ["明显", "隐蔽", "偶然", "普通"], 0, "显著表示非常明显。"],
-    ["HSK5 • 阅读", "调查结果表明，越来越多的人开始___环保生活方式。", ["采用", "阻止", "否认", "拆除"], 0, "采用生活方式表示开始使用、实行。"],
-    ["HSK5 • 语法", "只要认真准备，___能够取得好成绩。", ["就", "却", "才", "仍"], 0, "只要……就……表示充分条件。"],
-    ["HSK5 • 词汇", "“推迟”的反义词是：", ["提前", "拒绝", "增加", "减少"], 0, "推迟与提前相对。"],
-    ["HSK5 • 阅读", "尽管天气恶劣，救援人员___坚持工作。", ["仍然", "否则", "几乎", "终于"], 0, "尽管……仍然……表示让步。"],
-    ["HSK5 • 词汇", "“资源丰富”中的“丰富”最接近：", ["充足", "稀少", "危险", "狭窄"], 0, "丰富表示数量或种类很多、充足。"],
-    ["HSK5 • 语法", "他把主要精力___了研究工作。", ["放在", "超过", "经过", "由于"], 0, "把精力放在某项工作上是固定搭配。"],
-    ["HSK5 • 阅读", "面对失败，他没有灰心，反而从中___了宝贵经验。", ["吸取", "关闭", "浪费", "取消"], 0, "从失败中吸取经验是常用搭配。"],
-    ["HSK5 • 词汇", "“促进”最接近：", ["推动其发展", "阻止其发生", "隐藏信息", "减少数量"], 0, "促进表示推动事物向好的方向发展。"],
-    ["HSK5 • 词汇", "“避免”最接近：", ["设法不发生", "主动增加", "公开宣布", "立即完成"], 0, "避免表示设法不让某事发生。"],
-    ["HSK5 • 语法", "这项政策一旦实施，___会产生影响。", ["就", "虽然", "否则", "而且"], 0, "一旦……就……表示条件一发生结果随即出现。"],
-    ["HSK5 • 阅读", "专家认为，这种方法能够有效___能源消耗。", ["降低", "承担", "邀请", "恢复"], 0, "降低能源消耗是常见搭配。"],
-    ["HSK5 • 词汇", "“逐步”最接近：", ["一步一步地", "突然地", "完全地", "故意地"], 0, "逐步表示按照步骤慢慢进行。"],
-    ["HSK5 • 语法", "即使遇到困难，我们也___坚持下去。", ["要", "已经", "才", "因为"], 0, "即使……也……表示让步条件。"],
-    ["HSK5 • 词汇", "“现象”是指：", ["可以观察到的事实或表现", "一条法律", "一个人名", "一种工具"], 0, "现象是客观存在、可以观察的表现。"],
-    ["HSK5 • 阅读", "随着城市发展，公共交通的需求不断___。", ["增加", "取消", "拒绝", "隐藏"], 0, "需求不断增加是自然搭配。"],
-    ["HSK5 • 语法", "他之所以成功，___他长期坚持。", ["是因为", "即使", "否则", "虽然"], 0, "之所以……是因为……表示原因。"],
-    ["HSK5 • 词汇", "“明显”的近义词是：", ["显著", "模糊", "偶然", "秘密"], 0, "明显与显著意思接近。"],
-    ["HSK5 • 阅读", "这个问题涉及多个方面，不能___处理。", ["简单地", "已经", "从来", "突然"], 0, "复杂问题不能简单地处理。"],
-    ["HSK5 • 语法", "除非你亲自说明，___很难解决这个误会。", ["否则", "因此", "虽然", "而且"], 0, "除非……否则……表示条件。"],
-    ["HSK5 • 词汇", "“承担”最接近：", ["负责接受", "主动逃避", "随意改变", "完全拒绝"], 0, "承担表示负责或接受某种任务、责任。"],
-    ["HSK5 • 阅读", "公司正在___新的管理制度。", ["实施", "消失", "拒绝", "误会"], 0, "实施制度表示把制度付诸实践。"],
-    ["HSK5 • 语法", "他宁可少赚一点，也不愿意___原则。", ["违反", "恢复", "促进", "适应"], 0, "宁可……也不……表示取舍。"],
-    ["HSK5 • 词汇", "“适应”最接近：", ["逐渐习惯并能应对", "完全拒绝", "马上离开", "公开批评"], 0, "适应表示逐渐习惯环境或情况。"],
-    ["HSK5 • 阅读", "为了保证质量，所有产品都必须经过严格的___。", ["检查", "邀请", "取消", "转移"], 0, "产品需要经过严格检查。"],
-    ["HSK5 • 语法", "他虽然经验不足，___学习能力很强。", ["但是", "因此", "否则", "于是"], 0, "虽然……但是……表示转折。"],
-    ["HSK5 • 词汇", "“趋势”最接近：", ["事物发展的方向", "一次考试", "个人情绪", "一件家具"], 0, "趋势表示事物发展的方向。"],
-    ["HSK5 • 阅读", "数据显示，网上购物已经成为一种越来越普遍的___。", ["现象", "责任", "机会", "压力"], 0, "普遍的社会现象是常见搭配。"],
-    ["HSK5 • 语法", "只要条件允许，我们___尽快完成项目。", ["就会", "却", "否则", "虽然"], 0, "只要……就……表示充分条件。"],
-    ["HSK5 • 词汇", "“改善”与下列哪项最接近？", ["使情况变得更好", "使情况更复杂", "停止工作", "拒绝帮助"], 0, "改善表示使原来的情况变好。"],
-    ["HSK5 • 阅读", "双方经过多次讨论，终于达成了___。", ["共识", "压力", "误会", "冲突"], 0, "达成共识是固定搭配。"],
-    ["HSK5 • 语法", "与其不断抱怨，___想办法解决问题。", ["不如", "即使", "除非", "由于"], 0, "与其……不如……表示选择更好的做法。"],
-    ["HSK5 • 词汇", "“客观”的反义词最接近：", ["主观", "准确", "实际", "公正"], 0, "客观与主观相对。"],
-    ["HSK5 • 阅读", "这项研究为未来的技术发展提供了重要的___。", ["依据", "拒绝", "争论", "障碍"], 0, "提供依据是常用搭配。"],
-    ["HSK5 • 语法", "无论结果如何，他___会认真总结经验。", ["都", "才", "却", "如果"], 0, "无论……都……表示无条件结果。"],
-    ["HSK5 • 词汇", "“障碍”最接近：", ["阻碍事情发展的因素", "成功的方法", "奖励", "计划"], 0, "障碍是阻碍事情发展的因素。"],
-    ["HSK5 • 阅读", "在竞争激烈的环境中，企业必须不断___创新。", ["加强", "取消", "减少", "拒绝"], 0, "加强创新能力是合理搭配。"],
-    ["HSK5 • 词汇", "“维持”最接近：", ["保持某种状态", "突然改变", "彻底取消", "公开讨论"], 0, "维持表示使某种状态继续保持。"],
-
+const INVERSION_QUESTIONS = [
+  ["Grammar", "Only after the meeting did I realize how serious the problem was.", ["Only after the meeting did I realize", "Only after the meeting I realized", "Only after did I realize the meeting", "Only the meeting after I realized"], 0, "After a negative/restrictive expression such as 'only after' comes first, auxiliary inversion is required."],
+  ["Grammar", "Rarely _____ such a beautiful view.", ["have I seen", "I have seen", "did I saw", "I saw have"], 0, "After 'rarely' at the beginning, use subject-auxiliary inversion: 'have I seen'."],
+  ["Grammar", "Never _____ such a difficult decision before.", ["had she faced", "she had faced", "did she faced", "has she face"], 0, "'Never' at the beginning triggers inversion: 'had she faced'."],
+  ["Grammar", "Not until midnight _____ the missing document.", ["did they find", "they found", "they did find", "found they"], 0, "'Not until...' at the beginning requires 'did + subject + base verb'."],
+  ["Grammar", "Under no circumstances _____ confidential information.", ["should you share", "you should share", "should share you", "you share should"], 0, "'Under no circumstances' triggers inversion with the modal 'should'."],
+  ["Grammar", "No sooner _____ home than the phone rang.", ["had he arrived", "he had arrived", "did he arrive", "he arrived had"], 0, "The structure is 'No sooner had + subject + past participle + than...'."],
+  ["Grammar", "Hardly _____ when the lights went out.", ["had we started", "we had started", "did we started", "we started had"], 0, "The structure is 'Hardly had + subject + past participle + when...'."],
+  ["Grammar", "Little _____ that the decision would change everything.", ["did we know", "we knew", "we did know", "knew we did"], 0, "'Little did we know' is a standard inverted structure."],
+  ["Grammar", "Only by working together _____ solve the problem.", ["can we", "we can", "can", "we"], 0, "'Only by...' at the beginning requires inversion: 'can we'."],
+  ["Grammar", "Not only _____ late, but he also forgot the documents.", ["was he", "he was", "did he was", "was"], 0, "'Not only' at the beginning requires inversion."],
+  ["Grammar", "Seldom _____ to work on Sundays.", ["does she have to go", "she has to go", "has she to go", "does she has to go"], 0, "With 'seldom', use auxiliary 'does' + subject + base verb."],
+  ["Grammar", "Only when the results arrived _____ the researchers celebrate.", ["did the researchers", "the researchers did", "did researchers the", "the researchers"], 0, "'Only when...' requires inversion in the main clause."],
+  ["Grammar", "Nowhere else _____ such a peaceful atmosphere.", ["can you find", "you can find", "can find you", "you find can"], 0, "After 'nowhere else', inversion is used."],
+  ["Grammar", "At no time _____ the manager admit responsibility.", ["did the manager", "the manager did", "did manager the", "the manager"], 0, "'At no time' triggers inversion with 'did'."],
+  ["Grammar", "Barely _____ the speech when the audience started asking questions.", ["had she finished", "she had finished", "did she finished", "she finished had"], 0, "'Barely had...' is the correct inverted pattern."],
+  ["Grammar", "Only then _____ how much work remained.", ["did I understand", "I understood", "I did understand", "understood I"], 0, "'Only then' at the beginning triggers inversion."],
+  ["Grammar", "Not once _____ about the consequences.", ["did he think", "he thought", "did he thought", "he did think"], 0, "'Not once' requires 'did + subject + base verb'."],
+  ["Grammar", "So difficult _____ that several students gave up.", ["was the exam", "the exam was", "was exam the", "the exam did"], 0, "The pattern is 'So + adjective + be + subject + that...'."],
+  ["Grammar", "Such was the demand that the company _____ extra staff.", ["had to hire", "had hire", "has to hiring", "did hired"], 0, "'Such was...' is an inverted structure followed by a normal clause."],
+  ["Grammar", "Only if you follow the instructions carefully _____ succeed.", ["will you", "you will", "will", "you"], 0, "'Only if' at the beginning requires inversion: 'will you succeed'."],
 ];
 
-const EN_DAO_NGU = [
-
-    ["部分倒装", "Never have I seen such a beautiful view.", ["Never have I seen such a beautiful view.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "倒装结构为 Never + 助动词 + 主语 + 动词。"],
-    ["部分倒装", "Hardly had I arrived when the meeting started.", ["Hardly had I arrived when the meeting started.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Hardly...when...使用过去完成时倒装。"],
-    ["部分倒装", "So difficult was the exam that many students complained.", ["So difficult was the exam that many students complained.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adjective 置于句首可形成倒装。"],
-    ["部分倒装", "Under no circumstances ___ this door.", ["should you open", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Under no circumstances 要求部分倒装。"],
-    ["部分倒装", "Little did they know what would happen next.", ["Little did they know what would happen next.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Little 置于句首表示几乎不知道，需倒装。"],
-    ["部分倒装", "Only then ___ why she was upset.", ["did I realize", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only then 置于句首后主句倒装。"],
-    ["部分倒装", "No sooner had he left than the phone rang.", ["No sooner had he left than the phone rang.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "No sooner...than...使用倒装和过去完成时。"],
-    ["条件倒装", "Had I known earlier, I would have helped.", ["Had I known earlier, I would have helped.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 3 bỏ if: Had + S + V3."],
-    ["条件倒装", "Were I you, I would accept the offer.", ["Were I you, I would accept the offer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 2: Were + S..."],
-    ["条件倒装", "Should you need help, call me.", ["Should you need help, call me.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Should + S... thay cho If S should..."],
-    ["部分倒装", "Not only did she apologize, but she also offered to help.", ["Not only did she apologize, but she also offered to help.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Not only ở đầu câu yêu cầu đảo trợ động từ."],
-    ["部分倒装", "Seldom does he complain about his workload.", ["Seldom does he complain about his workload.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Seldom mang nghĩa hiếm khi và gây đảo ngữ khi đứng đầu."],
-    ["部分倒装", "On no account should you reveal the password.", ["On no account should you reveal the password.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "On no account = under no circumstances, dùng đảo ngữ."],
-    ["phần đảo ngữ", "Only by working together can we solve the problem.", ["Only by working together can we solve the problem.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only + cụm trạng ngữ ở đầu câu kéo theo đảo ngữ."],
-    ["phần đảo ngữ", "So quickly did she answer that everyone was surprised.", ["So quickly did she answer that everyone was surprised.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adverb ở đầu câu có thể dùng đảo ngữ."],
-    ["phần đảo ngữ", "Neither did I know the answer.", ["Neither did I know the answer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Neither + trợ động từ + chủ ngữ dùng để đồng tình với phủ định."],
-    ["phần đảo ngữ", "Nowhere else can you find a view like this.", ["Nowhere else can you find a view like this.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Trạng từ phủ định/giới hạn ở đầu câu gây đảo ngữ."],
-    ["phần đảo ngữ", "Only after reading the report did we understand the problem.", ["Only after reading the report did we understand the problem.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Only after + phrase at the beginning triggers inversion."],
-    ["phần đảo ngữ", "At no time should employees share confidential data.", ["At no time should employees share confidential data.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "At no time is a negative/restrictive phrase that triggers inversion."],
-    ["phần đảo ngữ", "Barely had the show begun when the lights went out.", ["Barely had the show begun when the lights went out.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Barely...when... uses inversion with past perfect."],
-
+const SUBJUNCTIVE_MOOD_QUESTIONS = [
+  ["Grammar", "It is essential that every applicant _____ the form before Friday.", ["complete", "completes", "completed", "will complete"], 0, "After 'it is essential that', formal English commonly uses the base-form subjunctive."],
+  ["Grammar", "The manager insisted that he _____ informed immediately.", ["be", "was", "is", "will be"], 0, "After 'insist that', the mandative subjunctive uses the base form 'be'."],
+  ["Grammar", "I wish I _____ more time to prepare for the exam.", ["had", "have", "will have", "would have"], 0, "For a present unreal situation, use past simple: 'I wish I had...'."],
+  ["Grammar", "If I _____ you, I would apologize.", ["were", "was", "am", "had been"], 0, "In the second conditional, formal English uses 'were' for all persons."],
+  ["Grammar", "If she had studied harder, she _____ the test.", ["would have passed", "would pass", "will have passed", "passed"], 0, "Third conditional: 'if + past perfect' → 'would have + past participle'."],
+  ["Grammar", "I would rather you _____ me before making a decision.", ["told", "tell", "will tell", "had tell"], 0, "After 'would rather + subject', use past simple for a present/future preference."],
+  ["Grammar", "It is important that he _____ on time.", ["be", "is", "was", "will be"], 0, "The mandative subjunctive uses the base form 'be'."],
+  ["Grammar", "The doctor recommended that she _____ more water.", ["drink", "drinks", "drank", "will drink"], 0, "After 'recommend that', the base-form subjunctive is standard in formal English."],
+  ["Grammar", "Suppose you _____ offered the job. Would you accept it?", ["were", "are", "will be", "have been"], 0, "'Suppose' can introduce a hypothetical situation; 'were offered' is the passive hypothetical form."],
+  ["Grammar", "If only I _____ the answer!", ["knew", "know", "had know", "will know"], 0, "'If only + past simple' expresses a wish about the present."],
+  ["Grammar", "He acts as if he _____ the owner of the company.", ["were", "is", "will be", "has been"], 0, "'As if' for an unreal present situation can take the subjunctive 'were'."],
+  ["Grammar", "It was suggested that the meeting _____ postponed.", ["be", "was", "is", "will be"], 0, "After 'it was suggested that', formal English uses the subjunctive 'be'."],
+  ["Grammar", "If I had known about the traffic, I _____ earlier.", ["would have left", "would leave", "will leave", "left"], 0, "This is a third conditional result."],
+  ["Grammar", "I wish you _____ making so much noise.", ["would stop", "stop", "stopped", "have stopped"], 0, "'Wish + would' expresses annoyance about a repeated action."],
+  ["Grammar", "The teacher demanded that all phones _____ switched off.", ["be", "are", "were", "will be"], 0, "The mandative subjunctive uses 'be' after 'demanded that'."],
+  ["Grammar", "Were I in your position, I _____ accept the offer.", ["would", "will", "did", "have"], 0, "'Were I...' is an inverted second conditional; the result uses 'would'."],
+  ["Grammar", "Had they left earlier, they _____ the train.", ["would have caught", "would catch", "will catch", "caught"], 0, "'Had they left...' is an inverted third conditional."],
+  ["Grammar", "It is vital that the report _____ accurate.", ["be", "is", "was", "will be"], 0, "After 'it is vital that', use the base-form subjunctive."],
+  ["Grammar", "I would rather _____ at home tonight.", ["stay", "stayed", "staying", "to stay"], 0, "After 'would rather' without a new subject, use the base verb."],
+  ["Grammar", "If he _____ more careful, he wouldn't make so many mistakes.", ["were", "is", "had been", "will be"], 0, "A present unreal condition uses 'were' in formal English."],
 ];
 
-const EN_THUC_GIA_DINH = [
-
-    ["subjunctive", "The teacher insisted that he ___ the report again.", ["rewrite", "rewrites", "rewrote", "rewriting"], 0, "Sau insist that, dùng subjunctive: động từ nguyên mẫu."],
-    ["subjunctive", "It is essential that every student ___ on time.", ["be", "is", "was", "being"], 0, "Sau It is essential that dùng động từ nguyên mẫu trong subjunctive."],
-    ["subjunctive", "The manager recommended that she ___ earlier.", ["leave", "leaves", "left", "leaving"], 0, "Recommend that + bare infinitive."],
-    ["subjunctive", "They demanded that the company ___ action immediately.", ["take", "takes", "took", "taking"], 0, "Demand that + bare infinitive."],
-    ["subjunctive", "I suggest that he ___ a doctor.", ["see", "sees", "saw", "seeing"], 0, "Suggest that + bare infinitive trong cấu trúc giả định."],
-    ["subjunctive", "It is important that he ___ honest.", ["be", "is", "was", "being"], 0, "Be là dạng nguyên mẫu trong subjunctive."],
-    ["subjunctive", "The committee proposed that the rule ___ changed.", ["be", "is", "was", "being"], 0, "Propose that + subject + be + V3."],
-    ["subjunctive", "She insisted that we ___ immediately.", ["go", "went", "goes", "going"], 0, "Insist that + bare infinitive."],
-    ["subjunctive", "The doctor advised that he ___ smoking.", ["stop", "stops", "stopped", "stopping"], 0, "Advise that có thể dùng subjunctive trong văn phong trang trọng."],
-    ["subjunctive", "It is vital that every applicant ___ the form.", ["complete", "completes", "completed", "completing"], 0, "It is vital that + bare infinitive."],
-    ["subjunctive", "The law requires that each employee ___ identification.", ["carry", "carries", "carried", "carrying"], 0, "Require that + bare infinitive."],
-    ["subjunctive", "The coach ordered that the players ___ silent.", ["remain", "remains", "remained", "remaining"], 0, "Order that + bare infinitive."],
-    ["subjunctive", "It was recommended that he ___ the course.", ["take", "takes", "took", "taking"], 0, "Recommend that + bare infinitive."],
-    ["subjunctive", "The board requested that the proposal ___ revised.", ["be", "is", "was", "being"], 0, "Request that + be + past participle."],
-    ["subjunctive", "Her parents insisted that she ___ home early.", ["return", "returns", "returned", "returning"], 0, "Insist that + bare infinitive."],
-    ["subjunctive", "It is crucial that the data ___ accurate.", ["be", "is", "was", "being"], 0, "Crucial that + be trong subjunctive."],
-    ["subjunctive", "The judge ordered that the witness ___ the question.", ["answer", "answers", "answered", "answering"], 0, "Order that + bare infinitive."],
-    ["subjunctive", "They suggested that the meeting ___ postponed.", ["be", "is", "was", "being"], 0, "Suggest that + be + V3."],
-    ["subjunctive", "It is necessary that he ___ prepared.", ["be", "is", "was", "being"], 0, "Necessary that + bare infinitive."],
-    ["subjunctive", "The director demanded that the work ___ finished today.", ["be", "is", "was", "being"], 0, "Demand that + be + V3."],
-
+const REDUCED_ADVERBIAL_CLAUSES_QUESTIONS = [
+  ["Grammar", "_____ the instructions, she started the machine.", ["Having read", "Having reading", "Read having", "To read having"], 0, "'Having read' reduces a perfect adverbial clause showing an earlier action."],
+  ["Grammar", "_____ by the news, he couldn't speak for several minutes.", ["Shocked", "Shocking", "Having shock", "Was shocked"], 0, "'Shocked by...' is a reduced passive adverbial clause."],
+  ["Grammar", "_____ the road, we saw a deer.", ["Driving along", "Driven along", "Drive along", "Having drive"], 0, "'Driving along...' reduces 'While we were driving along...'."],
+  ["Grammar", "_____ the report, the manager sent it to the client.", ["After checking", "After checked", "Checking after", "Having check"], 0, "'After checking...' is a reduced time clause with the same subject."],
+  ["Grammar", "_____ all the evidence, the jury reached a decision.", ["Having considered", "Having consider", "Considered having", "Consider"], 0, "'Having considered...' shows the consideration happened first."],
+  ["Grammar", "_____ in London, she knows the city very well.", ["Having lived", "Having live", "Lived having", "To living"], 0, "'Having lived...' reduces 'Because/As she has lived...'."],
+  ["Grammar", "_____ from the airport, call me.", ["When arriving", "Arriving when", "Arrived when", "When arrived"], 0, "'When arriving...' can reduce a time clause when the subject is understood."],
+  ["Grammar", "_____ carefully, the instructions are easy to follow.", ["When read", "When reading", "Read when", "Having read"], 0, "'When read' is a reduced passive clause meaning 'when they are read'."],
+  ["Grammar", "_____ the door, he realized he had forgotten his keys.", ["Having locked", "Having lock", "Locked having", "To locked"], 0, "The perfect participle shows the first action happened before the realization."],
+  ["Grammar", "_____ tired, she decided to go home.", ["Feeling", "Felt", "Having feel", "To feeling"], 0, "'Feeling tired' reduces 'Because she felt tired...'."],
+  ["Grammar", "_____ the problem, they looked for a solution.", ["Understanding", "Understood", "Having understand", "To understood"], 0, "The present participle can reduce a clause with the same subject."],
+  ["Grammar", "_____ enough money, he couldn't buy the laptop.", ["Not having", "Not had", "Having not had", "Not have"], 0, "'Not having enough money' is a reduced negative clause."],
+  ["Grammar", "_____ by the sudden noise, the baby started crying.", ["Frightened", "Frightening", "Having frighten", "Was frightening"], 0, "'Frightened by...' is a reduced passive clause."],
+  ["Grammar", "_____ the email, she immediately called her colleague.", ["Having received", "Received having", "Receiving had", "To received"], 0, "'Having received...' indicates the email came first."],
+  ["Grammar", "_____ for the bus, I met an old friend.", ["Waiting", "Waited", "Having wait", "To waited"], 0, "'Waiting for the bus' reduces 'While I was waiting...'."],
+  ["Grammar", "_____ the project on time, the team celebrated.", ["Having completed", "Completed having", "Having complete", "To completing"], 0, "'Having completed...' shows completion before the celebration."],
+  ["Grammar", "_____ properly, this equipment can last for years.", ["Maintained", "Maintaining", "Having maintain", "Maintain"], 0, "'Maintained properly' is a reduced passive condition."],
+  ["Grammar", "_____ the answer, he remained silent.", ["Knowing", "Known", "Having know", "To knowing"], 0, "'Knowing the answer' reduces a clause with the same subject."],
+  ["Grammar", "_____ the report, she noticed several errors.", ["While reviewing", "While reviewed", "Reviewed while", "To reviewed"], 0, "'While reviewing...' is a reduced time clause."],
+  ["Grammar", "_____ all the tickets, we could not enter the concert.", ["Having forgotten", "Forgotten having", "Having forget", "To forgetting"], 0, "'Having forgotten...' shows the earlier action causing the later situation."],
 ];
 
-const EN_TRANG_TU_RUT_GON = [
-
-    ["reduced adverbial clause", "While ___ to work, she met an old friend.", ["walking", "walked", "walks", "to walk"], 0, "Rút gọn while + S + V thành while + V-ing khi chủ ngữ giống nhau."],
-    ["reduced adverbial clause", "When ___ the report, check all figures carefully.", ["writing", "written", "writes", "to write"], 0, "When + V-ing là dạng rút gọn của mệnh đề trạng ngữ chủ động."],
-    ["reduced adverbial clause", "After ___ the email, he called his manager.", ["sending", "sent", "sends", "to send"], 0, "After + V-ing dùng khi chủ ngữ hai mệnh đề giống nhau."],
-    ["reduced adverbial clause", "Although ___ tired, she continued studying.", ["feeling", "felt", "feels", "to feel"], 0, "Although + V-ing là dạng rút gọn chủ động."],
-    ["reduced adverbial clause", "If ___ carefully, this machine is safe.", ["used", "using", "use", "to use"], 0, "If + V3 rút gọn mệnh đề bị động: If used carefully."],
-    ["reduced adverbial clause", "When ___ properly, the software works well.", ["installed", "installing", "installs", "to install"], 0, "When + V3 là dạng rút gọn bị động."],
-    ["reduced adverbial clause", "Before ___ the contract, read every clause.", ["signing", "signed", "signs", "to sign"], 0, "Before + V-ing là dạng rút gọn."],
-    ["reduced adverbial clause", "Having ___ the task, she went home.", ["finished", "finish", "finishing", "finishes"], 0, "Having + V3 diễn tả hành động xảy ra trước."],
-    ["reduced adverbial clause", "___ by the news, he remained silent.", ["Shocked", "Shocking", "Shock", "To shock"], 0, "V3 đầu câu có thể rút gọn mệnh đề bị động."],
-    ["reduced adverbial clause", "___ the instructions, they assembled the device.", ["Following", "Followed", "Follows", "To follow"], 0, "Following = while/after they followed the instructions."],
-    ["reduced adverbial clause", "If ___ in advance, the problem can be avoided.", ["planned", "planning", "plans", "to plan"], 0, "If + V3 rút gọn mệnh đề bị động."],
-    ["reduced adverbial clause", "While ___ for the bus, I read a book.", ["waiting", "waited", "waits", "to wait"], 0, "While + V-ing diễn tả hai hành động đồng thời."],
-    ["reduced adverbial clause", "After ___ the data, the team found an error.", ["analyzing", "analyzed", "analyzes", "to analyze"], 0, "After + V-ing khi chủ ngữ giống nhau."],
-    ["reduced adverbial clause", "Although ___ inexperienced, he performed well.", ["being", "been", "be", "to be"], 0, "Although + being + adjective là dạng rút gọn."],
-    ["reduced adverbial clause", "Once ___, the decision cannot be changed.", ["made", "making", "makes", "to make"], 0, "Once + V3 rút gọn mệnh đề bị động."],
-    ["reduced adverbial clause", "Having ___ the problem, we proposed a solution.", ["identified", "identify", "identifying", "identifies"], 0, "Having + V3 diễn tả hành động hoàn tất trước."],
-    ["reduced adverbial clause", "___ carefully, the medicine should be safe.", ["Taken", "Taking", "Take", "To take"], 0, "Taken carefully = if it is taken carefully."],
-    ["reduced adverbial clause", "Before ___ the presentation, she checked the slides.", ["giving", "given", "gives", "to give"], 0, "Before + V-ing."],
-    ["reduced adverbial clause", "When ___ from the top, the building looks smaller.", ["seen", "seeing", "sees", "to see"], 0, "When + V3 rút gọn mệnh đề bị động."],
-    ["reduced adverbial clause", "While ___ dinner, he listened to a podcast.", ["cooking", "cooked", "cooks", "to cook"], 0, "While + V-ing."],
-
+const ADVERBIAL_CLAUSES_QUESTIONS = [
+  ["Grammar", "I'll call you _____ I arrive at the station.", ["as soon as", "unless", "although", "whereas"], 0, "'As soon as' introduces a time clause."],
+  ["Grammar", "_____ it was raining, they continued the match.", ["Although", "Because", "Unless", "So that"], 0, "'Although' introduces a contrast/concession clause."],
+  ["Grammar", "You should take an umbrella _____ it rains later.", ["in case", "although", "whereas", "because of"], 0, "'In case' introduces a precaution against a possible future event."],
+  ["Grammar", "We stayed inside _____ the storm had passed.", ["until", "unless", "whereas", "so that"], 0, "'Until' introduces the time limit."],
+  ["Grammar", "He left early _____ he could catch the first train.", ["so that", "although", "unless", "whereas"], 0, "'So that' introduces a purpose clause."],
+  ["Grammar", "_____ you work hard, you can achieve your goal.", ["If", "Although", "Whereas", "Since"], 0, "'If' introduces a condition."],
+  ["Grammar", "She stayed home _____ she was feeling ill.", ["because", "although", "unless", "whereas"], 0, "'Because' gives the reason."],
+  ["Grammar", "_____ you apologize, she may not forgive you.", ["Unless", "Although", "Because", "Whereas"], 0, "'Unless' means 'if not'."],
+  ["Grammar", "He talks _____ he knew everything.", ["as if", "because", "until", "so that"], 0, "'As if' introduces a comparison with an apparent but possibly unreal situation."],
+  ["Grammar", "_____ I was cooking, the phone rang.", ["While", "Unless", "Although", "Since"], 0, "'While' introduces an action happening at the same time."],
+  ["Grammar", "She took notes _____ she wouldn't forget the details.", ["so that", "whereas", "although", "until"], 0, "'So that' expresses purpose."],
+  ["Grammar", "_____ you have finished your work, you can leave.", ["Once", "Although", "Unless", "Whereas"], 0, "'Once' introduces a time/condition meaning 'after or when'."],
+  ["Grammar", "We went for a walk _____ the weather was cold.", ["even though", "because", "unless", "so that"], 0, "'Even though' introduces a strong contrast."],
+  ["Grammar", "He works from home _____ his wife works in an office.", ["whereas", "because", "until", "unless"], 0, "'Whereas' contrasts two situations."],
+  ["Grammar", "_____ she was tired, she finished the report.", ["Even though", "Because", "Unless", "So that"], 0, "'Even though' shows contrast."],
+  ["Grammar", "I'll wait here _____ you come back.", ["until", "although", "because", "whereas"], 0, "'Until' marks the endpoint of the waiting."],
+  ["Grammar", "They cancelled the picnic _____ the forecast predicted heavy rain.", ["since", "although", "unless", "whereas"], 0, "'Since' can introduce a reason."],
+  ["Grammar", "Take your passport with you _____ you need to show identification.", ["in case", "although", "whereas", "until"], 0, "'In case' expresses precaution."],
+  ["Grammar", "She whispered _____ nobody would hear her.", ["so that", "although", "unless", "whereas"], 0, "'So that' introduces the purpose of whispering."],
+  ["Grammar", "_____ he had never studied abroad, his English was excellent.", ["Although", "Because", "Unless", "Until"], 0, "'Although' introduces the contrast."],
 ];
 
-const EN_MENH_DE_TRANG_NGU = [
-
-    ["adverbial clause", "___ it was raining, they continued the match.", ["Although", "Because", "Unless", "So that"], 0, "Although introduces a concessive adverbial clause."],
-    ["adverbial clause", "Call me ___ you arrive.", ["when", "unless", "although", "because"], 0, "When introduces a time clause."],
-    ["adverbial clause", "We stayed home ___ the weather was terrible.", ["because", "although", "unless", "so that"], 0, "Because introduces a reason clause."],
-    ["adverbial clause", "Take an umbrella ___ it rains.", ["in case", "although", "because", "whereas"], 0, "In case introduces a precautionary condition."],
-    ["adverbial clause", "You cannot enter ___ you have a pass.", ["unless", "although", "because", "while"], 0, "Unless means if not."],
-    ["adverbial clause", "She spoke slowly ___ everyone could understand.", ["so that", "although", "because", "unless"], 0, "So that introduces purpose."],
-    ["adverbial clause", "___ he was tired, he finished the report.", ["Even though", "Because", "Unless", "Since"], 0, "Even though introduces concession."],
-    ["adverbial clause", "I will wait here ___ you come back.", ["until", "because", "although", "unless"], 0, "Until introduces an endpoint in time."],
-    ["adverbial clause", "He studies hard ___ he can pass the exam.", ["so that", "although", "unless", "whereas"], 0, "So that expresses purpose."],
-    ["adverbial clause", "___ you hurry, you will miss the train.", ["If", "Although", "Because", "While"], 0, "If introduces a condition."],
-    ["adverbial clause", "She smiled ___ she was nervous.", ["although", "because", "unless", "so that"], 0, "Although shows contrast."],
-    ["adverbial clause", "We left early ___ we could avoid traffic.", ["so that", "because", "although", "unless"], 0, "So that expresses purpose."],
-    ["adverbial clause", "I have known him ___ we were children.", ["since", "unless", "although", "whereas"], 0, "Since introduces the starting point of a time period."],
-    ["adverbial clause", "___ you finish, you can leave.", ["Once", "Although", "Because", "Unless"], 0, "Once means when something has happened."],
-    ["adverbial clause", "She cannot relax ___ the work is finished.", ["until", "because", "although", "if"], 0, "Until marks the time before an event is completed."],
-    ["adverbial clause", "___ he apologized, she remained upset.", ["Even though", "Because", "Unless", "So that"], 0, "Even though introduces concession."],
-    ["adverbial clause", "Bring some cash ___ the card machine does not work.", ["in case", "although", "because", "whereas"], 0, "In case expresses precaution."],
-    ["adverbial clause", "He took notes ___ he would not forget the details.", ["so that", "unless", "although", "while"], 0, "So that expresses purpose."],
-    ["adverbial clause", "___ the meeting ended, everyone left.", ["After", "Unless", "Although", "Because"], 0, "After introduces a time clause."],
-    ["adverbial clause", "You can borrow my laptop ___ you return it tomorrow.", ["provided that", "although", "because", "while"], 0, "Provided that means on the condition that."],
-
+const IDIOMS_QUESTIONS = [
+  ["Vocabulary", "If a task is 'a piece of cake', it is _____.", ["very easy", "very expensive", "dangerous", "unfinished"], 0, "'A piece of cake' means something is very easy."],
+  ["Vocabulary", "If someone says 'break a leg', they usually mean _____.", ["good luck", "be careful", "hurry up", "calm down"], 0, "'Break a leg' is an idiomatic way to wish someone good luck."],
+  ["Vocabulary", "If you are 'under the weather', you feel _____.", ["ill", "excited", "wealthy", "confused"], 0, "'Under the weather' means feeling unwell."],
+  ["Vocabulary", "If someone 'hits the nail on the head', they _____.", ["describe something exactly", "make a mistake", "arrive late", "avoid a problem"], 0, "The idiom means to say or do something exactly right."],
+  ["Vocabulary", "If you 'spill the beans', you _____.", ["reveal a secret", "cook dinner", "waste money", "leave early"], 0, "'Spill the beans' means reveal secret information."],
+  ["Vocabulary", "If something 'costs an arm and a leg', it is _____.", ["very expensive", "very small", "free", "easy to find"], 0, "The idiom means extremely expensive."],
+  ["Vocabulary", "If you 'see eye to eye' with someone, you _____.", ["agree with them", "avoid them", "argue with them", "work for them"], 0, "'See eye to eye' means agree or have the same opinion."],
+  ["Vocabulary", "If you 'get cold feet', you _____.", ["become nervous and lose confidence", "become very cold", "run a marathon", "feel hungry"], 0, "'Get cold feet' means become too nervous to do something."],
+  ["Vocabulary", "If a person is 'a night owl', they prefer to _____.", ["stay awake late", "wake up very early", "work outdoors", "sleep at noon"], 0, "A 'night owl' is someone who is active late at night."],
+  ["Vocabulary", "If you 'keep an eye on' something, you _____.", ["watch it carefully", "hide it", "buy it", "repair it"], 0, "'Keep an eye on' means watch or monitor."],
+  ["Vocabulary", "If a plan 'goes down in flames', it _____.", ["fails badly", "succeeds quickly", "costs nothing", "starts early"], 0, "The idiom describes a complete or embarrassing failure."],
+  ["Vocabulary", "If someone is 'on the same page', they _____.", ["have the same understanding", "are reading together", "are angry", "are lost"], 0, "'On the same page' means sharing the same understanding or goals."],
+  ["Vocabulary", "If you 'bite the bullet', you _____.", ["face a difficult situation bravely", "avoid responsibility", "change your name", "take a holiday"], 0, "'Bite the bullet' means accept and face something difficult."],
+  ["Vocabulary", "If something happens 'once in a blue moon', it happens _____.", ["very rarely", "every day", "at midnight", "without warning"], 0, "The idiom means very rarely."],
+  ["Vocabulary", "If you 'call it a day', you _____.", ["stop working for the day", "start a new project", "make a phone call", "arrive at work"], 0, "'Call it a day' means stop working for the day."],
+  ["Vocabulary", "If someone 'pulls your leg', they are _____.", ["joking with you", "helping you walk", "criticizing you", "copying your work"], 0, "'Pull someone's leg' means tease or joke with them."],
+  ["Vocabulary", "If you are 'in hot water', you are _____.", ["in trouble", "very successful", "very thirsty", "on holiday"], 0, "'In hot water' means in trouble."],
+  ["Vocabulary", "If you 'make ends meet', you _____.", ["manage your money successfully", "finish a meeting early", "make two people meet", "avoid paying taxes"], 0, "'Make ends meet' means have enough money for basic expenses."],
+  ["Vocabulary", "If a colleague is 'a people person', they are good at _____.", ["dealing with other people", "working alone", "using computers", "driving"], 0, "A 'people person' is sociable and comfortable dealing with others."],
+  ["Vocabulary", "If you 'go the extra mile', you _____.", ["make more effort than expected", "travel exactly one mile", "stop working", "ask for a refund"], 0, "'Go the extra mile' means make extra effort."],
 ];
 
-const EN_IDIOM = [
-
-    ["idiom", "“Break the ice” means:", ["start a friendly conversation", "end a relationship", "make someone angry", "work very quickly"], 0, "Break the ice means make people feel more relaxed."],
-    ["idiom", "“Hit the nail on the head” means:", ["describe something exactly", "make a mistake", "avoid a problem", "arrive late"], 0, "It means say or do exactly the right thing."],
-    ["idiom", "“A piece of cake” means:", ["very easy", "very expensive", "very dangerous", "very boring"], 0, "A piece of cake means easy."],
-    ["idiom", "“Under the weather” means:", ["feeling ill", "feeling excited", "being outside", "being late"], 0, "Under the weather means feeling unwell."],
-    ["idiom", "“Once in a blue moon” means:", ["very rarely", "every day", "very loudly", "without warning"], 0, "It means something happens rarely."],
-    ["idiom", "“Cost an arm and a leg” means:", ["be very expensive", "be free", "be dangerous", "be simple"], 0, "The idiom means cost a lot of money."],
-    ["idiom", "“Spill the beans” means:", ["reveal a secret", "cook dinner", "make a plan", "leave quickly"], 0, "Spill the beans means reveal secret information."],
-    ["idiom", "“Call it a day” means:", ["stop working for the day", "start a project", "make a phone call", "change jobs"], 0, "It means stop working for the day."],
-    ["idiom", "“Get cold feet” means:", ["become nervous about doing something", "feel physically cold", "run fast", "become confident"], 0, "Get cold feet means lose courage."],
-    ["idiom", "“In hot water” means:", ["in trouble", "in a bath", "very successful", "very relaxed"], 0, "In hot water means in trouble."],
-    ["idiom", "“Keep an eye on” means:", ["watch carefully", "ignore", "repair", "borrow"], 0, "Keep an eye on means watch or monitor."],
-    ["idiom", "“Go the extra mile” means:", ["make extra effort", "travel abroad", "stop early", "avoid responsibility"], 0, "It means make more effort than expected."],
-    ["idiom", "“Bite the bullet” means:", ["face a difficult situation bravely", "eat quickly", "avoid a decision", "complain loudly"], 0, "Bite the bullet means endure something difficult."],
-    ["idiom", "“The ball is in your court” means:", ["it is your turn to act", "you are playing tennis", "you have lost", "the game is over"], 0, "It means the next action is your responsibility."],
-    ["idiom", "“On the same page” means:", ["share the same understanding", "read the same book", "disagree strongly", "work alone"], 0, "It means have the same understanding."],
-    ["idiom", "“Miss the boat” means:", ["miss an opportunity", "travel by ship", "arrive early", "change direction"], 0, "Miss the boat means lose an opportunity."],
-    ["idiom", "“Back to square one” means:", ["return to the beginning", "win easily", "finish a task", "take a shortcut"], 0, "It means start again from the beginning."],
-    ["idiom", "“Pull someone’s leg” means:", ["joke with someone", "help someone walk", "criticize someone", "follow someone"], 0, "Pull someone’s leg means tease or joke."],
-    ["idiom", "“A blessing in disguise” means:", ["something that seems bad but turns out good", "a hidden gift card", "a religious event", "an obvious success"], 0, "It describes an apparent problem with a positive result."],
-    ["idiom", "“Beat around the bush” means:", ["avoid saying something directly", "work in a garden", "speak clearly", "finish quickly"], 0, "It means avoid the main point."],
-
+const PHRASAL_VERBS_QUESTIONS = [
+  ["Vocabulary", "Please _____ the lights before you leave.", ["turn off", "turn into", "turn over", "turn up"], 0, "'Turn off' means switch something off."],
+  ["Vocabulary", "We need to _____ the meeting until next Monday.", ["put off", "put on", "put out", "put up"], 0, "'Put off' means postpone."],
+  ["Vocabulary", "She _____ her younger brother after school.", ["looks after", "looks into", "looks up", "looks over"], 0, "'Look after' means take care of."],
+  ["Vocabulary", "I need to _____ this word in the dictionary.", ["look up", "look after", "look out", "look over"], 0, "'Look up' means search for information."],
+  ["Vocabulary", "The plane _____ at 7:30.", ["took off", "took after", "took over", "took up"], 0, "'Take off' means an aircraft leaves the ground."],
+  ["Vocabulary", "He _____ smoking last year.", ["gave up", "gave away", "gave in", "gave off"], 0, "'Give up' means stop doing something."],
+  ["Vocabulary", "Can you _____ the form before submitting it?", ["fill in", "fill out", "fill over", "fill off"], 1, "'Fill out' is commonly used for completing a form."],
+  ["Vocabulary", "The company decided to _____ a new branch.", ["set up", "set off", "set aside", "set out"], 0, "'Set up' means establish or create."],
+  ["Vocabulary", "Please _____ the word if you don't know it.", ["write down", "write off", "write out of", "write over"], 0, "'Write down' means record something on paper."],
+  ["Vocabulary", "We have _____ milk, so I'll buy some.", ["run out of", "run into", "run over", "run after"], 0, "'Run out of' means have none left."],
+  ["Vocabulary", "I _____ an old friend at the station yesterday.", ["ran into", "ran out of", "ran over", "ran after"], 0, "'Run into' can mean meet someone unexpectedly."],
+  ["Vocabulary", "The fire department quickly _____ the fire.", ["put out", "put off", "put away", "put through"], 0, "'Put out' means extinguish a fire."],
+  ["Vocabulary", "Could you _____ the volume? I can't hear it.", ["turn up", "turn off", "turn down", "turn into"], 0, "'Turn up' means increase the volume."],
+  ["Vocabulary", "She _____ the job offer because the salary was too low.", ["turned down", "turned up", "turned into", "turned over"], 0, "'Turn down' means reject or refuse."],
+  ["Vocabulary", "We need to _____ the problem before making a decision.", ["look into", "look after", "look up to", "look out"], 0, "'Look into' means investigate."],
+  ["Vocabulary", "He _____ his old laptop to his cousin.", ["gave away", "gave up", "gave in", "gave off"], 0, "'Give away' means give something to someone for free."],
+  ["Vocabulary", "The manager asked us to _____ the issue at the next meeting.", ["bring up", "bring in", "bring out", "bring over"], 0, "'Bring up' means introduce a topic for discussion."],
+  ["Vocabulary", "The new policy will _____ major changes.", ["bring about", "bring up", "bring out", "bring back"], 0, "'Bring about' means cause something to happen."],
+  ["Vocabulary", "Please _____ your shoes before entering.", ["take off", "take after", "take over", "take up"], 0, "'Take off' can mean remove clothing."],
+  ["Vocabulary", "She _____ her father in the way she speaks.", ["takes after", "takes off", "takes over", "takes up"], 0, "'Take after' means resemble a family member."],
 ];
 
-const EN_PHRASAL_VERB = [
-
-    ["phrasal verb", "Please ___ the lights before you leave.", ["turn off", "turn into", "turn over", "turn up"], 0, "Turn off = switch off."],
-    ["phrasal verb", "I need to ___ this word in the dictionary.", ["look up", "look after", "look into", "look out"], 0, "Look up = search for information."],
-    ["phrasal verb", "She ___ her little brother every afternoon.", ["looks after", "looks up", "looks into", "looks for"], 0, "Look after = take care of."],
-    ["phrasal verb", "The meeting was ___ until Friday.", ["put off", "put on", "put out", "put up"], 0, "Put off = postpone."],
-    ["phrasal verb", "We have ___ milk, so I will buy some.", ["run out of", "run into", "run over", "run away"], 0, "Run out of = have none left."],
-    ["phrasal verb", "He ___ an old friend at the station.", ["ran into", "ran out of", "ran over", "ran away"], 0, "Run into = meet unexpectedly."],
-    ["phrasal verb", "Please ___ your shoes before entering.", ["take off", "take after", "take up", "take in"], 0, "Take off = remove."],
-    ["phrasal verb", "She decided to ___ yoga.", ["take up", "take off", "take over", "take after"], 0, "Take up = begin a hobby/activity."],
-    ["phrasal verb", "Can you ___ this form?", ["fill in", "fill out", "fill up", "fill over"], 0, "Fill in = complete information on a form."],
-    ["phrasal verb", "The plane ___ on time.", ["took off", "took after", "took up", "took in"], 0, "Take off = leave the ground."],
-    ["phrasal verb", "We need to ___ the problem before deciding.", ["figure out", "figure up", "figure off", "figure into"], 0, "Figure out = understand or solve."],
-    ["phrasal verb", "He ___ smoking last year.", ["gave up", "gave in", "gave out", "gave away"], 0, "Give up = stop doing something."],
-    ["phrasal verb", "The car ___ on the way home.", ["broke down", "broke into", "broke up", "broke off"], 0, "Break down = stop working."],
-    ["phrasal verb", "They ___ the old building.", ["knocked down", "knocked out", "knocked up", "knocked over"], 0, "Knock down = demolish."],
-    ["phrasal verb", "I will ___ you ___ at 8 a.m.", ["pick / up", "pick / out", "pick / on", "pick / over"], 0, "Pick someone up = collect someone by car."],
-    ["phrasal verb", "She ___ the invitation because she was busy.", ["turned down", "turned off", "turned into", "turned over"], 0, "Turn down = reject."],
-    ["phrasal verb", "He ___ the meaning of the word.", ["found out", "found over", "found off", "found up"], 0, "Find out = discover information."],
-    ["phrasal verb", "Please ___ the children while I cook.", ["look after", "look up", "look into", "look out"], 0, "Look after = take care of."],
-    ["phrasal verb", "The company will ___ a new product next month.", ["bring out", "bring up", "bring in", "bring off"], 0, "Bring out = release or publish."],
-    ["phrasal verb", "We need to ___ a solution together.", ["come up with", "come across", "come down", "come over"], 0, "Come up with = think of or create."],
-
+const SYNONYMS_QUESTIONS = [
+  ["Vocabulary", "Choose the word closest in meaning to 'reliable'.", ["dependable", "temporary", "uncertain", "careless"], 0, "Reliable means dependable or trustworthy."],
+  ["Vocabulary", "Choose the word closest in meaning to 'rapid'.", ["quick", "weak", "rare", "quiet"], 0, "Rapid means very fast or quick."],
+  ["Vocabulary", "Choose the word closest in meaning to 'purchase'.", ["buy", "borrow", "repair", "sell"], 0, "Purchase is a formal synonym of buy."],
+  ["Vocabulary", "Choose the word closest in meaning to 'assist'.", ["help", "avoid", "refuse", "delay"], 0, "Assist means help."],
+  ["Vocabulary", "Choose the word closest in meaning to 'accurate'.", ["correct", "uncertain", "late", "complex"], 0, "Accurate means correct and free from significant error."],
+  ["Vocabulary", "Choose the word closest in meaning to 'essential'.", ["necessary", "optional", "ordinary", "distant"], 0, "Essential means absolutely necessary."],
+  ["Vocabulary", "Choose the word closest in meaning to 'obtain'.", ["get", "lose", "hide", "throw"], 0, "Obtain means get or acquire."],
+  ["Vocabulary", "Choose the word closest in meaning to 'maintain'.", ["keep", "destroy", "replace", "ignore"], 0, "Maintain means keep something in a particular condition."],
+  ["Vocabulary", "Choose the word closest in meaning to 'significant'.", ["important", "tiny", "private", "temporary"], 0, "Significant means important or meaningful."],
+  ["Vocabulary", "Choose the word closest in meaning to 'decline'.", ["decrease", "increase", "accept", "celebrate"], 0, "Decline can mean decrease."],
+  ["Vocabulary", "Choose the word closest in meaning to 'acquire'.", ["obtain", "lose", "return", "borrow"], 0, "Acquire means obtain or get something."],
+  ["Vocabulary", "Choose the word closest in meaning to 'require'.", ["need", "offer", "avoid", "finish"], 0, "Require means need."],
+  ["Vocabulary", "Choose the word closest in meaning to 'brief'.", ["short", "wide", "heavy", "formal"], 0, "Brief means short in duration or length."],
+  ["Vocabulary", "Choose the word closest in meaning to 'complex'.", ["complicated", "simple", "empty", "cheap"], 0, "Complex means complicated."],
+  ["Vocabulary", "Choose the word closest in meaning to 'fortunate'.", ["lucky", "unhappy", "careless", "ordinary"], 0, "Fortunate means lucky."],
+  ["Vocabulary", "Choose the word closest in meaning to 'sufficient'.", ["enough", "rare", "extraordinary", "missing"], 0, "Sufficient means enough."],
+  ["Vocabulary", "Choose the word closest in meaning to 'improve'.", ["enhance", "damage", "reduce", "ignore"], 0, "Enhance means improve or increase quality."],
+  ["Vocabulary", "Choose the word closest in meaning to 'prevent'.", ["stop", "allow", "encourage", "repeat"], 0, "Prevent means stop something from happening."],
+  ["Vocabulary", "Choose the word closest in meaning to 'aware'.", ["conscious", "unrelated", "silent", "unprepared"], 0, "Aware means conscious of or knowing about something."],
+  ["Vocabulary", "Choose the word closest in meaning to 'purchase'.", ["buy", "rent", "lend", "lose"], 0, "Purchase means buy."],
 ];
 
-const EN_DONG_NGHIA = [
-
-    ["synonym", "“Rapid” is closest in meaning to:", ["fast", "quiet", "weak", "rare"], 0, "Rapid = fast."],
-    ["synonym", "“Purchase” is closest in meaning to:", ["buy", "sell", "borrow", "repair"], 0, "Purchase = buy."],
-    ["synonym", "“Assist” is closest in meaning to:", ["help", "avoid", "refuse", "delay"], 0, "Assist = help."],
-    ["synonym", "“Accurate” is closest in meaning to:", ["correct", "expensive", "simple", "recent"], 0, "Accurate = correct."],
-    ["synonym", "“Essential” is closest in meaning to:", ["necessary", "optional", "temporary", "ordinary"], 0, "Essential = necessary."],
-    ["synonym", "“Huge” is closest in meaning to:", ["enormous", "tiny", "narrow", "weak"], 0, "Huge = enormous."],
-    ["synonym", "“Reliable” is closest in meaning to:", ["dependable", "dangerous", "expensive", "uncertain"], 0, "Reliable = dependable."],
-    ["synonym", "“Difficult” is closest in meaning to:", ["challenging", "empty", "polite", "familiar"], 0, "Difficult = challenging."],
-    ["synonym", "“Improve” is closest in meaning to:", ["enhance", "damage", "remove", "hide"], 0, "Improve = enhance."],
-    ["synonym", "“Objective” is closest in meaning to:", ["goal", "mistake", "method", "argument"], 0, "Objective = goal."],
-    ["synonym", "“Purchase” is closest in meaning to:", ["acquire", "lose", "throw", "repair"], 0, "Acquire can mean obtain or purchase."],
-    ["synonym", "“Brief” is closest in meaning to:", ["short", "wide", "heavy", "late"], 0, "Brief = short."],
-    ["synonym", "“Select” is closest in meaning to:", ["choose", "reject", "copy", "divide"], 0, "Select = choose."],
-    ["synonym", "“Modify” is closest in meaning to:", ["change", "destroy", "repeat", "measure"], 0, "Modify = change."],
-    ["synonym", "“Maintain” is closest in meaning to:", ["keep", "remove", "forget", "sell"], 0, "Maintain = keep in good condition."],
-    ["synonym", "“Complex” is closest in meaning to:", ["complicated", "cheap", "friendly", "empty"], 0, "Complex = complicated."],
-    ["synonym", "“Obtain” is closest in meaning to:", ["get", "lose", "hide", "return"], 0, "Obtain = get."],
-    ["synonym", "“Require” is closest in meaning to:", ["need", "offer", "avoid", "borrow"], 0, "Require = need."],
-    ["synonym", "“Approximately” is closest in meaning to:", ["roughly", "exactly", "never", "immediately"], 0, "Approximately = roughly."],
-    ["synonym", "“Previous” is closest in meaning to:", ["earlier", "future", "current", "separate"], 0, "Previous = earlier."],
-
+const ANTONYMS_QUESTIONS = [
+  ["Vocabulary", "Choose the word opposite in meaning to 'expand'.", ["contract", "increase", "develop", "extend"], 0, "Contract means become smaller or reduce in size."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'generous'.", ["selfish", "kind", "helpful", "friendly"], 0, "Selfish is opposite to generous in this context."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'temporary'.", ["permanent", "brief", "short", "limited"], 0, "Permanent means lasting for a long time or indefinitely."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'ancient'.", ["modern", "historic", "old", "traditional"], 0, "Modern is the opposite of ancient."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'accept'.", ["reject", "receive", "allow", "agree"], 0, "Reject means refuse to accept."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'increase'.", ["decrease", "grow", "raise", "improve"], 0, "Decrease means become less."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'polite'.", ["rude", "formal", "kind", "friendly"], 0, "Rude is the opposite of polite."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'visible'.", ["hidden", "clear", "obvious", "bright"], 0, "Hidden means not visible."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'flexible'.", ["rigid", "adaptable", "soft", "changeable"], 0, "Rigid means not flexible."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'optimistic'.", ["pessimistic", "hopeful", "positive", "confident"], 0, "Pessimistic is the opposite of optimistic."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'minor'.", ["major", "small", "slight", "limited"], 0, "Major is the opposite of minor."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'frequent'.", ["rare", "regular", "common", "usual"], 0, "Rare means happening infrequently."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'complex'.", ["simple", "difficult", "complicated", "advanced"], 0, "Simple is the opposite of complex."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'arrive'.", ["depart", "reach", "come", "enter"], 0, "Depart means leave, the opposite of arrive."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'include'.", ["exclude", "contain", "involve", "add"], 0, "Exclude means leave out."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'victory'.", ["defeat", "success", "triumph", "win"], 0, "Defeat is the opposite of victory."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'legal'.", ["illegal", "official", "valid", "lawful"], 0, "Illegal is the opposite of legal."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'accurate'.", ["inaccurate", "correct", "precise", "exact"], 0, "Inaccurate means not correct."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'maximum'.", ["minimum", "highest", "greatest", "top"], 0, "Minimum is the opposite of maximum."],
+  ["Vocabulary", "Choose the word opposite in meaning to 'advance'.", ["retreat", "progress", "develop", "improve"], 0, "Retreat means move back, the opposite of advance."],
 ];
 
-const EN_TRAI_NGHIA = [
-
-    ["antonym", "The opposite of “expand” is:", ["contract", "increase", "develop", "extend"], 0, "Expand ↔ contract."],
-    ["antonym", "The opposite of “ancient” is:", ["modern", "old", "historic", "traditional"], 0, "Ancient ↔ modern."],
-    ["antonym", "The opposite of “generous” is:", ["selfish", "kind", "helpful", "polite"], 0, "Generous ↔ selfish."],
-    ["antonym", "The opposite of “temporary” is:", ["permanent", "brief", "short", "recent"], 0, "Temporary ↔ permanent."],
-    ["antonym", "The opposite of “accept” is:", ["reject", "receive", "allow", "agree"], 0, "Accept ↔ reject."],
-    ["antonym", "The opposite of “increase” is:", ["decrease", "improve", "grow", "expand"], 0, "Increase ↔ decrease."],
-    ["antonym", "The opposite of “visible” is:", ["hidden", "clear", "bright", "obvious"], 0, "Visible ↔ hidden."],
-    ["antonym", "The opposite of “flexible” is:", ["rigid", "adaptable", "soft", "useful"], 0, "Flexible ↔ rigid."],
-    ["antonym", "The opposite of “optimistic” is:", ["pessimistic", "hopeful", "positive", "confident"], 0, "Optimistic ↔ pessimistic."],
-    ["antonym", "The opposite of “include” is:", ["exclude", "contain", "add", "accept"], 0, "Include ↔ exclude."],
-    ["antonym", "The opposite of “major” is:", ["minor", "important", "large", "main"], 0, "Major ↔ minor."],
-    ["antonym", "The opposite of “accurate” is:", ["incorrect", "precise", "correct", "exact"], 0, "Accurate ↔ incorrect."],
-    ["antonym", "The opposite of “frequent” is:", ["rare", "regular", "common", "usual"], 0, "Frequent ↔ rare."],
-    ["antonym", "The opposite of “strengthen” is:", ["weaken", "support", "improve", "build"], 0, "Strengthen ↔ weaken."],
-    ["antonym", "The opposite of “arrive” is:", ["depart", "reach", "enter", "come"], 0, "Arrive ↔ depart."],
-    ["antonym", "The opposite of “complicated” is:", ["simple", "difficult", "detailed", "advanced"], 0, "Complicated ↔ simple."],
-    ["antonym", "The opposite of “polite” is:", ["rude", "friendly", "formal", "kind"], 0, "Polite ↔ rude."],
-    ["antonym", "The opposite of “profit” is:", ["loss", "income", "salary", "benefit"], 0, "Profit ↔ loss."],
-    ["antonym", "The opposite of “maximum” is:", ["minimum", "highest", "largest", "top"], 0, "Maximum ↔ minimum."],
-    ["antonym", "The opposite of “permit” is:", ["forbid", "allow", "approve", "accept"], 0, "Permit ↔ forbid."],
-
+const CONJUNCTIONS_QUESTIONS = [
+  ["Grammar", "I stayed at home _____ I was feeling sick.", ["because", "although", "unless", "whereas"], 0, "'Because' introduces a reason."],
+  ["Grammar", "_____ he was tired, he finished the report.", ["Although", "Because", "Unless", "So"], 0, "'Although' introduces a contrast."],
+  ["Grammar", "Hurry up, _____ we will miss the bus.", ["or", "and", "because", "although"], 0, "'Or' can introduce a negative consequence if an action is not taken."],
+  ["Grammar", "She studied hard, _____ she passed the exam.", ["so", "but", "unless", "although"], 0, "'So' introduces the result."],
+  ["Grammar", "I like tea, _____ my brother prefers coffee.", ["whereas", "because", "so", "unless"], 0, "'Whereas' contrasts two preferences."],
+  ["Grammar", "We can go out _____ it stops raining.", ["if", "although", "because", "whereas"], 0, "'If' introduces a condition."],
+  ["Grammar", "He didn't go to work _____ he was ill.", ["because", "although", "unless", "while"], 0, "'Because' gives the reason."],
+  ["Grammar", "You won't improve _____ you practice regularly.", ["unless", "because", "although", "whereas"], 0, "'Unless' means 'if not'."],
+  ["Grammar", "She called me _____ she arrived.", ["when", "unless", "although", "whereas"], 0, "'When' introduces a time clause."],
+  ["Grammar", "Take an umbrella _____ it rains.", ["in case", "although", "whereas", "until"], 0, "'In case' expresses precaution."],
+  ["Grammar", "He is rich, _____ he isn't very happy.", ["but", "because", "so", "unless"], 0, "'But' introduces contrast."],
+  ["Grammar", "We waited _____ the shop opened.", ["until", "because", "although", "whereas"], 0, "'Until' marks the endpoint of waiting."],
+  ["Grammar", "She spoke quietly _____ nobody would hear.", ["so that", "although", "unless", "whereas"], 0, "'So that' expresses purpose."],
+  ["Grammar", "_____ you finish, you can leave.", ["Once", "Although", "Because", "Whereas"], 0, "'Once' means after/when a condition is fulfilled."],
+  ["Grammar", "I will go _____ you come with me.", ["provided that", "although", "because", "whereas"], 0, "'Provided that' means 'if' with a condition."],
+  ["Grammar", "He continued working _____ he was exhausted.", ["even though", "because", "unless", "so that"], 0, "'Even though' introduces a strong contrast."],
+  ["Grammar", "We left early _____ avoid the traffic.", ["so as to", "although", "whereas", "unless"], 0, "'So as to' introduces purpose."],
+  ["Grammar", "She didn't buy it _____ it was on sale.", ["even though", "because", "unless", "whereas"], 0, "'Even though' introduces an unexpected contrast."],
+  ["Grammar", "Call me _____ you need any help.", ["if", "although", "whereas", "until"], 0, "'If' introduces a condition."],
+  ["Grammar", "He saved money _____ he could travel abroad.", ["so that", "although", "unless", "whereas"], 0, "'So that' introduces purpose."],
 ];
 
-const TOAN_11_QUESTIONS = [["Lượng giác", "Giá trị của sin(0) bằng?", ["0", "1", "-1", "√2/2"], 0, "sin(0)=0."], ["Lượng giác", "Giá trị của sin(π/6) bằng?", ["1/2", "0", "1", "-1"], 0, "sin(π/6)=1/2."], ["Lượng giác", "Giá trị của sin(π/4) bằng?", ["√2/2", "0", "1", "-1"], 0, "sin(π/4)=√2/2."], ["Lượng giác", "Giá trị của sin(π/3) bằng?", ["√3/2", "0", "1", "-1"], 0, "sin(π/3)=√3/2."], ["Lượng giác", "Giá trị của sin(π/2) bằng?", ["1", "0", "-1", "√2/2"], 0, "sin(π/2)=1."], ["Lượng giác", "Giá trị của cos(0) bằng?", ["1", "0", "-1", "√2/2"], 0, "cos(0)=1."], ["Lượng giác", "Giá trị của cos(π/3) bằng?", ["1/2", "0", "1", "-1"], 0, "cos(π/3)=1/2."], ["Lượng giác", "Giá trị của cos(π/2) bằng?", ["0", "1", "-1", "√2/2"], 0, "cos(π/2)=0."], ["Lượng giác", "Giá trị của cos(π) bằng?", ["-1", "0", "1", "√2/2"], 0, "cos(π)=-1."], ["Lượng giác", "Giá trị của tan(0) bằng?", ["0", "1", "-1", "√2/2"], 0, "tan(0)=0."], ["Lượng giác", "Giá trị của tan(π/4) bằng?", ["1", "0", "-1", "√2/2"], 0, "tan(π/4)=1."], ["Lượng giác", "Giá trị của tan(π/6) bằng?", ["√3/3", "0", "1", "-1"], 0, "tan(π/6)=√3/3."], ["Lượng giác", "Giá trị của cot(π/4) bằng?", ["1", "0", "-1", "√2/2"], 0, "cot(π/4)=1."], ["Lượng giác", "Giá trị của cot(π/3) bằng?", ["√3/3", "0", "1", "-1"], 0, "cot(π/3)=√3/3."], ["Lượng giác", "Giá trị của cot(π/6) bằng?", ["√3", "0", "1", "-1"], 0, "cot(π/6)=√3."], ["Lượng giác", "Công thức đúng của sin²x+cos²x là?", ["1", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin²x+cos²x=1."], ["Lượng giác", "Công thức đúng của 1+tan²x là?", ["1/cos²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: 1+tan²x=1/cos²x."], ["Lượng giác", "Công thức đúng của sin 2x là?", ["2sin x cos x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin 2x=2sin x cos x."], ["Lượng giác", "Công thức đúng của cos 2x là?", ["1-2sin²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos 2x=1-2sin²x."], ["Lượng giác", "Công thức đúng của sin(a+b) là?", ["sin a cos b + cos a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(a+b)=sin a cos b + cos a sin b."], ["Lượng giác", "Công thức đúng của cos(a+b) là?", ["cos a cos b - sin a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos(a+b)=cos a cos b - sin a sin b."], ["Lượng giác", "Công thức đúng của sin(a-b) là?", ["sin a cos b - cos a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(a-b)=sin a cos b - cos a sin b."], ["Lượng giác", "Công thức đúng của tan(a+b) là?", ["(tan a+tan b)/(1-tan a tan b)", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: tan(a+b)=(tan a+tan b)/(1-tan a tan b)."], ["Lượng giác", "Công thức đúng của sin²x là?", ["(1-cos 2x)/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin²x=(1-cos 2x)/2."], ["Lượng giác", "Công thức đúng của cos²x là?", ["(1+cos 2x)/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos²x=(1+cos 2x)/2."], ["Lượng giác", "Công thức đúng của sin x cos x là?", ["sin 2x/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin x cos x=sin 2x/2."], ["Lượng giác", "Công thức đúng của cot x là?", ["cos x/sin x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cot x=cos x/sin x."], ["Lượng giác", "Công thức đúng của tan x là?", ["sin x/cos x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: tan x=sin x/cos x."], ["Lượng giác", "Công thức đúng của 1+cot²x là?", ["1/sin²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: 1+cot²x=1/sin²x."], ["Lượng giác", "Công thức đúng của sin(-x) là?", ["-sin x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(-x)=-sin x."], ["Cấp số cộng", "Cho cấp số cộng u₁=2, d=3. Giá trị u_5 là?", ["14", "17", "11", "17"], 0, "u_n=u₁+(n-1)d=14."], ["Cấp số cộng", "Cho cấp số cộng u₁=3, d=4. Giá trị u_6 là?", ["23", "27", "19", "27"], 0, "u_n=u₁+(n-1)d=23."], ["Cấp số cộng", "Cho cấp số cộng u₁=4, d=5. Giá trị u_7 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=5, d=6. Giá trị u_8 là?", ["47", "53", "41", "53"], 0, "u_n=u₁+(n-1)d=47."], ["Cấp số cộng", "Cho cấp số cộng u₁=6, d=7. Giá trị u_9 là?", ["62", "69", "55", "69"], 0, "u_n=u₁+(n-1)d=62."], ["Cấp số cộng", "Cho cấp số cộng u₁=7, d=3. Giá trị u_10 là?", ["34", "37", "31", "37"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=8, d=4. Giá trị u_5 là?", ["24", "28", "20", "28"], 0, "u_n=u₁+(n-1)d=24."], ["Cấp số cộng", "Cho cấp số cộng u₁=9, d=5. Giá trị u_6 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=10, d=6. Giá trị u_7 là?", ["46", "52", "40", "52"], 0, "u_n=u₁+(n-1)d=46."], ["Cấp số cộng", "Cho cấp số cộng u₁=11, d=7. Giá trị u_8 là?", ["60", "67", "53", "67"], 0, "u_n=u₁+(n-1)d=60."], ["Cấp số cộng", "Cho cấp số cộng u₁=12, d=3. Giá trị u_9 là?", ["36", "39", "33", "39"], 0, "u_n=u₁+(n-1)d=36."], ["Cấp số cộng", "Cho cấp số cộng u₁=13, d=4. Giá trị u_10 là?", ["49", "53", "45", "53"], 0, "u_n=u₁+(n-1)d=49."], ["Cấp số cộng", "Cho cấp số cộng u₁=14, d=5. Giá trị u_5 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=15, d=6. Giá trị u_6 là?", ["45", "51", "39", "51"], 0, "u_n=u₁+(n-1)d=45."], ["Cấp số cộng", "Cho cấp số cộng u₁=16, d=7. Giá trị u_7 là?", ["58", "65", "51", "65"], 0, "u_n=u₁+(n-1)d=58."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=2. Giá trị u_4 là?", ["8", "16", "4", "8"], 0, "u_n=8."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=3. Tổng 5 số hạng đầu bằng?", ["242", "244", "726", "162"], 0, "S_n=242."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=4. Giá trị u_6 là?", ["3072", "12288", "768", "72"], 0, "u_n=3072."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=2. Tổng 7 số hạng đầu bằng?", ["508", "512", "1016", "256"], 0, "S_n=508."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=3. Giá trị u_8 là?", ["10935", "32805", "3645", "120"], 0, "u_n=10935."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=4. Tổng 4 số hạng đầu bằng?", ["85", "86", "340", "64"], 0, "S_n=85."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=2. Giá trị u_5 là?", ["32", "64", "16", "20"], 0, "u_n=32."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=3. Tổng 6 số hạng đầu bằng?", ["1092", "1095", "3276", "729"], 0, "S_n=1092."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=4. Giá trị u_7 là?", ["16384", "65536", "4096", "112"], 0, "u_n=16384."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=2. Tổng 8 số hạng đầu bằng?", ["1275", "1280", "2550", "640"], 0, "S_n=1275."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=3. Giá trị u_4 là?", ["27", "81", "9", "12"], 0, "u_n=27."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=4. Tổng 5 số hạng đầu bằng?", ["682", "684", "2728", "512"], 0, "S_n=682."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=2. Giá trị u_6 là?", ["96", "192", "48", "36"], 0, "u_n=96."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=3. Tổng 7 số hạng đầu bằng?", ["4372", "4376", "13116", "2916"], 0, "S_n=4372."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=4. Giá trị u_8 là?", ["81920", "327680", "20480", "160"], 0, "u_n=81920."], ["Giới hạn dãy số", "lim n→∞ (2n+1)/n bằng?", ["2", "1", "3", "0"], 0, "Giới hạn bằng 2."], ["Giới hạn dãy số", "lim n→∞ (3n+2)/n bằng?", ["3", "2", "5", "0"], 0, "Giới hạn bằng 3."], ["Giới hạn dãy số", "lim n→∞ (4n+3)/n bằng?", ["4", "3", "7", "0"], 0, "Giới hạn bằng 4."], ["Giới hạn dãy số", "lim n→∞ (5n+4)/n bằng?", ["5", "4", "9", "0"], 0, "Giới hạn bằng 5."], ["Giới hạn dãy số", "lim n→∞ (6n+5)/n bằng?", ["6", "5", "11", "0"], 0, "Giới hạn bằng 6."], ["Giới hạn dãy số", "lim n→∞ (7n+1)/n bằng?", ["7", "1", "8", "0"], 0, "Giới hạn bằng 7."], ["Giới hạn dãy số", "lim n→∞ (2n+2)/n bằng?", ["2", "2", "4", "0"], 0, "Giới hạn bằng 2."], ["Giới hạn dãy số", "lim n→∞ (3n+3)/n bằng?", ["3", "3", "6", "0"], 0, "Giới hạn bằng 3."], ["Giới hạn dãy số", "lim n→∞ (4/n+4/n²) bằng?", ["0", "4", "4", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (5/n+5/n²) bằng?", ["0", "5", "5", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (6/n+1/n²) bằng?", ["0", "6", "1", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (7/n+2/n²) bằng?", ["0", "7", "2", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (2/n+3/n²) bằng?", ["0", "2", "3", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (3/n+4/n²) bằng?", ["0", "3", "4", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (4/n+5/n²) bằng?", ["0", "4", "5", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn hàm số", "lim x→1 (1x+2) bằng?", ["3", "4", "3", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 3."], ["Giới hạn hàm số", "lim x→2 (2x+3) bằng?", ["7", "8", "5", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 7."], ["Giới hạn hàm số", "lim x→3 (3x+4) bằng?", ["13", "14", "7", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 13."], ["Giới hạn hàm số", "lim x→1 (4x+5) bằng?", ["9", "10", "9", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 9."], ["Giới hạn hàm số", "lim x→2 (5x+6) bằng?", ["16", "17", "11", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 16."], ["Giới hạn hàm số", "lim x→3 (6x+2) bằng?", ["20", "21", "8", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 20."], ["Giới hạn hàm số", "lim x→1 (1x+3) bằng?", ["4", "5", "4", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 4."], ["Giới hạn hàm số", "lim x→2 (2x+4) bằng?", ["8", "9", "6", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 8."], ["Giới hạn hàm số", "lim x→3 (3x+5) bằng?", ["14", "15", "8", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 14."], ["Giới hạn hàm số", "lim x→1 (4x+6) bằng?", ["10", "11", "10", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 10."], ["Giới hạn hàm số", "lim x→2 (5x+2) bằng?", ["12", "13", "7", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 12."], ["Giới hạn hàm số", "lim x→3 (6x+3) bằng?", ["21", "22", "9", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 21."], ["Giới hạn hàm số", "lim x→1 (1x+4) bằng?", ["5", "6", "5", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 5."], ["Giới hạn hàm số", "lim x→2 (2x+5) bằng?", ["9", "10", "7", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 9."], ["Giới hạn hàm số", "lim x→3 (3x+6) bằng?", ["15", "16", "9", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 15."], ["Hàm số liên tục", "Với f(x)=x²+3x, giá trị f(0) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=0 được 0."], ["Hàm số liên tục", "Với f(x)=2x-5, giá trị f(3) bằng?", ["1", "2", "0", "0"], 0, "Thay x=3 được 1."], ["Hàm số liên tục", "Với f(x)=x³, giá trị f(-1) bằng?", ["-1", "0", "-2", "0"], 0, "Thay x=-1 được -1."], ["Hàm số liên tục", "Với f(x)=5x+2, giá trị f(2) bằng?", ["12", "13", "11", "0"], 0, "Thay x=2 được 12."], ["Hàm số liên tục", "Với f(x)=x²-4, giá trị f(2) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=2 được 0."], ["Hàm số liên tục", "Với f(x)=3x², giá trị f(1) bằng?", ["3", "4", "2", "0"], 0, "Thay x=1 được 3."], ["Hàm số liên tục", "Với f(x)=x²+x, giá trị f(-2) bằng?", ["2", "3", "1", "0"], 0, "Thay x=-2 được 2."], ["Hàm số liên tục", "Với f(x)=4x-1, giá trị f(0) bằng?", ["-1", "0", "-2", "0"], 0, "Thay x=0 được -1."], ["Hàm số liên tục", "Với f(x)=x³+1, giá trị f(1) bằng?", ["2", "3", "1", "0"], 0, "Thay x=1 được 2."], ["Hàm số liên tục", "Với f(x)=2x²+1, giá trị f(-1) bằng?", ["3", "4", "2", "0"], 0, "Thay x=-1 được 3."], ["Hàm số liên tục", "Với f(x)=x²+2x, giá trị f(0) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=0 được 0."], ["Hàm số liên tục", "Với f(x)=7x, giá trị f(2) bằng?", ["14", "15", "13", "0"], 0, "Thay x=2 được 14."], ["Hàm số liên tục", "Với f(x)=x³-x, giá trị f(1) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=1 được 0."], ["Hàm số liên tục", "Với f(x)=x²-1, giá trị f(-1) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=-1 được 0."], ["Hàm số liên tục", "Với f(x)=3x+4, giá trị f(-2) bằng?", ["-2", "-1", "-3", "0"], 0, "Thay x=-2 được -2."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+1x là?", ["4x+1", "2x+1", "4x", "2x²+1"], 0, "f'(x)=4x+1."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+2x là?", ["6x+2", "3x+2", "6x", "3x²+2"], 0, "f'(x)=6x+2."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+3x là?", ["8x+3", "4x+3", "8x", "4x²+3"], 0, "f'(x)=8x+3."], ["Đạo hàm", "Đạo hàm của f(x)=5x²+4x là?", ["10x+4", "5x+4", "10x", "5x²+4"], 0, "f'(x)=10x+4."], ["Đạo hàm", "Đạo hàm của f(x)=6x²+1x là?", ["12x+1", "6x+1", "12x", "6x²+1"], 0, "f'(x)=12x+1."], ["Đạo hàm", "Đạo hàm của f(x)=7x²+2x là?", ["14x+2", "7x+2", "14x", "7x²+2"], 0, "f'(x)=14x+2."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+3x là?", ["4x+3", "2x+3", "4x", "2x²+3"], 0, "f'(x)=4x+3."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+4x là?", ["6x+4", "3x+4", "6x", "3x²+4"], 0, "f'(x)=6x+4."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+1x là?", ["8x+1", "4x+1", "8x", "4x²+1"], 0, "f'(x)=8x+1."], ["Đạo hàm", "Đạo hàm của f(x)=5x²+2x là?", ["10x+2", "5x+2", "10x", "5x²+2"], 0, "f'(x)=10x+2."], ["Đạo hàm", "Đạo hàm của f(x)=6x²+3x là?", ["12x+3", "6x+3", "12x", "6x²+3"], 0, "f'(x)=12x+3."], ["Đạo hàm", "Đạo hàm của f(x)=7x²+4x là?", ["14x+4", "7x+4", "14x", "7x²+4"], 0, "f'(x)=14x+4."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+1x là?", ["4x+1", "2x+1", "4x", "2x²+1"], 0, "f'(x)=4x+1."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+2x là?", ["6x+2", "3x+2", "6x", "3x²+2"], 0, "f'(x)=6x+2."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+3x là?", ["8x+3", "4x+3", "8x", "4x²+3"], 0, "f'(x)=8x+3."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+2x, f'(1) bằng?", ["4", "5", "2", "3"], 0, "f'(1)=4."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+3x, f'(2) bằng?", ["11", "12", "8", "7"], 0, "f'(2)=11."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+4x, f'(3) bằng?", ["22", "23", "18", "13"], 0, "f'(3)=22."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+5x, f'(1) bằng?", ["13", "14", "8", "9"], 0, "f'(1)=13."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+2x, f'(2) bằng?", ["22", "23", "20", "12"], 0, "f'(2)=22."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+3x, f'(3) bằng?", ["9", "10", "6", "6"], 0, "f'(3)=9."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+4x, f'(1) bằng?", ["8", "9", "4", "6"], 0, "f'(1)=8."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+5x, f'(2) bằng?", ["17", "18", "12", "11"], 0, "f'(2)=17."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+2x, f'(3) bằng?", ["26", "27", "24", "14"], 0, "f'(3)=26."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+3x, f'(1) bằng?", ["13", "14", "10", "8"], 0, "f'(1)=13."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+4x, f'(2) bằng?", ["8", "9", "4", "6"], 0, "f'(2)=8."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+5x, f'(3) bằng?", ["17", "18", "12", "11"], 0, "f'(3)=17."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+2x, f'(1) bằng?", ["8", "9", "6", "5"], 0, "f'(1)=8."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+3x, f'(2) bằng?", ["19", "20", "16", "11"], 0, "f'(2)=19."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+4x, f'(3) bằng?", ["34", "35", "30", "19"], 0, "f'(3)=34."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 2 của 8 phần tử là?", ["56", "28", "16", "64"], 0, "A(8,2)=56."], ["Tổ hợp - xác suất", "Số tổ hợp chập 3 của 9 phần tử là?", ["84", "504", "27", "12"], 0, "C(9,3)=84."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 4 của 10 phần tử là?", ["5040", "210", "40", "10000"], 0, "A(10,4)=5040."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 2 của 8 phần tử là?", ["56", "28", "16", "64"], 0, "A(8,2)=56."], ["Tổ hợp - xác suất", "Số tổ hợp chập 3 của 9 phần tử là?", ["84", "504", "27", "12"], 0, "C(9,3)=84."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 4 của 10 phần tử là?", ["5040", "210", "40", "10000"], 0, "A(10,4)=5040."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."]];
-
-const EXTRA_LANGUAGE_QUESTIONS = [
-  ...toQuestions("HSK 4", "hsk4", HSK4_QUESTIONS),
-  ...toQuestions("HSK 5", "hsk5", HSK5_QUESTIONS),
-  ...toQuestions("Tiếng Anh • Đảo ngữ", "english_inversion", EN_DAO_NGU),
-  ...toQuestions("Tiếng Anh • Thức giả định", "english_subjunctive", EN_THUC_GIA_DINH),
-  ...toQuestions("Tiếng Anh • Trạng từ rút gọn", "english_reduced", EN_TRANG_TU_RUT_GON),
-  ...toQuestions("Tiếng Anh • Mệnh đề trạng ngữ", "english_adverbial", EN_MENH_DE_TRANG_NGU),
-  ...toQuestions("Tiếng Anh • Idiom", "english_idiom", EN_IDIOM),
-  ...toQuestions("Tiếng Anh • Phrasal verb", "english_phrasal", EN_PHRASAL_VERB),
-  ...toQuestions("Tiếng Anh • Đồng nghĩa", "english_synonym", EN_DONG_NGHIA),
-  ...toQuestions("Tiếng Anh • Trái nghĩa", "english_antonym", EN_TRAI_NGHIA),
-];
+const toQuestions = (subject, key, rows) =>
+  rows.map((r, i) => ({
+    id: `${key}${String(i + 1).padStart(2, "0")}`,
+    subject,
+    topic: r[0],
+    q: r[1],
+    choices: r[2],
+    answer: r[3],
+    explanation: r[4],
+  }));
 
 const QUIZ_BANK = [
   ...toQuestions("Ngữ văn", "van", VAN_QUESTIONS),
   ...toQuestions("Vật lý", "ly", LY_QUESTIONS),
-  ...toQuestions("Toán", "toan10_11", TOAN_10_11_QUESTIONS),
-  ...toQuestions("Toán 11", "toan11", TOAN_11_QUESTIONS),
-  ...toQuestions("Vật lý", "ly10_11", LY_10_11_QUESTIONS),
   ...toQuestions("Hóa học", "hoa", HOA_QUESTIONS),
   ...toQuestions("Sinh học", "sinh", SINH_QUESTIONS),
   ...toQuestions("Lịch sử", "su", SU_QUESTIONS),
@@ -922,351 +641,18 @@ const QUIZ_BANK = [
   ...toQuestions("Tiếng Anh", "anh", ANH_QUESTIONS),
   ...toQuestions("GDCD", "gdcd", GDCD_QUESTIONS),
   ...toQuestions("Đố mẹo", "meo", MEO_QUESTIONS),
-  ...toQuestions("Modal Verbs", "modalverb", MODAL_VERB_QUESTIONS),
-  ...EXTRA_LANGUAGE_QUESTIONS,
+  ...toQuestions("Tiếng Trung HSK 4", "hsk4", HSK4_QUESTIONS),
+  ...toQuestions("Tiếng Trung HSK 5", "hsk5", HSK5_QUESTIONS),
+  ...toQuestions("English B1-B2 — Inversion", "inv", INVERSION_QUESTIONS),
+  ...toQuestions("English B1-B2 — Subjunctive/Mood", "subj", SUBJUNCTIVE_MOOD_QUESTIONS),
+  ...toQuestions("English B1-B2 — Reduced Adverbial Clauses", "redadv", REDUCED_ADVERBIAL_CLAUSES_QUESTIONS),
+  ...toQuestions("English B1-B2 — Adverbial Clauses", "advcl", ADVERBIAL_CLAUSES_QUESTIONS),
+  ...toQuestions("English B1-B2 — Idioms", "idiom", IDIOMS_QUESTIONS),
+  ...toQuestions("English B1-B2 — Phrasal Verbs", "phrasal", PHRASAL_VERBS_QUESTIONS),
+  ...toQuestions("English B1-B2 — Synonyms", "syn", SYNONYMS_QUESTIONS),
+  ...toQuestions("English B1-B2 — Antonyms", "ant", ANTONYMS_QUESTIONS),
+  ...toQuestions("English B1-B2 — Conjunctions", "conj", CONJUNCTIONS_QUESTIONS),
 ];
-
-/* =========================================================
-   CÁC KỲ THI TRONG NĂM HỌC
-   5 kỳ thi × 8 môn × 5 câu = 200 câu riêng biệt.
-   Bộ đề thi độc lập với kho ôn tập hiện có + 260 câu mới phía trên.
-========================================================= */
-const EXAM_SUBJECTS = ["Ngữ văn", "Vật lý", "Hóa học", "Sinh học", "Lịch sử", "Địa lý", "Tiếng Anh", "GDCD"];
-
-const EXAM_SCHEDULE = [
-  {id:"mid1", title:"Giữa kỳ 1", icon:"📝", day:8, timeIndex:4},
-  {id:"final1", title:"Cuối kỳ 1", icon:"📕", day:17, timeIndex:4},
-  {id:"mid2", title:"Giữa kỳ 2", icon:"📝", day:26, timeIndex:4},
-  {id:"final2", title:"Cuối kỳ 2", icon:"📕", day:35, timeIndex:4},
-  {id:"thpt", title:"Thi THPT", icon:"🎓", day:45, timeIndex:4},
-];
-
-const EXAM_BANKS = {
-  mid1: {
-    "Ngữ văn": [
-      {"topic":"Truyện Kiều","q":"Truyện Kiều chủ yếu được viết bằng thể thơ nào?","choices":["Lục bát","Song thất lục bát","Thất ngôn bát cú","Tự do"],"answer":0,"explanation":"Truyện Kiều được viết chủ yếu bằng thể thơ lục bát."},
-      {"topic":"Truyện Kiều","q":"Ngôn ngữ Truyện Kiều nổi bật ở đặc điểm nào?","choices":["Giàu tính dân tộc và giàu sức biểu cảm","Chỉ dùng từ Hán Việt","Hoàn toàn khẩu ngữ","Chỉ dùng thuật ngữ khoa học"],"answer":0,"explanation":"Nguyễn Du vận dụng rất linh hoạt ngôn ngữ dân tộc và tiếng Việt giàu sức biểu cảm."},
-      {"topic":"Truyện Kiều","q":"Nhân vật nào là người chị của Thúy Vân?","choices":["Thúy Kiều","Đạm Tiên","Hoạn Thư","Giác Duyên"],"answer":0,"explanation":"Thúy Kiều là chị, Thúy Vân là em."},
-      {"topic":"Chí Phèo","q":"Sau khi trở về làng, Chí Phèo thường dùng cách nào để gây sự?","choices":["Uống rượu và rạch mặt ăn vạ","Bỏ làng đi nơi khác","Viết thư khiếu nại","Xin việc trong trường học"],"answer":0,"explanation":"Chí Phèo thường uống rượu, chửi bới và rạch mặt ăn vạ để gây sự."},
-      {"topic":"Chí Phèo","q":"Ai là người khiến Chí Phèo lần đầu cảm nhận rõ khát vọng làm người lương thiện?","choices":["Thị Nở","Bá Kiến","Lý Cường","Ông giáo"],"answer":0,"explanation":"Sự chăm sóc của Thị Nở đánh thức khát vọng lương thiện ở Chí Phèo."},
-    ],
-    "Vật lý": [
-      {"topic":"Điện lượng","q":"Đơn vị SI của điện lượng là gì?","choices":["Coulomb (C)","Volt (V)","Ampere (A)","Watt (W)"],"answer":0,"explanation":"Điện lượng có đơn vị coulomb (C)."},
-      {"topic":"Công suất","q":"Hiệu suất của một máy được tính bằng tỉ số nào?","choices":["Công có ích chia cho công toàn phần","Công toàn phần chia cho công có ích","Lực chia cho thời gian","Khối lượng chia cho thể tích"],"answer":0,"explanation":"Hiệu suất bằng công có ích chia cho công toàn phần."},
-      {"topic":"Khối lượng riêng","q":"Công thức tính khối lượng riêng là gì?","choices":["D = m/V","D = V/m","D = mV","D = F/s"],"answer":0,"explanation":"Khối lượng riêng bằng khối lượng chia thể tích."},
-      {"topic":"Áp suất","q":"Áp suất của chất rắn lên một mặt được tính bởi công thức nào?","choices":["p = F/S","p = FS","p = S/F","p = m/V"],"answer":0,"explanation":"Áp suất bằng áp lực trên diện tích bị ép."},
-      {"topic":"Lực đẩy","q":"Lực đẩy Archimedes có phương như thế nào?","choices":["Thẳng đứng, hướng lên","Nằm ngang","Thẳng đứng, hướng xuống","Luôn nghiêng 45 độ"],"answer":0,"explanation":"Lực đẩy Archimedes có phương thẳng đứng và chiều từ dưới lên."},
-    ],
-    "Hóa học": [
-      {"topic":"Mol","q":"Một mol chất chứa khoảng bao nhiêu hạt vi mô?","choices":["6,02×10²³","6,02×10²⁰","9,81×10⁸","3×10²³"],"answer":0,"explanation":"Số Avogadro xấp xỉ 6,02×10²³ hạt/mol."},
-      {"topic":"Oxidation","q":"Quá trình nhường electron được gọi là gì?","choices":["Oxi hóa","Khử","Trung hòa","Điện li"],"answer":0,"explanation":"Nhường electron là quá trình oxi hóa."},
-      {"topic":"Reduction","q":"Quá trình nhận electron được gọi là gì?","choices":["Khử","Oxi hóa","Trùng hợp","Thủy phân"],"answer":0,"explanation":"Nhận electron là quá trình khử."},
-      {"topic":"Dung dịch","q":"Nồng độ mol cho biết điều gì?","choices":["Số mol chất tan trong 1 lít dung dịch","Khối lượng dung môi trong 1 gam","Thể tích chất rắn trong 1 kg","Số electron trong nguyên tử"],"answer":0,"explanation":"Nồng độ mol là số mol chất tan có trong 1 lít dung dịch."},
-      {"topic":"Kết tủa","q":"Khi phản ứng tạo ra chất rắn không tan trong dung dịch, chất rắn đó thường gọi là gì?","choices":["Kết tủa","Dung môi","Chất xúc tác","Điện cực"],"answer":0,"explanation":"Chất rắn không tan sinh ra trong dung dịch gọi là kết tủa."},
-    ],
-    "Sinh học": [
-      {"topic":"Tế bào","q":"Bào quan nào là trung tâm hô hấp tế bào và tạo nhiều ATP?","choices":["Ti thể","Ribosome","Lục lạp","Không bào"],"answer":0,"explanation":"Ti thể là nơi diễn ra phần lớn quá trình hô hấp tế bào và tạo ATP."},
-      {"topic":"Tế bào","q":"Ribosome có vai trò chính nào?","choices":["Tổng hợp protein","Quang hợp","Lưu trữ nước","Tạo thành tế bào"],"answer":0,"explanation":"Ribosome là nơi tổng hợp protein."},
-      {"topic":"Màng sinh chất","q":"Màng sinh chất có tính chất nào giúp tế bào kiểm soát chất ra vào?","choices":["Tính thấm chọn lọc","Không thấm hoàn toàn","Chỉ cho nước qua","Chỉ cho ion qua"],"answer":0,"explanation":"Màng sinh chất có tính thấm chọn lọc."},
-      {"topic":"DNA","q":"Trong DNA, adenine bắt cặp với base nào?","choices":["Thymine","Guanine","Cytosine","Uracil"],"answer":0,"explanation":"Adenine bắt cặp với thymine trong DNA."},
-      {"topic":"RNA","q":"Trong RNA, base nào thay thymine?","choices":["Uracil","Cytosine","Guanine","Adenine"],"answer":0,"explanation":"RNA sử dụng uracil thay cho thymine."},
-    ],
-    "Lịch sử": [
-      {"topic":"Việt Nam 1945","q":"Chính phủ Việt Nam Dân chủ Cộng hòa ra mắt quốc dân tại đâu?","choices":["Quảng trường Ba Đình","Căn cứ Pác Bó","Chiến khu Việt Bắc","Huế"],"answer":0,"explanation":"Sau Cách mạng tháng Tám, lễ ra mắt Chính phủ diễn ra tại Hà Nội."},
-      {"topic":"Kháng chiến chống Pháp","q":"Chiến dịch Điện Biên Phủ kết thúc vào năm nào?","choices":["1954","1945","1968","1975"],"answer":0,"explanation":"Chiến dịch Điện Biên Phủ kết thúc ngày 7/5/1954."},
-      {"topic":"Kháng chiến chống Pháp","q":"Hiệp định Genève năm 1954 liên quan trực tiếp đến việc chấm dứt chiến tranh ở đâu?","choices":["Đông Dương","Triều Tiên","Trung Đông","Tây Âu"],"answer":0,"explanation":"Hiệp định Genève năm 1954 giải quyết vấn đề Đông Dương."},
-      {"topic":"Kháng chiến chống Mỹ","q":"Phong trào Đồng khởi bùng nổ mạnh mẽ ở miền Nam vào giai đoạn nào?","choices":["1959-1960","1945-1946","1968-1969","1974-1975"],"answer":0,"explanation":"Phong trào Đồng khởi diễn ra mạnh trong 1959-1960, tiêu biểu ở Bến Tre."},
-      {"topic":"Kháng chiến chống Mỹ","q":"Chiến thắng nào năm 1972 góp phần tạo sức ép lớn trên bàn đàm phán Paris?","choices":["Điện Biên Phủ trên không","Biên giới 1950","Việt Bắc 1947","Hòa Bình 1951"],"answer":0,"explanation":"Chiến thắng Hà Nội - Hải Phòng cuối năm 1972 thường gọi là Điện Biên Phủ trên không."},
-    ],
-    "Địa lý": [
-      {"topic":"Nông nghiệp","q":"Vùng nào đứng đầu cả nước về sản lượng lúa?","choices":["Đồng bằng sông Cửu Long","Tây Nguyên","Đông Bắc","Bắc Trung Bộ"],"answer":0,"explanation":"Đồng bằng sông Cửu Long là vùng sản xuất lúa lớn nhất cả nước."},
-      {"topic":"Công nghiệp","q":"Trung tâm công nghiệp lớn của Đông Nam Bộ là thành phố nào?","choices":["Thành phố Hồ Chí Minh","Điện Biên Phủ","Huế","Cần Thơ"],"answer":0,"explanation":"Thành phố Hồ Chí Minh là trung tâm công nghiệp lớn của vùng Đông Nam Bộ."},
-      {"topic":"Giao thông","q":"Tuyến đường sắt Bắc - Nam còn được gọi là gì?","choices":["Đường sắt Thống Nhất","Đường sắt Tây Bắc","Đường sắt Đông - Tây","Đường sắt ven biển"],"answer":0,"explanation":"Tuyến đường sắt Bắc - Nam thường gọi là đường sắt Thống Nhất."},
-      {"topic":"Khí hậu","q":"Tính chất nhiệt đới của khí hậu Việt Nam thể hiện rõ ở yếu tố nào?","choices":["Nhiệt độ trung bình năm cao","Mùa đông kéo dài quanh năm","Lượng mưa luôn dưới 500 mm","Không có bão"],"answer":0,"explanation":"Nền nhiệt trung bình năm tương đối cao là biểu hiện của tính nhiệt đới."},
-      {"topic":"Sông ngòi","q":"Sông nào có lưu vực lớn nhất trong hệ thống sông ngòi Việt Nam?","choices":["Sông Hồng","Sông Đồng Nai","Sông Thu Bồn","Sông Ba"],"answer":0,"explanation":"Hệ thống sông Hồng có lưu vực lớn và vai trò nổi bật ở miền Bắc."},
-    ],
-    "Tiếng Anh": [
-      {"topic":"Grammar","q":"Choose the correct sentence.","choices":["She has lived here since 2020.","She live here since 2020.","She has live here since 2020.","She living here since 2020."],"answer":0,"explanation":"The present perfect is used with since for an action continuing to the present."},
-      {"topic":"Grammar","q":"If I had more free time, I ___ a new language.","choices":["would learn","will learn","learned","am learning"],"answer":0,"explanation":"Second conditional: If + past simple, would + base verb."},
-      {"topic":"Grammar","q":"The book ___ by millions of readers every year.","choices":["is read","reads","is reading","has read"],"answer":0,"explanation":"Use the present simple passive for a regular action."},
-      {"topic":"Grammar","q":"By the time we arrived, the movie ___.","choices":["had started","starts","has started","will start"],"answer":0,"explanation":"Past perfect describes an earlier past action."},
-      {"topic":"Grammar","q":"I am looking forward to ___ you again.","choices":["seeing","see","saw","to see"],"answer":0,"explanation":"Look forward to is followed by a gerund."},
-    ],
-    "GDCD": [
-      {"topic":"Pháp luật","q":"Pháp luật có đặc trưng nào sau đây?","choices":["Tính bắt buộc chung","Chỉ áp dụng cho trẻ em","Chỉ dựa vào thói quen","Không có chế tài"],"answer":0,"explanation":"Pháp luật có tính bắt buộc chung và được Nhà nước bảo đảm thực hiện."},
-      {"topic":"Quyền công dân","q":"Công dân bình đẳng trước pháp luật nghĩa là gì?","choices":["Không ai bị phân biệt trong việc thực hiện quyền và nghĩa vụ theo pháp luật","Mọi người có thu nhập như nhau","Mọi người có cùng nghề nghiệp","Mọi người được miễn nghĩa vụ"],"answer":0,"explanation":"Bình đẳng trước pháp luật là nguyên tắc mọi người được đối xử bình đẳng trong khuôn khổ pháp luật."},
-      {"topic":"Trách nhiệm","q":"Hành vi nào thể hiện trách nhiệm với cộng đồng?","choices":["Tuân thủ quy định nơi công cộng","Xả rác tùy ý","Phá hoại tài sản chung","Lan truyền tin giả"],"answer":0,"explanation":"Tuân thủ quy định và giữ gìn tài sản chung là biểu hiện trách nhiệm với cộng đồng."},
-      {"topic":"Quyền riêng tư","q":"Tự ý đăng ảnh riêng tư của người khác lên mạng có thể xâm phạm quyền nào?","choices":["Quyền về đời tư và hình ảnh","Quyền sở hữu trí tuệ của Nhà nước","Quyền được nghỉ học","Quyền đăng ký xe"],"answer":0,"explanation":"Đời tư và hình ảnh cá nhân được pháp luật bảo vệ trong những điều kiện nhất định."},
-      {"topic":"Hợp đồng","q":"Một hợp đồng hợp pháp thường dựa trên yếu tố nào?","choices":["Sự tự nguyện và phù hợp pháp luật","Ép buộc một bên","Che giấu mọi thông tin","Không cần điều khoản"],"answer":0,"explanation":"Hợp đồng hợp pháp cần dựa trên sự tự nguyện và không trái quy định pháp luật."},
-    ],
-  },
-  final1: {
-    "Ngữ văn": [
-      {"topic":"Vợ nhặt","q":"Bà cụ Tứ là nhân vật nào trong Vợ nhặt?","choices":["Mẹ của Tràng","Mẹ của Thị","Hàng xóm của Tràng","Chủ nhà trọ"],"answer":0,"explanation":"Bà cụ Tứ là mẹ của Tràng."},
-      {"topic":"Vợ nhặt","q":"Chi tiết nồi cháo cám trong Vợ nhặt gợi cảm giác gì?","choices":["Khắc nghiệt của nạn đói nhưng vẫn có tình người","Sự giàu sang của gia đình","Không khí hội hè","Niềm vui chiến thắng"],"answer":0,"explanation":"Nồi cháo cám vừa cho thấy cái đói khắc nghiệt vừa làm nổi bật tình thương và hy vọng."},
-      {"topic":"Vợ chồng A Phủ","q":"Mị trong Vợ chồng A Phủ sống ở nhà ai?","choices":["Thống lí Pá Tra","Bá Kiến","Ông Hai","Bà cụ Tứ"],"answer":0,"explanation":"Mị bị bắt về làm con dâu gạt nợ trong nhà thống lí Pá Tra."},
-      {"topic":"Vợ chồng A Phủ","q":"Hành động nào thể hiện Mị phản kháng khi cứu A Phủ?","choices":["Cắt dây trói cho A Phủ rồi cùng chạy trốn","Đốt nhà thống lí","Bỏ về nhà bố mẹ ngay lập tức","Báo quan"],"answer":0,"explanation":"Mị cắt dây trói cho A Phủ rồi cùng anh chạy trốn khỏi Hồng Ngài."},
-      {"topic":"Tây Tiến","q":"Địa bàn hoạt động của đoàn quân Tây Tiến chủ yếu gắn với vùng nào?","choices":["Tây Bắc","Nam Bộ","Đồng bằng sông Cửu Long","Đông Nam Bộ"],"answer":0,"explanation":"Tây Tiến gắn với vùng núi Tây Bắc và biên giới Việt-Lào."},
-    ],
-    "Vật lý": [
-      {"topic":"Nhiệt học","q":"Nhiệt lượng vật thu vào khi tăng nhiệt độ được tính theo công thức nào?","choices":["Q = mcΔt","Q = m/cΔt","Q = c/(mΔt)","Q = mgh"],"answer":0,"explanation":"Nhiệt lượng khi không có chuyển thể được tính Q = mcΔt."},
-      {"topic":"Nhiệt nóng chảy","q":"Trong quá trình nóng chảy của chất rắn kết tinh, nhiệt độ thường như thế nào?","choices":["Không đổi","Tăng liên tục","Giảm liên tục","Bằng 0°C trong mọi trường hợp"],"answer":0,"explanation":"Với chất rắn kết tinh, trong lúc nóng chảy nhiệt độ giữ không đổi ở nhiệt độ nóng chảy."},
-      {"topic":"Nhiệt độ","q":"Dụng cụ đo nhiệt độ thông dụng là gì?","choices":["Nhiệt kế","Lực kế","Ampe kế","Vôn kế"],"answer":0,"explanation":"Nhiệt kế dùng để đo nhiệt độ."},
-      {"topic":"Ma sát","q":"Lực ma sát trượt có chiều như thế nào so với chuyển động tương đối?","choices":["Ngược chiều chuyển động tương đối","Cùng chiều chuyển động","Vuông góc với chuyển động","Không có phương xác định"],"answer":0,"explanation":"Ma sát trượt cản trở chuyển động tương đối giữa hai bề mặt."},
-      {"topic":"Đàn hồi","q":"Theo định luật Hooke trong giới hạn đàn hồi, độ lớn lực đàn hồi tỉ lệ với đại lượng nào?","choices":["Độ biến dạng","Khối lượng vật","Thời gian","Nhiệt độ"],"answer":0,"explanation":"Trong giới hạn đàn hồi, lực đàn hồi tỉ lệ với độ biến dạng."},
-    ],
-    "Hóa học": [
-      {"topic":"Điện phân","q":"Trong điện phân, catot là điện cực xảy ra quá trình nào?","choices":["Khử","Oxi hóa","Trung hòa","Bay hơi"],"answer":0,"explanation":"Catot là nơi xảy ra quá trình khử."},
-      {"topic":"Este","q":"Phản ứng giữa axit cacboxylic và ancol tạo este thường gọi là gì?","choices":["Este hóa","Trùng hợp","Cracking","Điện phân"],"answer":0,"explanation":"Axit cacboxylic phản ứng với ancol tạo este và nước là phản ứng este hóa."},
-      {"topic":"Ancol","q":"Nhóm chức đặc trưng của ancol là gì?","choices":["-OH","-COOH","-CHO","-COO-"],"answer":0,"explanation":"Ancol chứa nhóm hydroxyl -OH liên kết với carbon no."},
-      {"topic":"Axit cacboxylic","q":"Nhóm chức của axit cacboxylic là gì?","choices":["-COOH","-OH","-NH2","-CHO"],"answer":0,"explanation":"Axit cacboxylic chứa nhóm carboxyl -COOH."},
-      {"topic":"Amino acid","q":"Nhóm chức đặc trưng của amino acid là gì?","choices":["-NH2 và -COOH","-OH và -CHO","-Cl và -Br","-NO2 và -OH"],"answer":0,"explanation":"Amino acid điển hình chứa đồng thời nhóm amino và carboxyl."},
-    ],
-    "Sinh học": [
-      {"topic":"Phiên mã","q":"Phiên mã là quá trình tổng hợp phân tử nào?","choices":["RNA từ khuôn DNA","DNA từ protein","Protein từ lipid","ATP từ RNA"],"answer":0,"explanation":"Phiên mã tạo RNA dựa trên một mạch DNA khuôn."},
-      {"topic":"Dịch mã","q":"Dịch mã diễn ra chủ yếu ở đâu?","choices":["Ribosome","Nhân tế bào","Lục lạp בלבד","Màng tế bào"],"answer":0,"explanation":"Dịch mã tổng hợp protein tại ribosome."},
-      {"topic":"Nguyên phân","q":"Kết quả của một lần nguyên phân của tế bào sinh dưỡng thường là gì?","choices":["Hai tế bào con gần như giống nhau về bộ NST","Bốn tế bào con đơn bội","Một tế bào con","Hai giao tử"],"answer":0,"explanation":"Nguyên phân tạo hai tế bào con có bộ nhiễm sắc thể tương đương tế bào mẹ."},
-      {"topic":"Giảm phân","q":"Giảm phân có vai trò quan trọng trong việc tạo ra loại tế bào nào?","choices":["Giao tử","Tế bào gan","Tế bào cơ","Tế bào da"],"answer":0,"explanation":"Giảm phân tạo giao tử ở sinh vật sinh sản hữu tính."},
-      {"topic":"Di truyền","q":"Kiểu gen là gì?","choices":["Tổ hợp các allele của cá thể","Tập hợp tính trạng quan sát được","Môi trường sống","Tuổi của cá thể"],"answer":0,"explanation":"Kiểu gen là tổ hợp allele mà cá thể mang."},
-    ],
-    "Lịch sử": [
-      {"topic":"Paris","q":"Hiệp định Paris về Việt Nam được ký năm nào?","choices":["1973","1968","1972","1975"],"answer":0,"explanation":"Hiệp định Paris được ký ngày 27/1/1973."},
-      {"topic":"1975","q":"Chiến dịch Hồ Chí Minh diễn ra vào năm nào?","choices":["1975","1972","1968","1986"],"answer":0,"explanation":"Chiến dịch Hồ Chí Minh diễn ra tháng 4/1975."},
-      {"topic":"Đổi mới","q":"Đường lối Đổi mới được đề ra tại Đại hội nào?","choices":["Đại hội VI (1986)","Đại hội IV (1976)","Đại hội II (1951)","Đại hội X (2006)"],"answer":0,"explanation":"Đại hội VI năm 1986 đề ra đường lối Đổi mới."},
-      {"topic":"ASEAN","q":"Trụ sở Ban Thư ký ASEAN đặt tại thành phố nào?","choices":["Jakarta","Bangkok","Manila","Hà Nội"],"answer":0,"explanation":"Ban Thư ký ASEAN đặt tại Jakarta, Indonesia."},
-      {"topic":"Liên Hợp Quốc","q":"Tổ chức Liên Hợp Quốc được thành lập vào năm nào?","choices":["1945","1919","1954","1961"],"answer":0,"explanation":"Liên Hợp Quốc chính thức thành lập năm 1945."},
-    ],
-    "Địa lý": [
-      {"topic":"Biển","q":"Hai quần đảo lớn của Việt Nam là gì?","choices":["Hoàng Sa và Trường Sa","Cát Bà và Phú Quốc","Cô Tô và Lý Sơn","Côn Đảo và Phú Quý"],"answer":0,"explanation":"Hoàng Sa và Trường Sa là hai quần đảo lớn của Việt Nam."},
-      {"topic":"Dân số","q":"Dân số đông tạo lợi thế nào cho phát triển kinh tế?","choices":["Nguồn lao động và thị trường rộng","Không cần đầu tư cơ sở hạ tầng","Giảm nhu cầu hàng hóa","Loại bỏ đô thị hóa"],"answer":0,"explanation":"Dân số đông tạo nguồn lao động và thị trường tiêu dùng lớn."},
-      {"topic":"Đô thị","q":"Đô thị hóa quá nhanh có thể gây sức ép lên yếu tố nào?","choices":["Hạ tầng và môi trường","Chiều dài bờ biển","Trữ lượng than toàn cầu","Độ nghiêng trục Trái Đất"],"answer":0,"explanation":"Đô thị hóa nhanh có thể gây áp lực lên hạ tầng, giao thông và môi trường."},
-      {"topic":"Tây Nguyên","q":"Cà phê là cây công nghiệp lâu năm quan trọng nhất của vùng nào?","choices":["Tây Nguyên","Đồng bằng sông Hồng","Đông Bắc","Bắc Trung Bộ"],"answer":0,"explanation":"Tây Nguyên nổi tiếng với sản xuất cà phê quy mô lớn."},
-      {"topic":"Đông Nam Bộ","q":"Đông Nam Bộ mạnh về cây công nghiệp lâu năm nào?","choices":["Cao su","Chè","Thuốc lá","Cói"],"answer":0,"explanation":"Đông Nam Bộ là vùng trồng cao su lớn."},
-    ],
-    "Tiếng Anh": [
-      {"topic":"Vocabulary","q":"The word 'generous' is closest in meaning to ___.","choices":["willing to give","very quiet","easily angry","extremely tired"],"answer":0,"explanation":"Generous means willing to give or share."},
-      {"topic":"Vocabulary","q":"A person who designs buildings is an ___.","choices":["architect","accountant","athlete","artist"],"answer":0,"explanation":"An architect designs buildings."},
-      {"topic":"Vocabulary","q":"If something is 'reliable', it is ___.","choices":["dependable","expensive","dangerous","temporary"],"answer":0,"explanation":"Reliable means dependable and trustworthy."},
-      {"topic":"Vocabulary","q":"The opposite of 'ancient' is ___.","choices":["modern","narrow","distant","formal"],"answer":0,"explanation":"Modern is the opposite of ancient."},
-      {"topic":"Vocabulary","q":"To 'reduce' something means to ___.","choices":["make it smaller or less","make it disappear completely","copy it exactly","measure it"],"answer":0,"explanation":"Reduce means make smaller or less."},
-    ],
-    "GDCD": [
-      {"topic":"Tiêu dùng","q":"Khi mua hàng trực tuyến, người tiêu dùng nên làm gì?","choices":["Kiểm tra người bán, thông tin sản phẩm và điều kiện giao dịch","Gửi mật khẩu tài khoản","Bỏ qua hóa đơn","Chuyển tiền cho tài khoản không rõ nguồn"],"answer":0,"explanation":"Kiểm tra thông tin giúp giảm rủi ro và bảo vệ quyền lợi người tiêu dùng."},
-      {"topic":"Bình đẳng","q":"Bình đẳng giới không đồng nghĩa với việc gì?","choices":["Mọi người phải có nghề nghiệp giống nhau","Mọi người có cơ hội và quyền bình đẳng","Không phân biệt giới tính trái pháp luật","Tôn trọng năng lực từng người"],"answer":0,"explanation":"Bình đẳng giới không có nghĩa mọi người phải làm cùng một nghề."},
-      {"topic":"Đạo đức","q":"Trung thực trong học tập góp phần xây dựng điều gì?","choices":["Nhân cách và niềm tin","Thói quen gian lận","Môi trường thiếu công bằng","Sự bất tín"],"answer":0,"explanation":"Trung thực giúp xây dựng nhân cách, uy tín và môi trường học tập công bằng."},
-      {"topic":"Kỷ luật","q":"Tự giác chấp hành nội quy trường học thể hiện phẩm chất nào?","choices":["Kỷ luật và trách nhiệm","Vụ lợi","Ích kỷ","Thờ ơ"],"answer":0,"explanation":"Tự giác chấp hành nội quy thể hiện kỷ luật và trách nhiệm."},
-      {"topic":"Công dân","q":"Thực hiện nghĩa vụ công dân đúng pháp luật là trách nhiệm của ai?","choices":["Mỗi công dân","Chỉ cán bộ","Chỉ doanh nghiệp","Chỉ người lớn tuổi"],"answer":0,"explanation":"Mỗi công dân đều có nghĩa vụ tôn trọng và thực hiện pháp luật."},
-    ],
-  },
-  mid2: {
-    "Ngữ văn": [
-      {"topic":"Tây Tiến","q":"Hình tượng người lính Tây Tiến được khắc họa với sự kết hợp nào?","choices":["Bi tráng và lãng mạn","Hài hước và châm biếm","Khoa học và chính luận","Tả thực lạnh lùng"],"answer":0,"explanation":"Quang Dũng kết hợp vẻ đẹp lãng mạn với chất bi tráng."},
-      {"topic":"Sóng","q":"Hình tượng sóng trong bài thơ cùng tên của Xuân Quỳnh chủ yếu tượng trưng cho điều gì?","choices":["Tâm trạng và khát vọng tình yêu","Chiến tranh","Tuổi thơ nông thôn","Thiên nhiên mùa đông"],"answer":0,"explanation":"Sóng là hình tượng biểu đạt những cung bậc và khát vọng của tình yêu."},
-      {"topic":"Sóng","q":"Bài thơ Sóng chủ yếu được viết theo thể thơ nào?","choices":["Năm chữ","Lục bát","Thất ngôn","Tám chữ"],"answer":0,"explanation":"Sóng được viết chủ yếu bằng thể thơ năm chữ."},
-      {"topic":"Đồng chí","q":"Cơ sở hình thành tình đồng chí trong bài thơ Đồng chí là gì?","choices":["Cùng cảnh ngộ và cùng chung nhiệm vụ chiến đấu","Cùng quê giàu có","Cùng học một trường","Cùng làm một nghề trước chiến tranh"],"answer":0,"explanation":"Những người lính từ các miền quê có cùng cảnh ngộ và nhiệm vụ nên gắn bó với nhau."},
-      {"topic":"Bếp lửa","q":"Hình ảnh người bà trong Bếp lửa gắn với phẩm chất nào nổi bật?","choices":["Tần tảo và giàu yêu thương","Lạnh lùng và nghiêm khắc","Phiêu lưu và mạo hiểm","Giàu có và quyền lực"],"answer":0,"explanation":"Người bà hiện lên tần tảo, giàu đức hi sinh và yêu thương cháu."},
-    ],
-    "Vật lý": [
-      {"topic":"Điện thế","q":"Hiệu điện thế giữa hai điểm có thể hiểu là công của lực điện trên một đơn vị nào?","choices":["Điện tích","Khối lượng","Thể tích","Thời gian"],"answer":0,"explanation":"Hiệu điện thế liên quan đến công tính trên một đơn vị điện tích."},
-      {"topic":"Điện năng","q":"Đơn vị thường dùng của điện năng trong gia đình là gì?","choices":["kWh","N","Pa","Hz"],"answer":0,"explanation":"Điện năng tiêu thụ trong gia đình thường tính bằng kWh."},
-      {"topic":"Mạch điện","q":"Cầu chì trong mạch điện gia đình có tác dụng chính gì?","choices":["Bảo vệ mạch khi dòng điện quá lớn","Tăng điện áp","Tăng điện trở mọi lúc","Làm đèn sáng hơn"],"answer":0,"explanation":"Cầu chì nóng chảy để bảo vệ mạch khi có dòng điện quá lớn."},
-      {"topic":"Điện xoay chiều","q":"Tần số dòng điện xoay chiều dùng phổ biến trong lưới điện Việt Nam là bao nhiêu?","choices":["50 Hz","25 Hz","60 Hz","100 Hz"],"answer":0,"explanation":"Lưới điện dân dụng Việt Nam sử dụng dòng xoay chiều 50 Hz."},
-      {"topic":"Phản xạ","q":"Theo định luật phản xạ ánh sáng, góc phản xạ bằng gì?","choices":["Góc tới","Góc tạo với mặt gương","180 độ trừ góc tới","Một nửa góc tới"],"answer":0,"explanation":"Góc phản xạ bằng góc tới."},
-    ],
-    "Hóa học": [
-      {"topic":"Polymer","q":"Polyethylene được tạo thành chủ yếu từ monomer nào?","choices":["Ethene","Ethanol","Ethanoic acid","Benzene"],"answer":0,"explanation":"Polyethylene được trùng hợp từ ethene."},
-      {"topic":"Kim loại","q":"Kim loại kiềm nào có kí hiệu hóa học Na?","choices":["Natri","Nhôm","Niken","Nitơ"],"answer":0,"explanation":"Na là kí hiệu của natri."},
-      {"topic":"Phản ứng","q":"Phản ứng đốt cháy methane tạo ra những sản phẩm chính nào?","choices":["CO2 và H2O","CO và H2","C và H2","CH3OH và O2"],"answer":0,"explanation":"Methane cháy hoàn toàn tạo CO2 và H2O."},
-      {"topic":"Carbon","q":"Kim cương và than chì là hai dạng thù hình của nguyên tố nào?","choices":["Carbon","Sulfur","Oxygen","Silicon"],"answer":0,"explanation":"Kim cương và than chì đều là dạng thù hình của carbon."},
-      {"topic":"Silicate","q":"Thành phần chính của cát thạch anh là gì?","choices":["SiO2","NaCl","CaCO3","Al2O3"],"answer":0,"explanation":"Cát thạch anh chủ yếu chứa silicon dioxide SiO2."},
-    ],
-    "Sinh học": [
-      {"topic":"Di truyền","q":"Kiểu hình của cá thể chịu ảnh hưởng của yếu tố nào?","choices":["Kiểu gen và môi trường","Chỉ kiểu gen","Chỉ môi trường","Chỉ tuổi"],"answer":0,"explanation":"Kiểu hình là kết quả tương tác giữa kiểu gen và môi trường."},
-      {"topic":"Mendel","q":"Theo quy luật phân li, mỗi giao tử chỉ nhận bao nhiêu allele của một gen?","choices":["Một allele","Hai allele","Ba allele","Không có allele"],"answer":0,"explanation":"Một giao tử chỉ mang một trong các allele của một gen."},
-      {"topic":"Đột biến","q":"Đột biến gen là biến đổi xảy ra ở đâu?","choices":["Trình tự nucleotide của gen","Toàn bộ hệ sinh thái","Khối lượng cơ thể","Môi trường sống"],"answer":0,"explanation":"Đột biến gen là biến đổi trong trình tự nucleotide của gen."},
-      {"topic":"Nhiễm sắc thể","q":"Nhiễm sắc thể được cấu tạo chủ yếu từ gì?","choices":["DNA và protein histone","RNA và lipid","Glucose và nước","Tinh bột và cellulose"],"answer":0,"explanation":"Nhiễm sắc thể gồm DNA liên kết với protein, trong đó có histone."},
-      {"topic":"Máu","q":"Nhóm máu ABO do hệ thống kháng nguyên nào trên hồng cầu quyết định?","choices":["A và B","C và D","X và Y","M và N בלבד"],"answer":0,"explanation":"Hệ ABO dựa trên sự có mặt của kháng nguyên A và/hoặc B trên hồng cầu."},
-    ],
-    "Lịch sử": [
-      {"topic":"Thế giới sau chiến tranh","q":"Chiến tranh Lạnh là sự đối đầu chủ yếu giữa hai khối do nước nào đứng đầu?","choices":["Mỹ và Liên Xô","Anh và Pháp","Đức và Nhật","Trung Quốc và Ấn Độ"],"answer":0,"explanation":"Hai cực Mỹ và Liên Xô đứng đầu hai hệ thống đối lập trong Chiến tranh Lạnh."},
-      {"topic":"Cách mạng tháng Tám","q":"Thắng lợi của Cách mạng tháng Tám năm 1945 dẫn đến sự ra đời của nhà nước nào?","choices":["Việt Nam Dân chủ Cộng hòa","Cộng hòa Xã hội Chủ nghĩa Việt Nam","Đại Nam","Liên bang Đông Dương"],"answer":0,"explanation":"Thắng lợi năm 1945 dẫn tới sự ra đời của Việt Nam Dân chủ Cộng hòa."},
-      {"topic":"Việt Minh","q":"Mặt trận Việt Minh được thành lập vào năm nào?","choices":["1941","1930","1945","1954"],"answer":0,"explanation":"Mặt trận Việt Minh được thành lập tháng 5/1941."},
-      {"topic":"Đảng Cộng sản","q":"Đảng Cộng sản Việt Nam được thành lập vào năm nào?","choices":["1930","1941","1945","1951"],"answer":0,"explanation":"Đảng Cộng sản Việt Nam thành lập đầu năm 1930."},
-      {"topic":"Phong trào yêu nước","q":"Phong trào Xô viết Nghệ - Tĩnh diễn ra trong thời gian nào?","choices":["1930-1931","1925-1926","1940-1941","1945-1946"],"answer":0,"explanation":"Xô viết Nghệ - Tĩnh gắn với cao trào cách mạng 1930-1931."},
-    ],
-    "Địa lý": [
-      {"topic":"Đồng bằng sông Hồng","q":"Thế mạnh nổi bật của Đồng bằng sông Hồng là gì?","choices":["Thâm canh lúa và phát triển đô thị - công nghiệp","Khai thác bauxite lớn nhất","Nuôi trồng cây công nghiệp nhiệt đới là chủ yếu","Chỉ phát triển lâm nghiệp"],"answer":0,"explanation":"Đồng bằng sông Hồng có trình độ thâm canh cao và đô thị hóa mạnh."},
-      {"topic":"Bắc Trung Bộ","q":"Bắc Trung Bộ có thế mạnh nào gắn với biển?","choices":["Khai thác và nuôi trồng thủy sản","Trồng cà phê quy mô lớn nhất","Khai thác than lớn nhất","Trồng chè duy nhất"],"answer":0,"explanation":"Kinh tế biển, đặc biệt thủy sản, là thế mạnh của Bắc Trung Bộ."},
-      {"topic":"Duyên hải miền Trung","q":"Duyên hải miền Trung thuận lợi phát triển du lịch nhờ yếu tố nào?","choices":["Nhiều bãi biển, cảnh quan và di sản","Có nhiều băng tuyết quanh năm","Không có đô thị","Khí hậu cực lạnh"],"answer":0,"explanation":"Bờ biển dài, cảnh quan và di sản tạo lợi thế lớn cho du lịch."},
-      {"topic":"Khoáng sản","q":"Quảng Ninh nổi tiếng với loại khoáng sản nào?","choices":["Than đá","Bauxite","Apatit","Dầu khí"],"answer":0,"explanation":"Quảng Ninh là trung tâm khai thác than lớn của Việt Nam."},
-      {"topic":"Đồng bằng","q":"Đất phù sa ở các đồng bằng thuận lợi nhất cho hoạt động nào?","choices":["Trồng cây lương thực","Trồng rừng ngập mặn trên núi","Khai thác dầu khí","Làm thủy điện"],"answer":0,"explanation":"Đất phù sa màu mỡ thích hợp với cây lương thực và nhiều loại cây trồng."},
-    ],
-    "Tiếng Anh": [
-      {"topic":"Grammar","q":"Neither Tom nor his friends ___ ready.","choices":["are","is","was","be"],"answer":0,"explanation":"With neither...nor, the verb commonly agrees with the nearer plural subject here: friends are."},
-      {"topic":"Grammar","q":"She asked me where I ___.","choices":["lived","live","am live","have live"],"answer":0,"explanation":"In reported speech, the past reporting verb backshifts live to lived."},
-      {"topic":"Grammar","q":"This is the restaurant ___ we met last year.","choices":["where","who","whose","what"],"answer":0,"explanation":"Where refers to a place."},
-      {"topic":"Grammar","q":"She ___ already finished her homework.","choices":["has","have","is","was"],"answer":0,"explanation":"With she and already in the present perfect, use has + past participle."},
-      {"topic":"Grammar","q":"He is interested in ___ science.","choices":["studying","study","to studying","studied"],"answer":0,"explanation":"Be interested in is followed by a gerund."},
-    ],
-    "GDCD": [
-      {"topic":"Môi trường","q":"Hành vi nào góp phần bảo vệ môi trường?","choices":["Phân loại và giảm rác thải","Đổ hóa chất xuống sông","Đốt rác nhựa tùy tiện","Khai thác tài nguyên không kiểm soát"],"answer":0,"explanation":"Giảm và phân loại rác thải góp phần bảo vệ môi trường."},
-      {"topic":"Mạng xã hội","q":"Trước khi chia sẻ tin nóng chưa kiểm chứng, nên làm gì?","choices":["Kiểm tra nguồn và độ tin cậy","Chia sẻ ngay","Đổi tiêu đề cho giật gân","Đăng kèm thông tin cá nhân người khác"],"answer":0,"explanation":"Kiểm chứng nguồn giúp hạn chế lan truyền thông tin sai lệch."},
-      {"topic":"Quyền học tập","q":"Quyền học tập của công dân gắn với trách nhiệm nào?","choices":["Tôn trọng nội quy và tích cực học tập","Được bỏ mọi quy định","Không cần tôn trọng người khác","Không cần tham gia học tập"],"answer":0,"explanation":"Quyền luôn đi cùng trách nhiệm thực hiện nghĩa vụ liên quan."},
-      {"topic":"An toàn","q":"Khi phát hiện cháy ở nơi công cộng, hành động phù hợp đầu tiên là gì?","choices":["Báo động và tìm đường thoát an toàn","Quay video trước","Che giấu thông tin","Chạy ngược vào khu vực cháy"],"answer":0,"explanation":"Cần báo động và ưu tiên thoát hiểm, đồng thời gọi lực lượng cứu hộ."},
-      {"topic":"Quyền sở hữu","q":"Quyền sở hữu tài sản thường bao gồm những quyền nào?","choices":["Chiếm hữu, sử dụng, định đoạt","Chỉ sử dụng","Chỉ cất giữ","Chỉ cho thuê"],"answer":0,"explanation":"Quyền sở hữu thường gồm chiếm hữu, sử dụng và định đoạt."},
-    ],
-  },
-  final2: {
-    "Ngữ văn": [
-      {"topic":"Chữ người tử tù","q":"Huấn Cao nổi bật với phẩm chất nào?","choices":["Tài hoa, khí phách và thiên lương","Giỏi buôn bán","Ham danh lợi","Sống an phận"],"answer":0,"explanation":"Huấn Cao là hình tượng tài hoa, có khí phách và thiên lương trong sáng."},
-      {"topic":"Chữ người tử tù","q":"Cảnh cho chữ diễn ra ở đâu?","choices":["Trong buồng giam tăm tối","Ngoài sân đình","Trong phủ quan","Bên bờ sông"],"answer":0,"explanation":"Cảnh cho chữ diễn ra trong không gian buồng giam tăm tối, đối lập với ánh sáng của cái đẹp."},
-      {"topic":"Người lái đò sông Đà","q":"Ông lái đò được Nguyễn Tuân khắc họa chủ yếu như thế nào?","choices":["Người lao động tài hoa, dũng cảm","Một viên quan triều đình","Một nhà thơ","Một thương nhân"],"answer":0,"explanation":"Ông lái đò là hình tượng người lao động có trí nhớ, kinh nghiệm và bản lĩnh tài hoa."},
-      {"topic":"Chiếc thuyền ngoài xa","q":"Phát hiện đầu tiên của nghệ sĩ Phùng trước cảnh biển là gì?","choices":["Một cảnh đẹp như bức tranh mực tàu","Một trận bão lớn","Một vụ cháy thuyền","Một lễ hội trên biển"],"answer":0,"explanation":"Phùng bắt gặp một cảnh biển rất đẹp qua màn sương."},
-      {"topic":"Chiếc thuyền ngoài xa","q":"Phát hiện thứ hai của Phùng làm thay đổi nhận thức của anh là gì?","choices":["Cảnh bạo lực gia đình phía sau vẻ đẹp","Một con thuyền bị chìm","Một cuộc đua thuyền","Một bức ảnh bị hỏng"],"answer":0,"explanation":"Phía sau cảnh đẹp là cảnh đời đầy nghịch lí và bạo lực gia đình."},
-    ],
-    "Vật lý": [
-      {"topic":"Khúc xạ","q":"Khi tia sáng truyền từ không khí vào nước, tia khúc xạ thường lệch về phía nào?","choices":["Gần pháp tuyến hơn","Xa pháp tuyến hơn","Song song mặt nước","Luôn quay ngược lại"],"answer":0,"explanation":"Từ môi trường chiết quang kém sang mạnh, tia khúc xạ lệch gần pháp tuyến."},
-      {"topic":"Thấu kính","q":"Đơn vị SI của tiêu cự thấu kính là gì?","choices":["mét (m)","điện kế (V)","newton (N)","hertz (Hz)"],"answer":0,"explanation":"Tiêu cự là độ dài nên trong SI có đơn vị mét."},
-      {"topic":"Điện từ","q":"Nam châm điện hoạt động dựa trên tác dụng nào của dòng điện?","choices":["Tác dụng từ","Tác dụng nhiệt","Tác dụng hóa học","Tác dụng phát sáng"],"answer":0,"explanation":"Dòng điện chạy qua cuộn dây tạo ra từ trường."},
-      {"topic":"Công suất","q":"Một thiết bị công suất 100 W hoạt động trong 10 s tiêu thụ năng lượng bao nhiêu?","choices":["1000 J","100 J","10 J","10000 J"],"answer":0,"explanation":"A = Pt = 100 × 10 = 1000 J."},
-      {"topic":"Chuyển động","q":"Gia tốc được xác định bằng đại lượng nào?","choices":["Độ biến thiên vận tốc chia thời gian","Quãng đường chia khối lượng","Lực chia quãng đường","Khối lượng chia vận tốc"],"answer":0,"explanation":"Gia tốc là độ biến thiên vận tốc trong một đơn vị thời gian."},
-    ],
-    "Hóa học": [
-      {"topic":"Muối","q":"Na2CO3 có tên thông dụng là gì?","choices":["Sodium carbonate","Sodium chloride","Calcium carbonate","Potassium nitrate"],"answer":0,"explanation":"Na2CO3 là sodium carbonate, còn gọi là soda ash."},
-      {"topic":"pH","q":"Dung dịch trung tính ở 25°C có pH gần bằng bao nhiêu?","choices":["7","1","5","14"],"answer":0,"explanation":"Ở 25°C, môi trường trung tính có pH xấp xỉ 7."},
-      {"topic":"Dung dịch","q":"Thêm nước vào dung dịch muối, nồng độ chất tan thường thay đổi như thế nào?","choices":["Giảm","Tăng","Không đổi mọi trường hợp","Bằng 0 ngay"],"answer":0,"explanation":"Thêm dung môi làm thể tích tăng nên nồng độ giảm nếu lượng chất tan không đổi."},
-      {"topic":"Kim loại","q":"Kim loại nào sau đây thuộc nhóm kim loại kiềm?","choices":["Kali","Sắt","Đồng","Kẽm"],"answer":0,"explanation":"Kali thuộc nhóm kim loại kiềm."},
-      {"topic":"Ăn mòn","q":"Sơn phủ bề mặt kim loại giúp hạn chế ăn mòn bằng cách nào?","choices":["Cách li kim loại khỏi môi trường","Tăng tốc phản ứng oxi hóa","Tạo thêm nước","Tăng độ dẫn điện"],"answer":0,"explanation":"Lớp sơn ngăn kim loại tiếp xúc với nước và oxygen."},
-    ],
-    "Sinh học": [
-      {"topic":"Miễn dịch","q":"Vaccine có tác dụng chính gì?","choices":["Kích thích cơ thể hình thành đáp ứng miễn dịch","Tiêu diệt mọi vi khuẩn ngay lập tức","Thay máu","Giảm nhiệt độ cơ thể"],"answer":0,"explanation":"Vaccine giúp cơ thể tạo trí nhớ miễn dịch và đáp ứng tốt hơn khi gặp tác nhân gây bệnh."},
-      {"topic":"Quang hợp","q":"Quang hợp ở cây xanh sử dụng nguồn năng lượng nào?","choices":["Ánh sáng","Âm thanh","Điện lưới","Nhiệt từ đất"],"answer":0,"explanation":"Quang hợp sử dụng năng lượng ánh sáng."},
-      {"topic":"Hô hấp","q":"Sản phẩm cuối của hô hấp hiếu khí hoàn toàn ở tế bào thường gồm gì?","choices":["CO2, H2O và năng lượng","O2 và glucose","N2 và nước","Protein và DNA"],"answer":0,"explanation":"Hô hấp hiếu khí hoàn toàn giải phóng năng lượng và tạo CO2, H2O."},
-      {"topic":"Hormone","q":"Insulin có tác dụng chính nào?","choices":["Giúp hạ đường huyết","Tăng mạnh nhịp tim","Làm đông máu trực tiếp","Tăng nhiệt độ môi trường"],"answer":0,"explanation":"Insulin giúp tế bào sử dụng glucose và làm giảm nồng độ đường huyết."},
-      {"topic":"Thần kinh","q":"Neuron là đơn vị cấu trúc và chức năng cơ bản của hệ nào?","choices":["Hệ thần kinh","Hệ tiêu hóa","Hệ bài tiết","Hệ vận động"],"answer":0,"explanation":"Neuron là tế bào thần kinh cơ bản."},
-    ],
-    "Lịch sử": [
-      {"topic":"1946","q":"Tổng tuyển cử đầu tiên của nước Việt Nam Dân chủ Cộng hòa diễn ra vào năm nào?","choices":["1946","1945","1947","1954"],"answer":0,"explanation":"Tổng tuyển cử bầu Quốc hội đầu tiên diễn ra ngày 6/1/1946."},
-      {"topic":"Kháng chiến","q":"Lời kêu gọi Toàn quốc kháng chiến được ra vào ngày nào?","choices":["19/12/1946","2/9/1945","7/5/1954","30/4/1975"],"answer":0,"explanation":"Chủ tịch Hồ Chí Minh ra Lời kêu gọi Toàn quốc kháng chiến ngày 19/12/1946."},
-      {"topic":"Biên giới","q":"Chiến dịch Biên giới Thu - Đông diễn ra vào năm nào?","choices":["1950","1947","1954","1960"],"answer":0,"explanation":"Chiến dịch Biên giới Thu - Đông diễn ra năm 1950."},
-      {"topic":"Việt Bắc","q":"Cuộc tiến công lên Việt Bắc của Pháp năm 1947 nhằm mục tiêu chủ yếu gì?","choices":["Nhanh chóng tiêu diệt cơ quan đầu não kháng chiến","Mở rộng kinh tế","Tổ chức bầu cử","Ký hiệp định thương mại"],"answer":0,"explanation":"Pháp muốn đánh vào căn cứ địa Việt Bắc và cơ quan đầu não kháng chiến."},
-      {"topic":"Phong trào Đồng khởi","q":"Bến Tre là địa phương tiêu biểu của phong trào nào?","choices":["Đồng khởi","Xô viết Nghệ - Tĩnh","Tây Sơn","Cần Vương"],"answer":0,"explanation":"Bến Tre là điểm nổi bật của phong trào Đồng khởi."},
-    ],
-    "Địa lý": [
-      {"topic":"Lâm nghiệp","q":"Rừng ngập mặn có vai trò quan trọng nào?","choices":["Chắn sóng và bảo vệ bờ biển","Tăng xói mòn bờ biển","Làm nước biển ngọt hoàn toàn","Tăng sa mạc hóa"],"answer":0,"explanation":"Rừng ngập mặn giúp chắn sóng, chống xói lở và bảo vệ hệ sinh thái ven biển."},
-      {"topic":"Biến đổi khí hậu","q":"Mực nước biển dâng đe dọa mạnh vùng nào của Việt Nam?","choices":["Các đồng bằng ven biển thấp","Chỉ vùng núi cao","Chỉ Tây Nguyên","Chỉ Đông Bắc"],"answer":0,"explanation":"Các đồng bằng ven biển thấp dễ chịu tác động của nước biển dâng."},
-      {"topic":"Kinh tế","q":"Ngành nào thuộc khu vực dịch vụ?","choices":["Du lịch","Trồng lúa","Khai thác than","Trồng cà phê"],"answer":0,"explanation":"Du lịch là ngành dịch vụ."},
-      {"topic":"Thủy sản","q":"Vùng biển nào có ngư trường trọng điểm phía Nam?","choices":["Kiên Giang - Cà Mau","Quảng Ninh - Hải Phòng","Thanh Hóa - Nghệ An","Đà Nẵng - Quảng Nam"],"answer":0,"explanation":"Kiên Giang - Cà Mau là một ngư trường quan trọng ở phía Nam."},
-      {"topic":"Cảng biển","q":"Cảng Hải Phòng có vai trò quan trọng nhất ở khu vực nào?","choices":["Phía Bắc","Tây Nguyên","Tây Nam Bộ","Nam Trung Bộ"],"answer":0,"explanation":"Hải Phòng là cửa ngõ giao thương đường biển quan trọng của miền Bắc."},
-    ],
-    "Tiếng Anh": [
-      {"topic":"Reading","q":"If a notice says 'No entry', what does it mean?","choices":["You must not enter.","You should enter quickly.","Entry is free.","Only students may enter."],"answer":0,"explanation":"No entry means people are not allowed to enter."},
-      {"topic":"Communication","q":"A: 'Would you like some tea?' B: '___'","choices":["Yes, please.","Yes, I do yesterday.","No, I am tea.","Tea can."],"answer":0,"explanation":"Yes, please is a natural response to an offer."},
-      {"topic":"Communication","q":"A: 'Thank you for your help.' B: '___'","choices":["You're welcome.","Never mind, yesterday.","I don't help.","Yes, I thank."],"answer":0,"explanation":"You're welcome is a polite response to thanks."},
-      {"topic":"Vocabulary","q":"A 'deadline' is ___.","choices":["the latest time something must be finished","a holiday","a meeting room","a type of document"],"answer":0,"explanation":"A deadline is the final time by which a task must be completed."},
-      {"topic":"Vocabulary","q":"If a plan is 'flexible', it can be ___.","choices":["changed when necessary","completed only once","broken easily","hidden from everyone"],"answer":0,"explanation":"Flexible plans can be adjusted when needed."},
-    ],
-    "GDCD": [
-      {"topic":"Phòng chống tệ nạn","q":"Biện pháp nào giúp phòng tránh tệ nạn xã hội ở học sinh?","choices":["Xây dựng lối sống lành mạnh và biết nói không với hành vi nguy hiểm","Thử mọi thứ cho biết","Giấu vấn đề với người lớn","Bỏ học"],"answer":0,"explanation":"Lối sống lành mạnh và kỹ năng từ chối giúp giảm nguy cơ."},
-      {"topic":"Lao động","q":"Người lao động cần tôn trọng điều gì tại nơi làm việc?","choices":["Nội quy và thỏa thuận hợp pháp","Tin đồn","Tài khoản cá nhân của người khác","Mọi mệnh lệnh bất kể pháp luật"],"answer":0,"explanation":"Người lao động và người sử dụng lao động đều cần tuân thủ thỏa thuận hợp pháp và pháp luật."},
-      {"topic":"Văn hóa","q":"Giữ gìn di sản văn hóa thể hiện điều gì?","choices":["Trách nhiệm với cộng đồng và lịch sử","Thái độ thờ ơ","Phá bỏ truyền thống","Chỉ quan tâm lợi ích cá nhân"],"answer":0,"explanation":"Bảo vệ di sản là trách nhiệm chung đối với giá trị văn hóa và lịch sử."},
-      {"topic":"Quyền trẻ em","q":"Trẻ em cần được bảo vệ khỏi hành vi nào?","choices":["Bạo lực và bóc lột","Giáo dục","Chăm sóc","Khuyến khích học tập"],"answer":0,"explanation":"Trẻ em cần được bảo vệ khỏi bạo lực, bóc lột và xâm hại."},
-      {"topic":"Ứng xử","q":"Khi xảy ra mâu thuẫn với bạn, cách ứng xử phù hợp là gì?","choices":["Trao đổi bình tĩnh và tôn trọng","Đăng bài xúc phạm","Đe dọa","Lan truyền tin riêng tư"],"answer":0,"explanation":"Trao đổi bình tĩnh và tôn trọng giúp giải quyết xung đột lành mạnh."},
-    ],
-  },
-  thpt: {
-    "Ngữ văn": [
-      {"topic":"Ai đã đặt tên cho dòng sông?","q":"Dòng sông trung tâm trong bút ký Ai đã đặt tên cho dòng sông? là sông nào?","choices":["Sông Hương","Sông Hàn","Sông Cửu Long","Sông Đà"],"answer":0,"explanation":"Tác phẩm viết về vẻ đẹp và văn hóa của sông Hương ở Huế."},
-      {"topic":"Rừng xà nu","q":"Hình tượng rừng xà nu trong tác phẩm thường được hiểu là biểu tượng cho điều gì?","choices":["Sức sống và sự tiếp nối của cộng đồng","Sự cô độc","Đời sống đô thị","Sự giàu có vật chất"],"answer":0,"explanation":"Rừng xà nu biểu tượng cho sức sống bền bỉ và sự tiếp nối của các thế hệ."},
-      {"topic":"Tuyên ngôn Độc lập","q":"Tuyên ngôn Độc lập năm 1945 thuộc kiểu văn bản nào?","choices":["Văn bản chính luận","Truyện ngắn","Bút ký du lịch","Kịch"],"answer":0,"explanation":"Tuyên ngôn Độc lập là một văn bản chính luận có sức lập luận mạnh."},
-      {"topic":"Đoàn thuyền đánh cá","q":"Không khí lao động trong Đoàn thuyền đánh cá được khắc họa như thế nào?","choices":["Hào hứng, khỏe khoắn và lãng mạn","Buồn bã và tuyệt vọng","Im lặng tuyệt đối","Lạnh lẽo và bi quan"],"answer":0,"explanation":"Bài thơ thể hiện niềm vui lao động và cảm hứng lãng mạn."},
-      {"topic":"Mặt đường khát vọng","q":"Đoạn trích Đất Nước nhấn mạnh đất nước gần gũi với đời sống nào?","choices":["Đời sống nhân dân và văn hóa dân gian","Chỉ đời sống cung đình","Chỉ đời sống đô thị","Chỉ đời sống quân đội"],"answer":0,"explanation":"Nguyễn Khoa Điềm nhìn đất nước từ văn hóa, đời sống nhân dân và lịch sử cộng đồng."},
-    ],
-    "Vật lý": [
-      {"topic":"Cân bằng","q":"Một vật đứng yên cân bằng khi hợp lực tác dụng lên vật bằng bao nhiêu?","choices":["0","1 N","Khối lượng vật","Trọng lực của vật"],"answer":0,"explanation":"Điều kiện cân bằng tịnh tiến là hợp lực bằng 0."},
-      {"topic":"Khí","q":"Khi nhiệt độ của một lượng khí tăng trong điều kiện thể tích không đổi, áp suất có xu hướng thế nào?","choices":["Tăng","Giảm","Không đổi","Bằng 0"],"answer":0,"explanation":"Ở thể tích không đổi, áp suất của khí tăng khi nhiệt độ tăng."},
-      {"topic":"Dao động","q":"Trong dao động điều hòa, vận tốc của vật bằng 0 tại vị trí nào?","choices":["Biên","Cân bằng","Mọi vị trí","Chỉ khi t = 0"],"answer":0,"explanation":"Vật dừng tức thời tại hai vị trí biên."},
-      {"topic":"Sóng cơ","q":"Sóng cơ cần môi trường nào để truyền?","choices":["Môi trường vật chất","Chân không","Chỉ kim loại","Chỉ nước"],"answer":0,"explanation":"Sóng cơ là sự lan truyền dao động trong một môi trường vật chất."},
-      {"topic":"An toàn điện","q":"Khi dây điện bị hở, nguy cơ lớn nhất là gì?","choices":["Điện giật","Tăng độ ngọt thức ăn","Giảm trọng lượng vật","Tăng nhiệt độ phòng"],"answer":0,"explanation":"Dây điện hở có thể gây điện giật và chập mạch."},
-    ],
-    "Hóa học": [
-      {"topic":"Phân bón","q":"Đạm urê cung cấp chủ yếu nguyên tố dinh dưỡng nào cho cây?","choices":["Nitrogen","Phosphorus","Potassium","Calcium"],"answer":0,"explanation":"Urê là phân đạm, cung cấp chủ yếu nitrogen."},
-      {"topic":"Phản ứng","q":"Chất làm tăng tốc độ phản ứng mà sau phản ứng gần như không đổi là gì?","choices":["Chất xúc tác","Chất phản ứng","Dung môi bắt buộc","Sản phẩm"],"answer":0,"explanation":"Chất xúc tác làm thay đổi tốc độ phản ứng và không bị tiêu hao theo phương trình tổng quát."},
-      {"topic":"Hữu cơ","q":"Chất hữu cơ nào là hydrocarbon?","choices":["C2H6","C2H5OH","CH3COOH","NH2CH2COOH"],"answer":0,"explanation":"Hydrocarbon chỉ chứa carbon và hydrogen; C2H6 đáp ứng điều đó."},
-      {"topic":"Bảo quản","q":"Bảo quản thực phẩm trong tủ lạnh chủ yếu làm chậm quá trình nào?","choices":["Các phản ứng và hoạt động của vi sinh vật","Sự tạo ra oxygen","Sự tăng khối lượng","Sự phân rã nguyên tử"],"answer":0,"explanation":"Nhiệt độ thấp làm chậm nhiều phản ứng hóa học và hoạt động của vi sinh vật."},
-      {"topic":"Hóa hữu cơ","q":"Ethanol còn được gọi thông dụng là gì?","choices":["Rượu etylic","Giấm ăn","Axit fomic","Đường mía"],"answer":0,"explanation":"Ethanol có tên thông dụng là rượu etylic."},
-    ],
-    "Sinh học": [
-      {"topic":"Sinh thái","q":"Quần thể là tập hợp cá thể của cùng loài sống trong đâu?","choices":["Một khu vực nhất định vào một thời điểm nhất định","Mọi nơi trên Trái Đất","Chỉ trong phòng thí nghiệm","Chỉ trong nước"],"answer":0,"explanation":"Quần thể gồm các cá thể cùng loài sống trong một không gian và thời gian xác định."},
-      {"topic":"Sinh thái","q":"Bậc dinh dưỡng đầu tiên trong chuỗi thức ăn thường là gì?","choices":["Sinh vật sản xuất","Sinh vật tiêu thụ bậc 1","Động vật ăn thịt","Sinh vật phân giải"],"answer":0,"explanation":"Sinh vật sản xuất là bậc dinh dưỡng đầu tiên."},
-      {"topic":"Tiến hóa","q":"Chọn lọc tự nhiên tác động trực tiếp lên đặc điểm nào?","choices":["Kiểu hình và khả năng sống sót, sinh sản","Chỉ DNA trong phòng thí nghiệm","Chỉ tuổi đời","Chỉ số lượng tế bào"],"answer":0,"explanation":"Chọn lọc tự nhiên tác động thông qua khác biệt về kiểu hình, sống sót và sinh sản."},
-      {"topic":"Trao đổi chất","q":"Enzyme trong tế bào có vai trò chủ yếu gì?","choices":["Xúc tác các phản ứng sinh hóa","Lưu trữ thông tin di truyền","Tạo bộ nhiễm sắc thể","Thay thế nước"],"answer":0,"explanation":"Enzyme là chất xúc tác sinh học, thường là protein."},
-      {"topic":"Sinh thái","q":"Yếu tố nào sau đây là yếu tố vô sinh?","choices":["Ánh sáng","Vi khuẩn","Cây cỏ","Động vật"],"answer":0,"explanation":"Ánh sáng là nhân tố vô sinh của môi trường."},
-    ],
-    "Lịch sử": [
-      {"topic":"Tổ chức quốc tế","q":"Hội nghị Ianta năm 1945 diễn ra giữa nguyên thủ của những cường quốc nào?","choices":["Mỹ, Anh, Liên Xô","Mỹ, Pháp, Đức","Anh, Nhật, Trung Quốc","Liên Xô, Nhật, Ý"],"answer":0,"explanation":"Hội nghị Ianta có sự tham dự của Roosevelt, Churchill và Stalin."},
-      {"topic":"Thế giới","q":"Mốc nào thường được xem là sự khởi đầu của Chiến tranh Lạnh?","choices":["1947","1939","1954","1975"],"answer":0,"explanation":"Năm 1947 thường được dùng làm mốc mở đầu Chiến tranh Lạnh."},
-      {"topic":"Châu Âu","q":"Kế hoạch Marshall của Mỹ sau Chiến tranh thế giới thứ hai nhằm mục tiêu chủ yếu gì?","choices":["Phục hồi kinh tế Tây Âu và tăng ảnh hưởng của Mỹ","Khôi phục Nhật Bản","Chấm dứt ASEAN","Thành lập Liên Hợp Quốc"],"answer":0,"explanation":"Kế hoạch Marshall hỗ trợ phục hồi kinh tế Tây Âu và củng cố ảnh hưởng của Mỹ."},
-      {"topic":"Hội nhập","q":"Việt Nam chính thức gia nhập WTO vào năm nào?","choices":["2007","1995","1986","2015"],"answer":0,"explanation":"Việt Nam trở thành thành viên WTO năm 2007."},
-      {"topic":"Hội nhập","q":"Việt Nam trở thành thành viên của APEC vào năm nào?","choices":["1998","1995","2007","1986"],"answer":0,"explanation":"Việt Nam gia nhập Diễn đàn Hợp tác Kinh tế châu Á - Thái Bình Dương (APEC) năm 1998."},
-    ],
-    "Địa lý": [
-      {"topic":"Tài nguyên","q":"Khoáng sản nào tập trung đáng kể ở Tây Nguyên?","choices":["Bauxite","Than đá","Dầu khí biển","Apatit Lào Cai"],"answer":0,"explanation":"Tây Nguyên có trữ lượng bauxite lớn."},
-      {"topic":"Năng lượng","q":"Thủy điện phát triển mạnh ở vùng nào nhờ hệ thống sông có độ dốc lớn?","choices":["Trung du và miền núi Bắc Bộ","Đồng bằng sông Hồng","Đồng bằng sông Cửu Long","Ven biển Nam Bộ"],"answer":0,"explanation":"Trung du và miền núi Bắc Bộ có địa hình dốc và sông nhiều tiềm năng thủy điện."},
-      {"topic":"Xuất khẩu","q":"Sản phẩm nào là mặt hàng xuất khẩu nông nghiệp nổi bật của Việt Nam?","choices":["Cà phê","Dầu thô của tất cả các vùng","Than đá duy nhất","Muối biển duy nhất"],"answer":0,"explanation":"Cà phê là một trong các mặt hàng nông sản xuất khẩu quan trọng của Việt Nam."},
-      {"topic":"Dịch vụ","q":"Trung tâm dịch vụ lớn nhất cả nước là nơi nào?","choices":["Hà Nội và Thành phố Hồ Chí Minh","Điện Biên và Lai Châu","Cao Bằng và Bắc Kạn","Kon Tum và Gia Lai"],"answer":0,"explanation":"Hà Nội và Thành phố Hồ Chí Minh là hai trung tâm dịch vụ lớn nhất."},
-      {"topic":"Phân bố dân cư","q":"Dân cư nước ta tập trung đông nhất ở khu vực nào?","choices":["Đồng bằng và đô thị","Núi cao","Các đảo nhỏ","Rừng đặc dụng"],"answer":0,"explanation":"Đồng bằng và đô thị có mật độ dân cư cao hơn miền núi."},
-    ],
-    "Tiếng Anh": [
-      {"topic":"Grammar","q":"I have known Lan ___ five years.","choices":["for","since","from","during"],"answer":0,"explanation":"For is used with a duration such as five years."},
-      {"topic":"Grammar","q":"He ___ to school when it started raining.","choices":["was walking","walks","has walked","will walk"],"answer":0,"explanation":"Past continuous describes an action in progress when another past event occurred."},
-      {"topic":"Vocabulary","q":"'Environment' refers to ___.","choices":["the natural world around us","a person's salary","a school subject only","a type of machine"],"answer":0,"explanation":"Environment means the natural and surrounding conditions in which we live."},
-      {"topic":"Grammar","q":"The students are studying hard ___ they want to pass the exam.","choices":["because","although","unless","while"],"answer":0,"explanation":"Because introduces the reason."},
-      {"topic":"Vocabulary","q":"To 'encourage' someone means to ___.","choices":["give support or confidence","make them afraid","ignore them","punish them"],"answer":0,"explanation":"Encourage means give someone support or confidence."},
-    ],
-    "GDCD": [
-      {"topic":"Dân chủ","q":"Dân chủ trong trường học có thể thể hiện qua việc nào?","choices":["Tham gia góp ý và bầu chọn theo quy định","Ép buộc người khác","Không cho ai phát biểu","Phá nội quy"],"answer":0,"explanation":"Tham gia góp ý và bầu chọn theo quy định là biểu hiện của dân chủ."},
-      {"topic":"Kinh tế","q":"Tiết kiệm trong chi tiêu cá nhân giúp đạt mục tiêu nào?","choices":["Sử dụng nguồn lực hợp lý và dự phòng cho tương lai","Luôn mua hàng đắt nhất","Không cần lập kế hoạch","Tăng chi tiêu vô hạn"],"answer":0,"explanation":"Tiết kiệm giúp sử dụng nguồn lực hợp lý và tạo khoản dự phòng."},
-      {"topic":"Pháp luật","q":"Chế tài pháp luật được đặt ra nhằm mục đích nào?","choices":["Bảo đảm và xử lý việc tuân thủ pháp luật","Khuyến khích vi phạm","Xóa bỏ quyền con người","Thay thế đạo đức hoàn toàn"],"answer":0,"explanation":"Chế tài góp phần bảo đảm việc tuân thủ pháp luật và xử lý hành vi vi phạm."},
-      {"topic":"Tự do","q":"Quyền tự do ngôn luận không có nghĩa là gì?","choices":["Muốn nói gì cũng được mà không chịu trách nhiệm","Được trình bày ý kiến theo pháp luật","Được góp ý xây dựng","Được trao đổi quan điểm"],"answer":0,"explanation":"Tự do ngôn luận được thực hiện trong khuôn khổ pháp luật và đi kèm trách nhiệm."},
-      {"topic":"Trách nhiệm số","q":"Bảo vệ tài khoản trực tuyến nên ưu tiên việc gì?","choices":["Dùng mật khẩu mạnh và bảo vệ mã xác thực","Chia sẻ mật khẩu với mọi người","Dùng một mật khẩu cho mọi nơi","Công khai mã OTP"],"answer":0,"explanation":"Mật khẩu mạnh và bảo vệ mã xác thực là nguyên tắc an toàn cơ bản."},
-    ],
-  },
-};
-
-const getExamQuestions = (exam) => {
-  if(!exam) return [];
-  const rows = [];
-  EXAM_SUBJECTS.forEach(subject=>{
-    (EXAM_BANKS[exam.id]?.[subject] || []).forEach((q,i)=>{
-      const id = `${exam.id}-${keysBySubject[subject]}-${String(i+1).padStart(2,"0")}`;
-      const varied = varyQuestionChoices(
-        q.choices,
-        q.answer,
-        i + exam.id.length + subject.length
-      );
-      rows.push({
-        ...q,
-        subject,
-        id,
-        choices:varied.choices,
-        answer:varied.answer
-      });
-    });
-  });
-  return rows;
-};
-
-const keysBySubject = {
-  "Ngữ văn":"van",
-  "Vật lý":"ly",
-  "Hóa học":"hoa",
-  "Sinh học":"sinh",
-  "Lịch sử":"su",
-  "Địa lý":"dia",
-  "Tiếng Anh":"anh",
-  "GDCD":"gdcd",
-};
 
 /* =========================================================
    THỜI TRANG
@@ -1354,9 +740,6 @@ const FASHION = [
   { id:"hair_blue", category:"Tóc", name:"Tóc highlight xanh", icon:"💙", price:140000, desc:"Cá tính", bonus:{reputation:8} },
   { id:"hair_pink", category:"Tóc", name:"Tóc highlight hồng", icon:"🩷", price:150000, desc:"Cute", bonus:{love:8} },
 ];
-const EXTRA_FASHION=[
-{id:"shirt_lavender",category:"Áo",name:"Sơ mi lavender",icon:"💜",price:60000,desc:"Pastel",bonus:{mood:5,love:2}},{id:"hoodie_blue",category:"Áo",name:"Hoodie xanh trời",icon:"🩵",price:95000,desc:"Dịu mắt",bonus:{mood:6,energy:2}},{id:"tee_green",category:"Áo",name:"T-shirt xanh lá",icon:"💚",price:55000,desc:"Tươi mới",bonus:{friends:4}},{id:"varsity_pink",category:"Áo",name:"Varsity hồng",icon:"🎀",price:150000,desc:"Campus",bonus:{love:6,friends:4}},{id:"pants_brown",category:"Quần",name:"Quần nâu vintage",icon:"👖",price:80000,desc:"Vintage",bonus:{mood:4}},{id:"skirt_blue",category:"Quần",name:"Chân váy xanh",icon:"💙",price:85000,desc:"Fresh",bonus:{friends:4}},{id:"wide_black",category:"Quần",name:"Quần ống rộng đen",icon:"🖤",price:105000,desc:"Minimal",bonus:{reputation:5}},{id:"sneaker_green",category:"Giày",name:"Sneaker xanh mint",icon:"👟",price:125000,desc:"Fresh step",bonus:{mood:5,energy:2}},{id:"sneaker_purple",category:"Giày",name:"Sneaker tím",icon:"👟",price:135000,desc:"Color pop",bonus:{love:5}},{id:"boots_brown",category:"Giày",name:"Boot nâu",icon:"🥾",price:210000,desc:"Vintage cool",bonus:{reputation:8}},{id:"bag_green",category:"Balo",name:"Balo xanh mint",icon:"🎒",price:110000,desc:"Campus",bonus:{friends:5}},{id:"bag_laptop",category:"Balo",name:"Balo laptop",icon:"💼",price:180000,desc:"Học tập",bonus:{skill:5,study:3}},{id:"watch_sport",category:"Phụ kiện",name:"Đồng hồ thể thao",icon:"⌚",price:190000,desc:"Năng động",bonus:{energy:4,skill:3}},{id:"earbuds",category:"Phụ kiện",name:"Tai nghe không dây",icon:"🎧",price:240000,desc:"Gọn nhẹ",bonus:{mood:8,skill:3}},{id:"ring_silver",category:"Phụ kiện",name:"Nhẫn bạc",icon:"💍",price:260000,desc:"Tinh tế",bonus:{love:8,reputation:4}},{id:"cap_white",category:"Phụ kiện",name:"Mũ trắng",icon:"🧢",price:40000,desc:"Clean",bonus:{mood:3}},{id:"hair_ash",category:"Tóc",name:"Tóc nâu khói",icon:"💇",price:120000,desc:"Trendy",bonus:{reputation:5,mood:4}},{id:"hair_pink",category:"Tóc",name:"Tóc hồng pastel",icon:"💇",price:160000,desc:"Nổi bật",bonus:{love:6,reputation:4}}];
-FASHION.push(...EXTRA_FASHION);
 
 const FASHION_CATEGORIES = ["Áo", "Quần", "Giày", "Balo", "Phụ kiện", "Tóc"];
 
@@ -1456,1243 +839,188 @@ const NPCS = [
 
 const DAILY_EVENTS = [
   {
-    id:"event_001",
-    icon:"🔔",
-    title:"Chuông báo thức hỏng",
-    text:"Sáng nay chuông không reo, bạn phải tự tỉnh bằng ánh sáng ngoài cửa sổ.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_002",
-    icon:"🥤",
-    title:"Quầy nước mới",
-    text:"Một quầy nước nhỏ vừa mở trước cổng trường và đông nghịt học sinh.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_003",
-    icon:"📝",
-    title:"Bạn quên vở",
-    text:"Đến tiết học, bạn mới phát hiện quyển vở quan trọng đang ở nhà.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_004",
-    icon:"🧩",
-    title:"Câu đố trên bảng",
-    text:"Giáo viên viết một câu đố vui lên bảng và cả lớp cùng suy nghĩ.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_005",
-    icon:"🎧",
-    title:"Tai nghe thất lạc",
-    text:"Bạn phát hiện một chiếc tai nghe quen thuộc nằm dưới gầm bàn.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_006",
-    icon:"📣",
-    title:"Loa trường thông báo",
-    text:"Một thông báo bất ngờ khiến cả hành lang xôn xao.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_007",
-    icon:"🧃",
-    title:"Bạn mang nước cho bạn",
-    text:"Một người bạn thấy bạn mệt nên đưa chai nước mát.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_008",
-    icon:"🪑",
-    title:"Đổi chỗ ngồi",
-    text:"Giáo viên sắp xếp lại chỗ ngồi và bạn có một người bạn bàn mới.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_009",
-    icon:"✏️",
-    title:"Mượn được bút đẹp",
-    text:"Bạn cùng lớp cho mượn một chiếc bút rất dễ viết.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_010",
-    icon:"📷",
-    title:"Ảnh kỷ yếu thử",
-    text:"Lớp tranh thủ chụp vài tấm ảnh kỷ yếu thử trong giờ nghỉ.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_011",
-    icon:"🎤",
-    title:"Mic bị hỏng",
-    text:"Đến lượt thuyết trình thì chiếc micro bất ngờ không hoạt động.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_012",
-    icon:"🧠",
-    title:"Thầy cô hỏi khó",
-    text:"Bạn nhận được một câu hỏi khó hơn bình thường nhưng rất thú vị.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_013",
-    icon:"🗂️",
-    title:"Tìm thấy hồ sơ cũ",
-    text:"Bạn tìm thấy một tập tài liệu cũ có nhiều ghi chú hữu ích.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_014",
-    icon:"🧼",
-    title:"Xà phòng hết",
-    text:"Nhà vệ sinh trường vừa hết xà phòng đúng lúc bạn cần.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_015",
-    icon:"🍞",
-    title:"Tiệm bánh giảm giá",
-    text:"Tiệm bánh gần trường giảm giá một số món vào cuối buổi.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_016",
-    icon:"🚲",
-    title:"Lốp xe mềm",
-    text:"Lốp xe của bạn hơi non khi chuẩn bị về nhà.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_017",
-    icon:"🌳",
-    title:"Gốc cây quen thuộc",
-    text:"Bạn tìm được một góc yên tĩnh dưới gốc cây trong sân trường.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_018",
-    icon:"🎲",
-    title:"Trò chơi giờ nghỉ",
-    text:"Nhóm bạn rủ bạn chơi một trò chơi nhanh trong giờ nghỉ.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_019",
-    icon:"📖",
-    title:"Sách bị đánh dấu",
-    text:"Bạn mượn một cuốn sách có sẵn những dòng ghi chú rất thú vị.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_020",
-    icon:"🧑‍🎨",
-    title:"Bạn khoe tranh",
-    text:"Một người bạn cho bạn xem bức tranh mới hoàn thành.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_021",
-    icon:"🎹",
-    title:"Âm nhạc hành lang",
-    text:"Có tiếng đàn vang lên ở phòng sinh hoạt khiến mọi người dừng lại nghe.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_022",
-    icon:"🍀",
-    title:"Nhặt được cỏ bốn lá",
-    text:"Bạn bắt gặp một nhánh cỏ bốn lá bên sân trường.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_023",
-    icon:"📌",
-    title:"Thông báo cuộc thi",
-    text:"Bảng tin vừa đăng một cuộc thi mà bạn có thể tham gia.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_024",
-    icon:"🧑‍💻",
-    title:"Máy tính trống",
-    text:"Phòng máy còn một máy tính trống ngay trước giờ học.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_025",
-    icon:"🧴",
-    title:"Kem chống nắng",
-    text:"Một người bạn nhắc bạn trời hôm nay nắng gắt.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_026",
-    icon:"🥪",
-    title:"Hộp cơm dư",
-    text:"Bạn cùng lớp có một phần đồ ăn dư và hỏi bạn có muốn dùng không.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_027",
-    icon:"🧹",
-    title:"Phân công trực nhật",
-    text:"Bạn được giao một phần việc trực nhật hơi khác thường.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_028",
-    icon:"📚",
-    title:"Kệ sách mới",
-    text:"Thư viện vừa bổ sung một kệ sách theo chủ đề bạn thích.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_029",
-    icon:"🧮",
-    title:"Bài toán mẹo",
-    text:"Một bài toán mẹo xuất hiện trong nhóm chat lớp.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_030",
-    icon:"💡",
-    title:"Ý tưởng dự án",
-    text:"Bạn bất chợt nghĩ ra một ý tưởng cho dự án nhóm.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_031",
-    icon:"🎫",
-    title:"Vé sự kiện trường",
-    text:"Bạn được tặng một vé tham dự hoạt động ngoại khóa.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_032",
-    icon:"🏸",
-    title:"Cầu lông giờ nghỉ",
-    text:"Sân thể thao đang trống và một nhóm bạn rủ bạn đánh cầu.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_033",
-    icon:"🩹",
-    title:"Xước nhẹ",
-    text:"Bạn bị xước tay nhẹ khi làm đồ thủ công.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_034",
-    icon:"☕",
-    title:"Góc học tập mới",
-    text:"Quán gần trường vừa có một góc học tập yên tĩnh.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_035",
-    icon:"🛍️",
-    title:"Cửa hàng tiện lợi",
-    text:"Bạn ghé cửa hàng và thấy một món đồ đang được giảm giá.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_036",
-    icon:"🧑‍🔬",
-    title:"Thí nghiệm thú vị",
-    text:"Tiết thực hành có một thí nghiệm khiến cả lớp bất ngờ.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_037",
-    icon:"🌈",
-    title:"Cầu vồng sau mưa",
-    text:"Sau cơn mưa, cả sân trường nhìn thấy một chiếc cầu vồng.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_038",
-    icon:"📱",
-    title:"Điện thoại sắp hết pin",
-    text:"Bạn nhận ra pin điện thoại chỉ còn rất ít trước khi tan học.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_039",
-    icon:"🔋",
-    title:"Tìm thấy sạc dự phòng",
-    text:"Một người bạn cho bạn mượn sạc dự phòng.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_040",
-    icon:"🎒",
-    title:"Cặp nặng bất thường",
-    text:"Hôm nay chiếc cặp của bạn nặng hơn hẳn vì mang quá nhiều sách.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_041",
-    icon:"🧑‍🤝‍🧑",
-    title:"Bạn mới chuyển lớp",
-    text:"Một học sinh mới đến lớp và cần người hướng dẫn.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_042",
-    icon:"🎯",
-    title:"Bảng thành tích lớp",
-    text:"Lớp cập nhật bảng thành tích tuần và bạn có tên trong đó.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_043",
-    icon:"📢",
-    title:"Bạn được gọi tên",
-    text:"Tên bạn được nhắc trong một thông báo của trường.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_044",
-    icon:"🧸",
-    title:"Gian hàng gây quỹ",
-    text:"CLB tổ chức gian hàng nhỏ để gây quỹ.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_045",
-    icon:"🍉",
-    title:"Chia trái cây",
-    text:"Một nhóm bạn mang trái cây đến chia cho mọi người.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_046",
-    icon:"🧢",
-    title:"Quên mũ",
-    text:"Bạn ra ngoài trời mà quên mang mũ.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_047",
-    icon:"🌡️",
-    title:"Phòng học nóng",
-    text:"Điều hòa lớp học hoạt động chập chờn.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_048",
-    icon:"❄️",
-    title:"Phòng học lạnh",
-    text:"Điều hòa hôm nay lại chạy quá lạnh.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_049",
-    icon:"📝",
-    title:"Bạn được nhờ soát bài",
-    text:"Một người bạn nhờ bạn đọc lại bài trước khi nộp.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_050",
-    icon:"🎨",
-    title:"Trang trí bảng lớp",
-    text:"Lớp chuẩn bị trang trí bảng cho một dịp đặc biệt.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_051",
-    icon:"📦",
-    title:"Gói hàng bất ngờ",
-    text:"Bạn nhận một gói hàng nhỏ mà mình đã gần quên mất.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_052",
-    icon:"💌",
-    title:"Mảnh giấy động viên",
-    text:"Bạn tìm thấy một mảnh giấy nhỏ với lời chúc dễ thương.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_053",
-    icon:"🪴",
-    title:"Cây lớp cần chăm",
-    text:"Chậu cây của lớp hơi héo và cần người chăm sóc.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_054",
-    icon:"🐱",
-    title:"Mèo trước cổng",
-    text:"Một chú mèo thân thiện xuất hiện gần cổng trường.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_055",
-    icon:"🐶",
-    title:"Chó lạc đường",
-    text:"Một chú chó đi lạc quanh khu vực trường.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_056",
-    icon:"🕊️",
-    title:"Chim bay vào lớp",
-    text:"Một chú chim nhỏ bay vào lớp rồi đậu trên cửa sổ.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_057",
-    icon:"🌱",
-    title:"Trồng cây cùng CLB",
-    text:"CLB xanh rủ bạn tham gia trồng thêm cây trong sân.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_058",
-    icon:"♻️",
-    title:"Đổi rác lấy quà",
-    text:"Trường tổ chức hoạt động đổi chai nhựa lấy quà nhỏ.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_059",
-    icon:"🚰",
-    title:"Máy nước mới",
-    text:"Trường lắp một máy nước uống mới.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_060",
-    icon:"🧃",
-    title:"Hộp sữa miễn phí",
-    text:"Bạn nhận được một hộp sữa trong chương trình của trường.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_061",
-    icon:"🍜",
-    title:"Món mới ở căn tin",
-    text:"Căn tin thử bán một món mới và mời học sinh góp ý.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_062",
-    icon:"🍦",
-    title:"Xe kem trước cổng",
-    text:"Một xe kem xuất hiện ngay giờ tan học.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_063",
-    icon:"🎈",
-    title:"Bóng bay sân trường",
-    text:"Sân trường được trang trí bằng rất nhiều bóng bay.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_064",
-    icon:"🎭",
-    title:"Tập kịch đột xuất",
-    text:"Đội văn nghệ thiếu một người cho buổi tập.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_065",
-    icon:"💃",
-    title:"Tập nhảy",
-    text:"Bạn bè rủ bạn thử một động tác nhảy mới.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_066",
-    icon:"🎸",
-    title:"Bạn mang đàn",
-    text:"Một người bạn mang đàn đến và chơi vài bài sau giờ học.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_067",
-    icon:"🎬",
-    title:"Xem phim tài liệu",
-    text:"CLB học thuật chiếu một phim tài liệu ngắn.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_068",
-    icon:"🧪",
-    title:"Phòng thí nghiệm mở",
-    text:"Phòng thực hành mở cửa thêm một khoảng thời gian.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_069",
-    icon:"📐",
-    title:"Mượn thước",
-    text:"Bạn cần một chiếc thước nhưng chỉ có bạn bên cạnh có.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_070",
-    icon:"🖊️",
-    title:"Bút hết mực",
-    text:"Chiếc bút của bạn hết mực đúng lúc cần ghi chép.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_071",
-    icon:"📎",
-    title:"Kẹp giấy thất lạc",
-    text:"Bạn tìm thấy một chiếc kẹp giấy hữu ích trong ngăn bàn.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_072",
-    icon:"🗃️",
-    title:"Tủ đồ lộn xộn",
-    text:"Bạn phải sắp xếp lại ngăn tủ cá nhân.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_073",
-    icon:"🧽",
-    title:"Bảng trắng khó xóa",
-    text:"Bảng lớp bị bám mực và cần người xử lý.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_074",
-    icon:"🧯",
-    title:"Tập huấn an toàn",
-    text:"Trường tổ chức buổi hướng dẫn an toàn ngắn.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_075",
-    icon:"🚪",
-    title:"Cửa phòng kẹt",
-    text:"Cửa phòng học bị kẹt và cần vài người hỗ trợ.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_076",
-    icon:"🛗",
-    title:"Thang máy đông",
-    text:"Bạn phải chọn giữa chờ thang máy hoặc đi cầu thang.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_077",
-    icon:"🪜",
-    title:"Giúp lấy đồ",
-    text:"Một món đồ ở trên cao cần người hỗ trợ lấy xuống.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_078",
-    icon:"🧤",
-    title:"Quên đồ thể thao",
-    text:"Bạn nhận ra mình để quên một món đồ cần cho tiết thể dục.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_079",
-    icon:"🏃",
-    title:"Chạy bộ ngắn",
-    text:"Một người bạn rủ bạn chạy vài vòng quanh sân.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_080",
-    icon:"🧘",
-    title:"Góc thư giãn",
-    text:"Bạn tìm thấy một góc yên tĩnh để ngồi thở một lát.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_081",
-    icon:"🎧",
-    title:"Podcast mới",
-    text:"Bạn được giới thiệu một podcast học tập khá thú vị.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_082",
-    icon:"📰",
-    title:"Tin tốt của lớp",
-    text:"Lớp nhận được một tin vui từ giáo viên chủ nhiệm.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_083",
-    icon:"📊",
-    title:"Bảng khảo sát",
-    text:"Bạn được mời tham gia khảo sát ý kiến học sinh.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_084",
-    icon:"🗣️",
-    title:"Luyện thuyết trình",
-    text:"Một người bạn muốn luyện nói trước khi thuyết trình.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_085",
-    icon:"🌐",
-    title:"Trang web hữu ích",
-    text:"Bạn được gửi một trang web hỗ trợ học tập.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_086",
-    icon:"⌨️",
-    title:"Phím máy tính kẹt",
-    text:"Một phím trên máy tính phòng học bị kẹt.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_087",
-    icon:"🖨️",
-    title:"Máy in hết giấy",
-    text:"Cả nhóm đang cần in tài liệu nhưng máy in hết giấy.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_088",
-    icon:"📬",
-    title:"Thư tay",
-    text:"Bạn nhận được một lá thư tay từ một người bạn.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_089",
-    icon:"🧩",
-    title:"Ghép hình giờ nghỉ",
-    text:"Bạn thấy một bộ ghép hình nhỏ và thử hoàn thành nó.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_090",
-    icon:"🎁",
-    title:"Quà sinh nhật bạn",
-    text:"Một người bạn tổ chức sinh nhật đơn giản sau giờ học.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
-  },
-  {
-    id:"event_091",
-    icon:"🎂",
-    title:"Bánh sinh nhật dư",
-    text:"Sau buổi sinh nhật còn một phần bánh được chia cho bạn.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
-  },
-  {
-    id:"event_092",
-    icon:"🌙",
-    title:"Tan học muộn",
-    text:"Bạn phải ở lại trường lâu hơn dự kiến.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
-  },
-  {
-    id:"event_093",
-    icon:"🌞",
-    title:"Sáng trời đẹp",
-    text:"Thời tiết đẹp khiến mọi người có thêm năng lượng.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
-  },
-  {
-    id:"event_094",
-    icon:"🌬️",
-    title:"Gió mạnh",
-    text:"Gió mạnh làm vài tờ giấy bay khắp sân.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
-  },
-  {
-    id:"event_095",
-    icon:"📄",
-    title:"Tài liệu bị bay",
-    text:"Một tập tài liệu của bạn bị gió thổi rơi xuống hành lang.",
-    result:"HP +3; Năng lượng -2",
-    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
-  },
-  {
-    id:"event_096",
+    id:"teacher",
     icon:"🧑‍🏫",
-    title:"Cô giáo nhờ việc",
-    text:"Giáo viên nhờ bạn hỗ trợ một việc nhỏ trước giờ học.",
-    result:"Kiến thức -2; Kỹ năng +2",
-    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+    title:"Được giáo viên khen",
+    text:"Bạn phát biểu rất tốt trong lớp.",
+    result:"Kiến thức +3 • Danh tiếng +5 • Thi đua +4",
+    apply:g=>{
+      addStat(g,"study",3);
+      addStat(g,"reputation",5);
+      addCompetition(g,4);
+    }
   },
   {
-    id:"event_097",
-    icon:"🏆",
-    title:"Cúp lưu động",
-    text:"Lớp được giữ chiếc cúp thành tích trong một tuần.",
-    result:"Kiến thức +4; Tâm trạng +2",
-    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+    id:"festival",
+    icon:"🎉",
+    title:"Trường tổ chức ngày hội",
+    text:"Cả trường náo nhiệt với nhiều hoạt động.",
+    result:"Tâm trạng +8 • Bạn bè +5 • Thi đua +3",
+    apply:g=>{
+      addStat(g,"mood",8);
+      addStat(g,"friends",5);
+      addCompetition(g,3);
+    }
   },
   {
-    id:"event_098",
-    icon:"🪪",
-    title:"Tìm thấy thẻ học sinh",
-    text:"Bạn phát hiện một chiếc thẻ học sinh bị đánh rơi.",
-    result:"Năng lượng +6; Tâm trạng +5",
-    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+    id:"test",
+    icon:"📄",
+    title:"Kiểm tra bất ngờ",
+    text:"Giáo viên bất ngờ phát đề.",
+    result:"Kiến thức -4 • Danh tiếng +2 • Thi đua +2",
+    apply:g=>{
+      addStat(g,"study",-4);
+      addStat(g,"reputation",2);
+      addCompetition(g,2);
+    }
   },
   {
-    id:"event_099",
-    icon:"🔑",
-    title:"Chìa khóa thất lạc",
-    text:"Bạn thấy một chiếc chìa khóa ở hành lang.",
-    result:"Tiền +20,000đ; Tâm trạng +3",
-    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+    id:"wallet",
+    icon:"💸",
+    title:"Làm rơi ví",
+    text:"Một khoản tiền nhỏ bị thất lạc.",
+    result:"Tiền -30.000đ • Tâm trạng -4",
+    apply:g=>{
+      addMoney(g,-30000);
+      addStat(g,"mood",-4);
+    }
   },
   {
-    id:"event_100",
-    icon:"💳",
-    title:"Thẻ xe buýt",
-    text:"Bạn tìm thấy một thẻ xe buýt có vẻ bị bỏ quên.",
-    result:"Bạn bè +5; Tâm trạng +4",
-    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+    id:"snack",
+    icon:"🍪",
+    title:"Bạn cho đồ ăn",
+    text:"Một người bạn bất ngờ chia đồ ăn cho bạn.",
+    result:"Năng lượng +5 • Tâm trạng +5",
+    apply:g=>{
+      addStat(g,"energy",5);
+      addStat(g,"mood",5);
+    }
+  },
+  {
+    id:"rain",
+    icon:"🌧️",
+    title:"Trời mưa",
+    text:"Mưa lớn khiến việc di chuyển khó khăn.",
+    result:"Năng lượng -5 • Tâm trạng -3",
+    apply:g=>{
+      addStat(g,"energy",-5);
+      addStat(g,"mood",-3);
+    }
+  },
+  {
+    id:"club",
+    icon:"🎯",
+    title:"CLB tuyển thành viên",
+    text:"Bạn được mời tham gia một CLB mới.",
+    result:"Kỹ năng +4 • Bạn bè +3",
+    apply:g=>{
+      addStat(g,"skill",4);
+      addStat(g,"friends",3);
+    }
+  },
+  {
+    id:"lunch",
+    icon:"🍱",
+    title:"Được mời ăn trưa",
+    text:"Một người bạn mời bạn ăn trưa.",
+    result:"Tiền +20.000đ • Tâm trạng +4",
+    apply:g=>{
+      addMoney(g,20000);
+      addStat(g,"mood",4);
+    }
+  },
+  {
+    id:"library",
+    icon:"📚",
+    title:"Tìm được tài liệu hay",
+    text:"Bạn tình cờ tìm thấy một cuốn sách hữu ích.",
+    result:"Kiến thức +5",
+    apply:g=>{
+      addStat(g,"study",5);
+      g.studyActions++;
+    }
+  },
+  {
+    id:"sport",
+    icon:"🏅",
+    title:"Ngày hội thể thao",
+    text:"Bạn tham gia một trận đấu vui vẻ.",
+    result:"HP +3 • Bạn bè +4 • Năng lượng -5",
+    apply:g=>{
+      addStat(g,"hp",3);
+      addStat(g,"friends",4);
+      addStat(g,"energy",-5);
+    }
+  },
+  {
+    id:"contest",
+    icon:"💻",
+    title:"Cuộc thi online",
+    text:"Bạn được rủ tham gia một cuộc thi kiến thức.",
+    result:"Kỹ năng +3 • Thi đua +5",
+    apply:g=>{
+      addStat(g,"skill",3);
+      addCompetition(g,5);
+    }
+  },
+  {
+    id:"bus",
+    icon:"🚌",
+    title:"Trễ xe buýt",
+    text:"Bạn phải chờ xe lâu hơn bình thường.",
+    result:"Năng lượng -8 • Tâm trạng -3",
+    apply:g=>{
+      addStat(g,"energy",-8);
+      addStat(g,"mood",-3);
+    }
+  },
+  {
+    id:"message",
+    icon:"📱",
+    title:"Bạn cũ nhắn tin",
+    text:"Một người bạn cũ bất ngờ liên lạc.",
+    result:"Bạn bè +5 • Tâm trạng +4",
+    apply:g=>{
+      addStat(g,"friends",5);
+      addStat(g,"mood",4);
+    }
+  },
+  {
+    id:"coupon",
+    icon:"🎟️",
+    title:"Nhận voucher",
+    text:"Bạn nhận được voucher từ một cửa hàng.",
+    result:"Tiền +15.000đ",
+    apply:g=>addMoney(g,15000)
+  },
+  {
+    id:"clean",
+    icon:"🧹",
+    title:"Dọn lớp",
+    text:"Bạn ở lại giúp lớp dọn dẹp.",
+    result:"Danh tiếng +3 • Bạn bè +2 • Thi đua +2",
+    apply:g=>{
+      addStat(g,"reputation",3);
+      addStat(g,"friends",2);
+      addCompetition(g,2);
+    }
   }
 ];
 
-const EVENT_CHOICES = {
-  event_001:[
-    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_002:[
-    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Quan sát trước",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_003:[
-    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Tập trung việc khác",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_004:[
-    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_005:[
-    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nghỉ một chút",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_006:[
-    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_007:[
-    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Quan sát trước",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_008:[
-    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Tập trung việc khác",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_009:[
-    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_010:[
-    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_011:[
-    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Để sau rồi tính",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_012:[
-    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Quan sát trước",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_013:[
-    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_014:[
-    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_015:[
-    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nghỉ một chút",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_016:[
-    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_017:[
-    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Quan sát trước",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_018:[
-    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_019:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_020:[
-    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nghỉ một chút",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_021:[
-    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Để sau rồi tính",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_022:[
-    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Quan sát trước",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_023:[
-    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Tập trung việc khác",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_024:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_025:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_026:[
-    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Để sau rồi tính",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_027:[
-    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Quan sát trước",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_028:[
-    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_029:[
-    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_030:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_031:[
-    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_032:[
-    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Quan sát trước",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_033:[
-    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Tập trung việc khác",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_034:[
-    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_035:[
-    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nghỉ một chút",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_036:[
-    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_037:[
-    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Quan sát trước",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_038:[
-    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Tập trung việc khác",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_039:[
-    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_040:[
-    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_041:[
-    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Để sau rồi tính",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_042:[
-    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Quan sát trước",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_043:[
-    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_044:[
-    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_045:[
-    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nghỉ một chút",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_046:[
-    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_047:[
-    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Quan sát trước",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_048:[
-    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_049:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_050:[
-    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nghỉ một chút",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_051:[
-    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Để sau rồi tính",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_052:[
-    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Quan sát trước",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_053:[
-    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Tập trung việc khác",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_054:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_055:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_056:[
-    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Để sau rồi tính",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_057:[
-    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Quan sát trước",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_058:[
-    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_059:[
-    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_060:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_061:[
-    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_062:[
-    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Quan sát trước",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_063:[
-    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Tập trung việc khác",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_064:[
-    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_065:[
-    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nghỉ một chút",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_066:[
-    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_067:[
-    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Quan sát trước",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_068:[
-    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Tập trung việc khác",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_069:[
-    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_070:[
-    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_071:[
-    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Để sau rồi tính",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_072:[
-    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Quan sát trước",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_073:[
-    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_074:[
-    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_075:[
-    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nghỉ một chút",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_076:[
-    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_077:[
-    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Quan sát trước",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_078:[
-    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_079:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_080:[
-    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Nghỉ một chút",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_081:[
-    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Để sau rồi tính",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_082:[
-    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Quan sát trước",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_083:[
-    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Tập trung việc khác",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_084:[
-    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_085:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_086:[
-    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Để sau rồi tính",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_087:[
-    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Quan sát trước",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_088:[
-    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Tập trung việc khác",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ],
-  event_089:[
-    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
-  ],
-  event_090:[
-    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
-  ],
-  event_091:[
-    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Để sau rồi tính",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
-  ],
-  event_092:[
-    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Quan sát trước",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
-  ],
-  event_093:[
-    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Tập trung việc khác",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
-  ],
-  event_094:[
-    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
-  ],
-  event_095:[
-    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
-    {label:"Nghỉ một chút",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
-  ],
-  event_096:[
-    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
-    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
-  ],
-  event_097:[
-    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
-    {label:"Quan sát trước",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
-  ],
-  event_098:[
-    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
-    {label:"Tập trung việc khác",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
-  ],
-  event_099:[
-    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
-    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
-  ],
-  event_100:[
-    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
-    {label:"Nghỉ một chút",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
-  ]
-};
-
 function eventData(ev){
   return {
-    id:ev.id, icon:ev.icon, title:ev.title, text:ev.text, result:ev.result,
-    choices:(EVENT_CHOICES[ev.id] || []).map((c,i)=>({label:c.label,result:c.result,index:i}))
+    id:ev.id,
+    icon:ev.icon,
+    title:ev.title,
+    text:ev.text,
+    result:ev.result
   };
 }
 
-function pickDailyEvents(lastIds=[],count=3){
-  const blocked=new Set(lastIds);
-  const pool=DAILY_EVENTS.filter(e=>!blocked.has(e.id));
-  const source=pool.length>=count ? pool : DAILY_EVENTS;
-  return shuffle(source).slice(0,Math.min(count,source.length));
+function pickDailyEvent(lastId){
+  const available = DAILY_EVENTS.filter(e=>e.id !== lastId);
+  return pick(available.length ? available : DAILY_EVENTS);
 }
-
-/* =========================================================
-   NGƯỜI CHƠI KHÁC — FALLBACK DEMO
-   Dùng khi Supabase chưa được cấu hình.
-   Khi online hoạt động, leaderboard lấy dữ liệu thật từ server.
-========================================================= */
-
-const OTHER_PLAYER_SEEDS = [
-  {id:"p1", name:"Mai Anh", icon:"👩🏻‍🎓", points:44},
-  {id:"p2", name:"Gia Hân", icon:"👩🏼‍🎓", points:39},
-  {id:"p3", name:"Khánh Linh", icon:"👩🏻‍💻", points:35},
-  {id:"p4", name:"Hoàng Nam", icon:"👨🏻‍🎓", points:32},
-  {id:"p5", name:"Minh Khang", icon:"👨🏼‍🎓", points:28},
-  {id:"p6", name:"Thảo Vy", icon:"👩🏽‍🎓", points:25},
-  {id:"p7", name:"Đức Anh", icon:"👨🏻‍💻", points:22},
-  {id:"p8", name:"Ngọc Hà", icon:"👩🏻‍🎨", points:19}
-];
-
-const createOtherPlayers = () =>
-  OTHER_PLAYER_SEEDS.map(p=>({...p, today:0}));
 
 /* =========================================================
    NGHỀ
@@ -2741,7 +1069,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,50000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",2);
+      addStat(g,"skill",4);
       addCompetition(g,4);
     }
   },
@@ -2757,7 +1085,7 @@ const JOBS = [
       addMoney(g,100000);
       addStat(g,"energy",-20);
       addStat(g,"reputation",3);
-      addStat(g,"skill",4);
+      addStat(g,"skill",5);
       addCompetition(g,6);
     }
   },
@@ -2772,7 +1100,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,150000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",3);
+      addStat(g,"skill",7);
       addCompetition(g,7);
     }
   },
@@ -2788,115 +1116,11 @@ const JOBS = [
       addMoney(g,200000);
       addStat(g,"energy",-10);
       addStat(g,"reputation",4);
-      addStat(g,"skill",5);
-      addCompetition(g,8);
-    }
-  }
-];
-
-/* =========================================================
-   NGHỀ MỚI — ĐI LÀM LUÔN TĂNG KỸ NĂNG
-========================================================= */
-const EXTRA_JOBS = [
-  {
-    id:"content_writer",
-    name:"Cộng tác viên viết nội dung",
-    icon:"✍️",
-    pay:70000,
-    energy:10,
-    desc:"Cần kỹ năng ≥ 60. Viết bài giúp tăng kỹ năng ngôn ngữ.",
-    can:g=>g.stats.skill>=60,
-    apply:g=>{
-      addMoney(g,70000);
-      addStat(g,"energy",-10);
-      addStat(g,"skill",5);
-      addStat(g,"reputation",2);
-      addCompetition(g,4);
-    }
-  },
-  {
-    id:"barista",
-    name:"Phụ barista",
-    icon:"☕",
-    pay:60000,
-    energy:12,
-    desc:"Cần kỹ năng ≥ 40. Rèn tốc độ và giao tiếp.",
-    can:g=>g.stats.skill>=40,
-    apply:g=>{
-      addMoney(g,60000);
-      addStat(g,"energy",-12);
-      addStat(g,"skill",3);
-      addStat(g,"friends",2);
-      addCompetition(g,3);
-    }
-  },
-  {
-    id:"social_media",
-    name:"Quản lý mạng xã hội",
-    icon:"📱",
-    pay:90000,
-    energy:10,
-    desc:"Cần kỹ năng ≥ 120 và chứng chỉ MOS.",
-    can:g=>g.stats.skill>=120 && g.certificates.includes("cert_mos"),
-    apply:g=>{
-      addMoney(g,90000);
-      addStat(g,"energy",-10);
-      addStat(g,"skill",6);
-      addStat(g,"reputation",3);
-      addCompetition(g,5);
-    }
-  },
-  {
-    id:"chinese_tutor",
-    name:"Trợ giảng tiếng Trung",
-    icon:"🇨🇳",
-    pay:130000,
-    energy:12,
-    desc:"Cần HSK 4 và kỹ năng ≥ 180.",
-    can:g=>g.certificates.includes("cert_hsk4") && g.stats.skill>=180,
-    apply:g=>{
-      addMoney(g,130000);
-      addStat(g,"energy",-12);
-      addStat(g,"skill",7);
-      addStat(g,"reputation",4);
-      addCompetition(g,6);
-    }
-  },
-  {
-    id:"chinese_translator",
-    name:"Cộng tác viên dịch Trung",
-    icon:"🀄",
-    pay:220000,
-    energy:14,
-    desc:"Cần HSK 5 và kỹ năng ≥ 300.",
-    can:g=>g.certificates.includes("cert_hsk5") && g.stats.skill>=300,
-    apply:g=>{
-      addMoney(g,220000);
-      addStat(g,"energy",-14);
-      addStat(g,"skill",9);
-      addStat(g,"reputation",5);
-      addCompetition(g,8);
-    }
-  },
-  {
-    id:"data_analyst",
-    name:"Trợ lý phân tích dữ liệu",
-    icon:"📊",
-    pay:180000,
-    energy:14,
-    desc:"Cần MOS và kỹ năng ≥ 250.",
-    can:g=>g.certificates.includes("cert_mos") && g.stats.skill>=250,
-    apply:g=>{
-      addMoney(g,180000);
-      addStat(g,"energy",-14);
       addStat(g,"skill",8);
-      addStat(g,"reputation",4);
-      addCompetition(g,7);
+      addCompetition(g,8);
     }
   }
 ];
-
-JOBS.push(...EXTRA_JOBS);
 
 /* =========================================================
    CHỨNG CHỈ
@@ -3029,32 +1253,6 @@ const ASSETS = [
   {id:"condo",name:"Căn hộ",icon:"🏢",price:20000000,desc:"Không gian riêng",bonus:{mood:12,energy:5}},
   {id:"villa",name:"Biệt thự",icon:"🏡",price:60000000,desc:"Tài sản mơ ước",bonus:{mood:18,reputation:15}},
 ];
-const EXTRA_ASSETS=[{id:"laptop",name:"Laptop học tập",icon:"💻",price:3500000,desc:"Học và làm việc",bonus:{skill:15,study:6}},{id:"tablet",name:"Máy tính bảng",icon:"📱",price:2200000,desc:"Ghi chú",bonus:{study:8,mood:4}},{id:"camera",name:"Máy ảnh",icon:"📷",price:2800000,desc:"Sáng tạo",bonus:{skill:10,reputation:5}},{id:"motorbike_premium",name:"Xe tay ga premium",icon:"🛵",price:1500000,desc:"Di chuyển",bonus:{energy:8,reputation:5}},{id:"studio",name:"Phòng studio",icon:"🎙️",price:12000000,desc:"Không gian sáng tạo",bonus:{skill:20,mood:10}},{id:"mini_library",name:"Tủ sách lớn",icon:"📚",price:1800000,desc:"Kho tri thức",bonus:{study:12,skill:8}},{id:"gaming_pc",name:"PC gaming",icon:"🖥️",price:6500000,desc:"Công nghệ",bonus:{mood:12,skill:12}},{id:"coffee_shop",name:"Góc cà phê riêng",icon:"☕",price:9000000,desc:"Thư giãn",bonus:{mood:15,friends:8}}];
-ASSETS.push(...EXTRA_ASSETS);
-
-const MORE_ASSETS = [
-  {id:"smartwatch",name:"Smartwatch",icon:"⌚",price:1800000,desc:"Theo dõi lịch học và vận động",bonus:{energy:6,skill:5}},
-  {id:"headphones",name:"Tai nghe chống ồn",icon:"🎧",price:2400000,desc:"Tập trung học tập",bonus:{study:10,mood:6}},
-  {id:"e_reader",name:"Máy đọc sách",icon:"📖",price:3200000,desc:"Thư viện di động",bonus:{study:14,knowledge:10}},
-  {id:"mechanical_keyboard",name:"Bàn phím cơ",icon:"⌨️",price:2800000,desc:"Góc học tập xịn hơn",bonus:{skill:8,mood:5}},
-  {id:"desk",name:"Bàn học thông minh",icon:"🪑",price:4500000,desc:"Tối ưu góc học tập",bonus:{study:12,skill:10}},
-  {id:"bookshelf",name:"Kệ sách mini",icon:"🗄️",price:2500000,desc:"Mở rộng kho sách",bonus:{study:10,knowledge:8}},
-  {id:"bicycle_pro",name:"Xe đạp thể thao",icon:"🚴",price:4200000,desc:"Di chuyển và rèn luyện",bonus:{energy:10,reputation:5}},
-  {id:"electric_scooter",name:"Xe máy điện",icon:"🛴",price:12000000,desc:"Di chuyển hiện đại",bonus:{energy:12,reputation:8}},
-  {id:"compact_car",name:"Ô tô gia đình",icon:"🚙",price:28000000,desc:"Tiện nghi hằng ngày",bonus:{energy:15,reputation:10,mood:8}},
-  {id:"sports_car",name:"Xe thể thao",icon:"🏁",price:85000000,desc:"Tài sản cực hiếm",bonus:{reputation:22,mood:15}},
-  {id:"penthouse",name:"Penthouse",icon:"🌆",price:120000000,desc:"Không gian sống cao cấp",bonus:{mood:25,reputation:22,energy:8}},
-  {id:"beach_house",name:"Nhà nghỉ ven biển",icon:"🏖️",price:160000000,desc:"Nghỉ dưỡng cuối tuần",bonus:{mood:30,reputation:18}},
-  {id:"office_room",name:"Văn phòng riêng",icon:"🏢",price:45000000,desc:"Không gian làm việc chuyên nghiệp",bonus:{skill:22,reputation:12}},
-  {id:"co_working",name:"Phòng co-working",icon:"🧑‍💻",price:18000000,desc:"Môi trường học và làm việc",bonus:{skill:15,friends:12}},
-  {id:"mini_cafe",name:"Quán cà phê mini",icon:"☕",price:55000000,desc:"Tài sản kinh doanh",bonus:{money:0,reputation:15,friends:15}},
-  {id:"online_store",name:"Cửa hàng online",icon:"🛒",price:30000000,desc:"Kinh doanh nhỏ",bonus:{reputation:12,skill:18}},
-  {id:"investment_fund",name:"Danh mục đầu tư",icon:"📊",price:75000000,desc:"Tài sản tài chính",bonus:{knowledge:20,reputation:20}},
-  {id:"gold_collection",name:"Bộ sưu tập vàng",icon:"🥇",price:95000000,desc:"Tài sản tích lũy",bonus:{reputation:18,mood:10}},
-  {id:"art_collection",name:"Bộ sưu tập nghệ thuật",icon:"🖼️",price:68000000,desc:"Đồ sưu tầm giá trị",bonus:{mood:18,reputation:20}},
-  {id:"private_library",name:"Thư viện riêng",icon:"🏛️",price:90000000,desc:"Không gian tri thức cá nhân",bonus:{study:20,skill:20,knowledge:25}}
-];
-ASSETS.push(...MORE_ASSETS);
 
 /* =========================================================
    TITLE
@@ -3065,7 +1263,7 @@ const TITLES = [
   {id:"diligent",name:"Người Chăm Chỉ",icon:"📚",desc:"8 lần học",condition:g=>g.studyActions>=8},
   {id:"scholar",name:"Học Bá",icon:"🏆",desc:"Kiến thức ≥ 85",condition:g=>g.stats.study>=85},
   {id:"social",name:"Tâm Điểm Lớp",icon:"🤝",desc:"Bạn bè ≥ 85",condition:g=>g.stats.friends>=85},
-  {id:"skill",name:"Đa Năng",icon:"🛠️",desc:"Kỹ năng ≥ 400",condition:g=>g.stats.skill>=400},
+  {id:"skill",name:"Đa Năng",icon:"⚡",desc:"Kỹ năng ≥ 80",condition:g=>g.stats.skill>=80},
   {id:"love",name:"Thanh Xuân Có Đôi",icon:"💗",desc:"Tình cảm ≥ 80",condition:g=>g.stats.love>=80},
   {id:"certificate",name:"Bộ Sưu Tập Chứng Chỉ",icon:"🎓",desc:"Có ≥ 3 chứng chỉ",condition:g=>g.certificates.length>=3},
   {id:"fashion",name:"Fashionista Học Đường",icon:"👗",desc:"Có ≥ 15 món thời trang",condition:g=>g.wardrobe.length>=15},
@@ -3074,8 +1272,6 @@ const TITLES = [
   {id:"competition",name:"Ngôi Sao Thi Đua",icon:"🌟",desc:"≥ 100 điểm thi đua",condition:g=>g.competitionPoints>=100},
   {id:"legend",name:"Thanh Xuân Rực Rỡ",icon:"✨",desc:"Hoàn thành hành trình",condition:g=>g.isGameOver},
 ];
-TITLES.push({id:"asset_tycoon",name:"Ông Trùm Tài Sản",icon:"🏦",desc:"Sở hữu ≥ 15 tài sản",condition:g=>g.assets.length>=15},{id:"property_king",name:"Vua Bất Động Sản",icon:"🏙️",desc:"Sở hữu ≥ 5 tài sản nhà ở",condition:g=>g.assets.filter(id=>["condo","villa","penthouse","beach_house"].includes(id)).length>=5},{id:"tech_collector",name:"Tín Đồ Công Nghệ",icon:"💻",desc:"Sở hữu ≥ 6 tài sản công nghệ",condition:g=>g.assets.filter(id=>["laptop","tablet","camera","gaming_pc","smartwatch","headphones","e_reader","mechanical_keyboard"].includes(id)).length>=6},{id:"luxury_life",name:"Cuộc Sống Xa Hoa",icon:"💎",desc:"Sở hữu ≥ 3 tài sản cao cấp",condition:g=>g.assets.filter(id=>["sports_car","penthouse","beach_house","investment_fund","gold_collection","art_collection","private_library"].includes(id)).length>=3},{id:"business_owner",name:"Chủ Doanh Nghiệp Trẻ",icon:"🏪",desc:"Sở hữu quán cà phê hoặc cửa hàng online",condition:g=>g.assets.includes("mini_cafe")||g.assets.includes("online_store")});
-TITLES.push({id:"math_master",name:"Chiến Thần Toán 11",icon:"🧮",desc:"Đã làm ≥ 30 câu Toán 11",condition:g=>g.quizHistory.filter(id=>String(id).startsWith("toan11")).length>=30},{id:"quiz_marathon",name:"Máy Cày Quiz",icon:"🔥",desc:"Đã làm ≥ 100 câu",condition:g=>g.quizHistory.length>=100},{id:"knowledge_hero",name:"Kho Báu Tri Thức",icon:"🧠",desc:"Tri thức ≥ 200",condition:g=>g.knowledgePoints>=200},{id:"achievement_hunter",name:"Thợ Săn Thành Tích",icon:"🏅",desc:"Thành tích ≥ 200",condition:g=>g.achievementPoints>=200},{id:"shopaholic",name:"Đại Gia Học Đường",icon:"🛍️",desc:"Có ≥ 30 món thời trang",condition:g=>g.wardrobe.length>=30},{id:"collector",name:"Nhà Sưu Tầm",icon:"🎁",desc:"Có ≥ 8 tài sản",condition:g=>g.assets.length>=15},{id:"career_climber",name:"Bậc Thầy Sự Nghiệp",icon:"💼",desc:"Kỹ năng ≥ 450 và ≥ 5 chứng chỉ",condition:g=>g.stats.skill>=450&&g.certificates.length>=5},{id:"language_lover",name:"Polyglot",icon:"🌏",desc:"Có HSK 4 và HSK 5",condition:g=>g.certificates.includes("cert_hsk4")&&g.certificates.includes("cert_hsk5")},{id:"english_pro",name:"English Pro",icon:"🇬🇧",desc:"TOEIC và kỹ năng ≥ 350",condition:g=>g.certificates.includes("cert_toeic")&&g.stats.skill>=350},{id:"worker",name:"Người Ham Làm",icon:"⚒️",desc:"Làm việc ≥ 15 lần",condition:g=>g.jobActions>=15},{id:"fashion_star",name:"Ngôi Sao Phong Cách",icon:"✨",desc:"Danh tiếng ≥ 90 và ≥ 20 món",condition:g=>g.stats.reputation>=90&&g.wardrobe.length>=20},{id:"rich_student",name:"Học Sinh Có Của",icon:"💰",desc:"Có ≥ 5.000.000đ",condition:g=>g.stats.money>=5000000});
 
 /* =========================================================
    SAVE / LOAD
@@ -3144,14 +1340,12 @@ function emptyDailyCompetition(){
 
 function createInitialState(){
   const g = {
-    version:GAME_VERSION,
-    season:GAME_SEASON,
+    version:6,
     isGameOver:false,
     day:1,
-    totalDays:100,
+    totalDays:45,
     timeIndex:0,
     location:"class",
-    playerName:"",
 
     stats:{
       hp:85,
@@ -3198,8 +1392,6 @@ function createInitialState(){
     diaryEntries:[],
 
     competitionPoints:0,
-    achievementPoints:0,
-    knowledgePoints:0,
 
     npcCompetition:{
       lan:42,
@@ -3211,10 +1403,6 @@ function createInitialState(){
     },
 
     dailyCompetition:emptyDailyCompetition(),
-
-    otherPlayers:createOtherPlayers(),
-
-    examResults:{},
 
     relationships:{
       lan:45,
@@ -3235,39 +1423,27 @@ function createInitialState(){
     mainActivityLabels:[],
 
     dailyEvent:null,
-    dailyEvents:[],
-    dailyEventIndex:0,
-    dailyEventResolved:false,
     lastEventId:null,
     dayStart:null,
 
     selectedTitle:"starter",
 
-    // Chống lặp câu hỏi: lưu ID các câu gần đây và khóa quiz nhanh 1 lần/ngày.
-    quizHistory:[],
-    dailyQuizDone:false,
-    dailyQuizCount:0,
-    dailyOralCheckCount:0
+    // Lịch sử câu hỏi để hạn chế lặp lại quá nhiều.
+    questionUsage:{},
+    recentQuestionIds:[]
   };
 
-  const events = pickDailyEvents([],1);
+  const ev = pickDailyEvent(null);
+
   g.dayStart = snapshotDay(g);
-  g.dailyEvents = events.map(eventData);
-  g.dailyEventIndex = 0;
-  g.dailyEventResolved = false;
-  g.dailyEvent = g.dailyEvents[0] || null;
-  g.lastEventId = events[0]?.id || null;
+  g.dailyEvent = eventData(ev);
+  g.lastEventId = ev.id;
+  ev.apply(g);
 
   return g;
 }
 
 function normalizeState(raw){
-  // Nâng cấp game phải giữ nguyên tiến độ. Chỉ chặn save khác Season;
-  // version cũ vẫn được migrate bằng cách merge vào state mới.
-  if(raw?.season && raw.season !== GAME_SEASON){
-    throw new Error("SAVE_OLD_SEASON");
-  }
-
   const base = createInitialState();
 
   const g = {
@@ -3282,7 +1458,6 @@ function normalizeState(raw){
     wardrobe:Array.isArray(raw?.wardrobe) ? raw.wardrobe : base.wardrobe,
     bag:Array.isArray(raw?.bag) ? raw.bag : base.bag,
     diaryEntries:Array.isArray(raw?.diaryEntries) ? raw.diaryEntries : [],
-    quizHistory:Array.isArray(raw?.quizHistory) ? raw.quizHistory : [],
     npcCompetition:{
       ...base.npcCompetition,
       ...(raw?.npcCompetition || {})
@@ -3291,64 +1466,28 @@ function normalizeState(raw){
       ...base.dailyCompetition,
       ...(raw?.dailyCompetition || {})
     },
-    examResults:{
-      ...base.examResults,
-      ...(raw?.examResults || {})
-    },
     relationships:{
       ...base.relationships,
       ...(raw?.relationships || {})
     },
-    otherPlayers:Array.isArray(raw?.otherPlayers)
-      ? raw.otherPlayers.map((p,i)=>({
-          ...(base.otherPlayers[i] || OTHER_PLAYER_SEEDS[i]),
-          ...p,
-          id:p.id || base.otherPlayers[i]?.id || `p${i+1}`,
-          name:String(p.name || base.otherPlayers[i]?.name || `Người chơi ${i+1}`).slice(0,20),
-          points:Math.max(0,Math.round(Number(p.points)||0)),
-          today:Math.max(0,Math.round(Number(p.today)||0))
-        }))
-      : createOtherPlayers(),
     outfit:{
       ...base.outfit,
       ...(raw?.outfit || {})
     }
   };
 
-  g.version = GAME_VERSION;
-  g.season = GAME_SEASON;
-
-  g.playerName = String(g.playerName || "").trim().slice(0,20);
-  g.achievementPoints = Math.max(0, Math.round(Number(g.achievementPoints) || 0));
-  g.knowledgePoints = Math.max(0, Math.round(Number(g.knowledgePoints) || 0));
-  g.dailyQuizCount = Math.max(0, Math.min(7, Number(g.dailyQuizCount) || (g.dailyQuizDone ? 1 : 0)));
-  g.dailyOralCheckCount = Math.max(0, Math.min(4, Number(g.dailyOralCheckCount) || (g.dailyOralCheckDone ? 1 : 0)));
-  g.dailyQuizDone = g.dailyQuizCount >= 7;
-  g.dailyOralCheckDone = g.dailyOralCheckCount >= 4;
-  g.quizHistory = Array.isArray(g.quizHistory)
-    ? g.quizHistory.filter(Boolean).slice(-300)
-    : [];
-
-  g.day = Math.max(1, Math.min(g.totalDays || 100, Number(g.day) || 1));
+  g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
   g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
   const legacyCount = g.mainActivityCount == null
     ? (g.mainActivityUsed ? 1 : 0)
     : Number(g.mainActivityCount) || 0;
-  g.mainActivityCount = Math.max(0, Math.min(2, legacyCount));
+  g.mainActivityCount = Math.max(0, Math.min(1, legacyCount));
   g.mainActivityLabels = Array.isArray(g.mainActivityLabels)
-    ? g.mainActivityLabels.filter(Boolean).slice(0,2)
+    ? g.mainActivityLabels.filter(Boolean).slice(0,1)
     : (g.mainActivityLabel ? [g.mainActivityLabel] : []);
-  g.mainActivityUsed = g.mainActivityCount >= 2;
+  g.mainActivityUsed = g.mainActivityCount >= 1;
   g.mainActivityLabel = g.mainActivityLabels.join(" • ");
   g.mainActivityLabel = g.mainActivityLabel || null;
-
-  // Giữ nguyên save hiện tại, nhưng Season 2 chỉ dùng 1 sự kiện/ngày.
-  // Nếu save cũ đang có nhiều event, giữ đúng event hiện tại và không reset tiến độ.
-  if(!g.dailyEvent && Array.isArray(g.dailyEvents) && g.dailyEvents.length){
-    g.dailyEvent = g.dailyEvents[g.dailyEventIndex || 0] || g.dailyEvents[0];
-  }
-  g.dailyEvents = g.dailyEvent ? [g.dailyEvent] : [];
-  g.dailyEventIndex = 0;
 
   for(const key of [
     "hp",
@@ -3357,14 +1496,20 @@ function normalizeState(raw){
     "study",
     "friends",
     "love",
-    "reputation",
-    "skill"
+    "reputation"
   ]){
-    const max = key === "skill" ? 500 : 100;
-    g.stats[key] = Math.max(0, Math.min(max, Number(g.stats[key]) || 0));
+    g.stats[key] = clamp(g.stats[key]);
   }
+  g.stats.skill = clamp(g.stats.skill, 0, 500);
 
   g.stats.money = Math.max(0, Number(g.stats.money) || 0);
+
+  g.questionUsage = (raw?.questionUsage && typeof raw.questionUsage === "object")
+    ? raw.questionUsage
+    : {};
+  g.recentQuestionIds = Array.isArray(raw?.recentQuestionIds)
+    ? raw.recentQuestionIds.filter(Boolean).slice(-60)
+    : [];
 
   if(!g.dayStart){
     g.dayStart = snapshotDay(g);
@@ -3431,23 +1576,18 @@ function Button({children,onClick,disabled=false,className=""}){
    APP
 ========================================================= */
 
-function App(){
+export default function App(){
 
   const [game,setGame] = useState(()=>{
     try{
-      // Season 2: xóa save cục bộ của các mùa cũ và không kế thừa tiến trình cũ.
-      [
-        "thanh_xuan_ruc_ro_deluxe_v17",
-        "thanh_xuan_ruc_ro_deluxe_v25",
-        "thanh_xuan_ruc_ro_deluxe_v26"
-      ].forEach(key=>localStorage.removeItem(key));
-
       const saved = localStorage.getItem(SAVE_KEY);
       if(saved) return normalizeState(JSON.parse(saved));
     }catch{}
     return createInitialState();
   });
 
+  const [secondsLeft,setSecondsLeft] = useState(SLOT_SECONDS);
+  const [autoTime,setAutoTime] = useState(true);
 
   const [overlay,setOverlay] = useState(null);
   const [toast,setToast] = useState("");
@@ -3457,76 +1597,40 @@ function App(){
 
   const [saveCode,setSaveCode] = useState("");
   const [fashionCategory,setFashionCategory] = useState("Áo");
-  const [playerNameDraft,setPlayerNameDraft] = useState("");
 
   const [audioOn,setAudioOn] = useState(false);
 
-  const [onlineUser,setOnlineUser] = useState(null);
-  const [onlinePlayers,setOnlinePlayers] = useState([]);
-  const [onlineReady,setOnlineReady] = useState(false);
-  const [onlineError,setOnlineError] = useState("");
-  const [onlineCount,setOnlineCount] = useState(0);
-  const onlineChannelRef = useRef(null);
-
   const advancingRef = useRef(false);
-  const examDismissedRef = useRef(null);
+
+  const blockingOverlay = Boolean(overlay);
 
   const currentTime = TIME_SLOTS[game.timeIndex];
   const nextTime =
     TIME_SLOTS[Math.min(game.timeIndex + 1,TIME_SLOTS.length - 1)];
-
-  const currentExam = EXAM_SCHEDULE.find(
-    exam=>exam.day===game.day && exam.timeIndex===game.timeIndex
-  ) || null;
-
-  const todayExam = EXAM_SCHEDULE.find(
-    exam=>exam.day===game.day
-  ) || null;
 
   const currentTitle =
     TITLES.find(t=>t.id===game.selectedTitle) || TITLES[0];
 
   const leaderboard = useMemo(()=>{
     const rows = [
+      {
+        id:"player",
+        name:"Bạn",
+        icon:currentTitle.icon,
+        points:game.competitionPoints,
+        today:game.dailyCompetition.player
+      },
       ...NPCS.map(n=>({
         id:n.id,
         name:n.name,
         icon:n.icon,
         points:game.npcCompetition[n.id] || 0,
-        today:game.dailyCompetition[n.id] || 0,
-        type:"NPC"
-      })),
-      ...(onlinePlayers.length
-        ? onlinePlayers
-            .filter(p=>p.id !== onlineUser?.id)
-            .map(p=>({
-              id:`online-${p.id}`,
-              name:p.player_name || "Người chơi",
-              icon:p.icon || "👩🏻‍🎓",
-              points:Number(p.points)||0,
-              today:Number(p.today)||0,
-              type:"Online"
-            }))
-        : game.otherPlayers.map(p=>({
-            id:`other-${p.id}`,
-            name:p.name,
-            icon:p.icon,
-            points:p.points,
-            today:p.today,
-            type:"Người chơi (demo)"
-          }))),
-      {
-        id:"player",
-        name:game.playerName || "Bạn",
-        icon:currentTitle.icon,
-        points:game.competitionPoints,
-        today:game.dailyCompetition.player,
-        type:onlineReady ? "Bạn • Online" : "Bạn"
-      }
+        today:game.dailyCompetition[n.id] || 0
+      }))
     ];
 
     return rows.sort((a,b)=>b.points-a.points);
-  },[game,currentTitle,onlinePlayers,onlineReady,onlineUser]);
+  },[game,currentTitle]);
 
   const ownedFashion = useMemo(
     ()=>FASHION.filter(item=>game.wardrobe.includes(item.id)),
@@ -3537,152 +1641,6 @@ function App(){
     ()=>FASHION.filter(item=>item.category===fashionCategory),
     [fashionCategory]
   );
-
-  /* -----------------------------------------
-     MULTIPLAYER ONLINE — REST / POLLING
-     Không phụ thuộc @supabase/supabase-js.
-  ----------------------------------------- */
-
-  const loadOnlineLeaderboard = useCallback(async(accessToken)=>{
-    if(!hasOnlineConfig) return [];
-
-    const rows = await onlineRequest(
-   `/rest/v1/${ONLINE_TABLE}?select=id,player_name,icon,points,today,day,time_index,updated_at&season=eq.${GAME_SEASON}&order=points.desc,updated_at.desc&limit=100`,
-      {headers:onlineAuthHeaders(accessToken)}
-    );
-
-    return Array.isArray(rows) ? rows : [];
-  },[]);
-
-  const pushOnlineScore = useCallback(async(session)=>{
-    if(!session?.access_token || !session?.user?.id || !game.playerName) return;
-
-    const payload = {
-      id:session.user.id,
-      season:GAME_SEASON,
-      player_name:game.playerName.slice(0,20),
-      icon:currentTitle.icon,
-      points:Math.max(0,Math.round(game.competitionPoints)),
-      today:Math.max(0,Math.round(game.dailyCompetition.player)),
-      day:Math.max(1,Math.round(game.day)),
-      time_index:Math.max(0,Math.round(game.timeIndex)),
-      updated_at:new Date().toISOString()
-    };
-
-    const doPush = async(s)=>onlineRequest(
-      `/rest/v1/${ONLINE_TABLE}?on_conflict=id`,
-      {
-        method:"POST",
-        headers:{
-          ...onlineAuthHeaders(s.access_token),
-          Prefer:"resolution=merge-duplicates,return=minimal"
-        },
-        body:JSON.stringify(payload)
-      }
-    );
-
-    try{
-      await doPush(session);
-    }catch(error){
-      const refreshed=await refreshAnonymousSession(session);
-      if(!refreshed) throw error;
-      await doPush(refreshed);
-      setOnlineUser(refreshed.user);
-    }
-  },[
-    game.playerName,
-    game.competitionPoints,
-    game.dailyCompetition.player,
-    game.day,
-    game.timeIndex,
-    currentTitle.icon
-  ]);
-
-  useEffect(()=>{
-    let cancelled=false;
-    let heartbeatTimer=null;
-    let pollTimer=null;
-
-    const init=async()=>{
-      if(!hasOnlineConfig){
-        setOnlineReady(false);
-        setOnlineError("Chưa cấu hình Supabase. Game vẫn chơi được offline.");
-        return;
-      }
-
-      try{
-        let session=readOnlineSession();
-        if(!session?.access_token || !session?.user?.id){
-          session=await createAnonymousSession();
-        }
-
-        try{
-          await loadOnlineLeaderboard(session.access_token);
-        }catch{
-          const refreshed=await refreshAnonymousSession(session);
-          if(refreshed) session=refreshed;
-          else session=await createAnonymousSession();
-        }
-
-        if(cancelled) return;
-
-        setOnlineUser(session.user);
-        setOnlineReady(true);
-        setOnlineError("");
-
-        const sync=async()=>{
-          if(cancelled) return;
-          const current=readOnlineSession() || session;
-          try{
-            await pushOnlineScore(current);
-            const rows=await loadOnlineLeaderboard(current.access_token);
-            setOnlinePlayers(rows);
-            setOnlineError("");
-          }catch(error){
-            setOnlineError(error?.message || "Không đồng bộ được bảng online.");
-          }
-        };
-
-        await sync();
-        heartbeatTimer=setInterval(sync,ONLINE_HEARTBEAT_MS);
-        pollTimer=setInterval(async()=>{
-          if(cancelled) return;
-          const current=readOnlineSession() || session;
-          try{
-            const rows=await loadOnlineLeaderboard(current?.access_token);
-            setOnlinePlayers(rows);
-          }catch{}
-        },ONLINE_POLL_MS);
-      }catch(error){
-        if(cancelled) return;
-        setOnlineReady(false);
-        setOnlineError(error?.message || "Không kết nối được máy chủ online.");
-      }
-    };
-
-    init();
-
-    return()=>{
-      cancelled=true;
-      if(heartbeatTimer) clearInterval(heartbeatTimer);
-      if(pollTimer) clearInterval(pollTimer);
-    };
-  },[loadOnlineLeaderboard,pushOnlineScore]);
-
-  useEffect(()=>{
-    if(!onlineReady || !onlineUser || !game.playerName) return;
-    pushOnlineScore(readOnlineSession()).catch(()=>{});
-  },[
-    onlineReady,
-    onlineUser,
-    game.playerName,
-    game.competitionPoints,
-    game.dailyCompetition.player,
-    game.day,
-    game.timeIndex,
-    currentTitle.icon,
-    pushOnlineScore
-  ]);
 
   /* -----------------------------------------
      SAVE
@@ -3745,34 +1703,11 @@ function App(){
     });
   },[]);
 
-  const confirmPlayerName = useCallback(()=>{
-    const name = playerNameDraft.trim().replace(/\s+/g," ");
-
-    if(!name){
-      setToast("✏️ Hãy nhập tên nhân vật.");
-      return;
-    }
-
-    updateGame(g=>{
-      g.playerName = name.slice(0,20);
-    });
-
-    setOverlay(null);
-    setToast(`✨ Chào mừng ${name}!`);
-  },[playerNameDraft,updateGame]);
-
-  useEffect(()=>{
-    if(!game.playerName && !game.isGameOver && overlay===null){
-      setPlayerNameDraft("");
-      setOverlay("nameSetup");
-    }
-  },[game.playerName,game.isGameOver,overlay]);
-
   const canDoMainActivity = useCallback(()=>{
     if(game.isGameOver) return false;
-    if((game.mainActivityCount || 0) >= 2){
+    if((game.mainActivityCount || 0) >= 1){
       setToast(
-        `⏱️ Mốc ${currentTime} đã đủ 2 hoạt động chính. ` +
+        `⏱️ Mốc ${currentTime} đã dùng hoạt động chính. ` +
         `Sang mốc mới để hoạt động tiếp.`
       );
       return false;
@@ -3788,29 +1723,11 @@ function App(){
      NEXT DAY
   ----------------------------------------- */
 
-  const finishDay = useCallback((grantFinalSlotNpcGain=false)=>{
+  const finishDay = useCallback(()=>{
     setGame(prev=>{
       const next = clone(prev);
 
       const finishedDay = next.day;
-
-      // Mỗi mốc thời gian, NPC nhận điểm thi đua ngẫu nhiên.
-      // Mốc cuối cùng được cộng ngay trước khi chuyển sang ngày mới.
-      if(grantFinalSlotNpcGain){
-        NPCS.forEach(npc=>{
-          const gain = 1 + Math.floor(Math.random() * 5);
-          next.npcCompetition[npc.id] =
-            (next.npcCompetition[npc.id] || 0) + gain;
-          next.dailyCompetition[npc.id] =
-            (next.dailyCompetition[npc.id] || 0) + gain;
-        });
-
-        next.otherPlayers.forEach(player=>{
-          const gain = Math.floor(Math.random() * 5);
-          player.points += gain;
-          player.today += gain;
-        });
-      }
       const before = next.dayStart || snapshotDay(next);
 
       const playerGain = Math.max(
@@ -3825,6 +1742,19 @@ function App(){
 
       next.competitionPoints += playerGain;
       next.dailyCompetition.player += playerGain;
+
+      // Từ ngày 2 trở đi, điểm từng NPC tăng ngẫu nhiên mỗi ngày.
+      const npcGain = {};
+      NPCS.forEach(npc=>{
+        npcGain[npc.id] = 1 + Math.floor(Math.random() * 8);
+      });
+
+      Object.entries(npcGain).forEach(([id,gain])=>{
+        next.npcCompetition[id] =
+          (next.npcCompetition[id] || 0) + gain;
+
+        next.dailyCompetition[id] = gain;
+      });
 
       const deltas = {
         study:next.stats.study-before.stats.study,
@@ -3863,30 +1793,25 @@ function App(){
       next.timeIndex = 0;
 
       next.dailyOralCheckDone = false;
-      next.dailyQuizDone = false;
-      next.dailyQuizCount = 0;
-      next.dailyOralCheckCount = 0;
       next.mainActivityUsed = false;
       next.mainActivityLabel = null;
       next.mainActivityCount = 0;
       next.mainActivityLabels = [];
 
       next.dailyCompetition = emptyDailyCompetition();
-      next.otherPlayers = next.otherPlayers.map(player=>({
-        ...player,
-        today:0
-      }));
 
-      const events = pickDailyEvents(next.lastEventId ? [next.lastEventId] : [],1);
+      const ev = pickDailyEvent(next.lastEventId);
+
       next.dayStart = snapshotDay(next);
-      next.dailyEvents = events.map(eventData);
-      next.dailyEventIndex = 0;
-      next.dailyEventResolved = false;
-      next.dailyEvent = next.dailyEvents[0] || null;
-      next.lastEventId = events[0]?.id || null;
+      next.dailyEvent = eventData(ev);
+      next.lastEventId = ev.id;
+
+      ev.apply(next);
 
       return normalizeState(next);
     });
+
+    setSecondsLeft(SLOT_SECONDS);
     beep(880,.14);
   },[beep]);
 
@@ -3895,68 +1820,59 @@ function App(){
   ----------------------------------------- */
 
   const advanceTime = useCallback(()=>{
-    if(advancingRef.current || game.isGameOver) return;
+    if(advancingRef.current || game.isGameOver || blockingOverlay) return;
 
     advancingRef.current = true;
 
     if(game.timeIndex >= TIME_SLOTS.length - 1){
-      finishDay(true);
+      finishDay();
     }else{
       setGame(prev=>{
         const next = clone(prev);
-
-        // Mỗi lần đồng hồ chuyển sang mốc mới, tất cả NPC đều
-        // nhận thêm điểm thi đua ngẫu nhiên (1–5 điểm).
-        NPCS.forEach(npc=>{
-          const gain = 1 + Math.floor(Math.random() * 5);
-          next.npcCompetition[npc.id] =
-            (next.npcCompetition[npc.id] || 0) + gain;
-          next.dailyCompetition[npc.id] =
-            (next.dailyCompetition[npc.id] || 0) + gain;
-        });
-
-        next.otherPlayers.forEach(player=>{
-          const gain = Math.floor(Math.random() * 5);
-          player.points += gain;
-          player.today += gain;
-        });
-
         next.timeIndex += 1;
-
-        // Mốc mới = 2 lượt hoạt động chính mới.
-        // Phải reset cả count + labels, không chỉ cờ boolean,
-        // nếu không normalizeState() sẽ khóa hoạt động ở mốc tiếp theo.
-        next.mainActivityCount = 0;
         next.mainActivityUsed = false;
         next.mainActivityLabel = null;
-        next.mainActivityLabels = [];
-
         return normalizeState(next);
       });
+      setSecondsLeft(SLOT_SECONDS);
       beep(700,.07);
     }
 
     setTimeout(()=>{ advancingRef.current = false; },50);
-  },[game.isGameOver,game.timeIndex,finishDay,beep]);
+  },[game.isGameOver,game.timeIndex,blockingOverlay,finishDay,beep]);
 
   /* -----------------------------------------
-     TIME ADVANCES BY ACTIVITIES
-     Không có đồng hồ tự chạy. Mỗi mốc có đúng 2 hoạt động chính;
-     hoàn thành hoạt động thứ 2 sẽ tự chuyển sang mốc tiếp theo.
+     TIMER
   ----------------------------------------- */
 
-  const previousMainActivityCountRef = useRef(game.mainActivityCount || 0);
-
   useEffect(()=>{
-    const previous = previousMainActivityCountRef.current;
-    const current = game.mainActivityCount || 0;
-    previousMainActivityCountRef.current = current;
-
-    if(previous < 2 && current >= 2 && !game.isGameOver){
-      const timer = setTimeout(()=>advanceTime(),0);
-      return ()=>clearTimeout(timer);
+    if(
+      !autoTime ||
+      blockingOverlay ||
+      game.isGameOver
+    ){
+      return;
     }
-  },[game.mainActivityCount,game.isGameOver,advanceTime]);
+
+    const timer = setInterval(()=>{
+      setSecondsLeft(prev=>{
+        if(prev > 1){
+          return prev - 1;
+        }
+
+        advanceTime();
+        return SLOT_SECONDS;
+      });
+    },1000);
+
+    return ()=>clearInterval(timer);
+  },[
+    autoTime,
+    blockingOverlay,
+    game.isGameOver,
+    game.timeIndex,
+    advanceTime
+  ]);
 
   /* -----------------------------------------
      DAY CHANGE TOAST
@@ -3983,6 +1899,7 @@ function App(){
   useEffect(()=>{
     if(game.isGameOver){
       setOverlay("ending");
+      setAutoTime(false);
     }
   },[game.isGameOver]);
 
@@ -3990,137 +1907,87 @@ function App(){
      ACTIONS
   ========================================================= */
 
-  const startQuiz = useCallback((mode="quick",cert=null,exam=null)=>{
-    if(mode==="quick") {
-      const count = Number(game.dailyQuizCount) || 0;
-      if(count >= 7) {
-        setToast("📚 Bạn đã dùng hết 7 lượt quiz hôm nay. Sang ngày mới để làm tiếp.");
-        return;
-      }
+  const selectQuizQuestions = useCallback((count)=>{
+    const recent = new Set(game.recentQuestionIds || []);
+    const usage = game.questionUsage || {};
+
+    // Ưu tiên câu chưa dùng; nếu hết thì ưu tiên câu có lượt dùng thấp nhất.
+    let pool = QUIZ_BANK.filter(q=>!recent.has(q.id));
+    if(pool.length < count){
+      pool = [...QUIZ_BANK];
     }
 
-    if(mode==="oral") {
-      const count = Number(game.dailyOralCheckCount) || 0;
-      if(count >= 4) {
-        setToast("🧑‍🏫 Bạn đã dùng hết 4 lượt kiểm tra miệng hôm nay. Sang ngày mới để làm tiếp.");
-        return;
-      }
-    }
+    const shuffled = shuffle(pool);
+    shuffled.sort((a,b)=>(usage[a.id] || 0) - (usage[b.id] || 0));
+    return shuffled.slice(0,count);
+  },[game.recentQuestionIds,game.questionUsage]);
 
-    if(!canDoMainActivity()){
+  const markQuestionsUsed = useCallback((questions)=>{
+    updateGame(g=>{
+      const ids = questions.map(q=>q.id);
+      ids.forEach(id=>{
+        g.questionUsage[id] = (g.questionUsage[id] || 0) + 1;
+      });
+      g.recentQuestionIds = [
+        ...(g.recentQuestionIds || []),
+        ...ids
+      ].slice(-60);
+    });
+  },[updateGame]);
+
+  const startQuiz = useCallback((mode="quick",cert=null)=>{
+    if(!canDoMainActivity()) return;
+
+    if(mode==="oral" && game.dailyOralCheckDone){
+      setToast("🧑‍🏫 Bạn đã hoàn thành kiểm tra miệng hôm nay.");
       return;
     }
 
-    if(mode==="exam") {
-      if(!exam) {
-        setToast("📝 Không xác định được kỳ thi.");
-        return;
-      }
-
-      if(game.examResults?.[exam.id]) {
-        setToast(`✅ ${exam.title} đã hoàn thành.`);
-        return;
-      }
-    }
-
-    let questions;
-
-    if(mode==="cert"){
-      questions = cert.questions.map((q,i)=>({
-        ...q,
-        id:`${cert.id}-${i}`
-      }));
-    }else if(mode==="exam"){
-      questions = getExamQuestions(exam);
-    }else if(mode==="oral"){
-      const recent = new Set(game.quizHistory || []);
-      const fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
-      questions = shuffle(fresh.length >= 3 ? fresh : QUIZ_BANK).slice(0,3);
-    }else{
-      const recent = new Set(game.quizHistory || []);
-      let fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
-      if(fresh.length < 10) fresh = QUIZ_BANK;
-      questions = shuffle(fresh).slice(0,10);
-    }
-
-    if(!questions.length){
-      setToast("❌ Không tìm thấy bộ đề.");
-      return;
-    }
+    const questions =
+      mode==="cert"
+        ? cert.questions.map((q,i)=>({
+            ...q,
+            id:`${cert.id}-${i}`
+          }))
+        : selectQuizQuestions(mode==="oral" ? 3 : 10);
 
     updateGame(g=>{
-      {
-        g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
-        g.mainActivityLabel =
-          mode==="quick" ? "📚 Quiz 10 câu" :
-          mode==="oral" ? "🧑‍🏫 Kiểm tra miệng" :
-          mode==="exam" ? `📝 ${exam.title}` :
-          mode==="cert" ? `🎓 Thi ${cert?.name || "chứng chỉ"}` :
-          "Hoạt động";
-        g.mainActivityLabels = [
-          ...(g.mainActivityLabels || []),
-          g.mainActivityLabel
-        ].slice(0,2);
-        g.mainActivityUsed = g.mainActivityCount >= 2;
-      }
+      g.mainActivityCount = Math.min(1, (g.mainActivityCount || 0) + 1);
+      g.mainActivityLabel =
+        mode==="oral" ? "Kiểm tra miệng" :
+        mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
+        "Quiz nhanh";
+      g.mainActivityLabels = [g.mainActivityLabel].slice(0,1);
+      g.mainActivityUsed = g.mainActivityCount >= 1;
 
       if(mode==="oral"){
-        g.dailyOralCheckCount = Math.min(4, (g.dailyOralCheckCount || 0) + 1);
-        g.dailyOralCheckDone = g.dailyOralCheckCount >= 4;
+        g.dailyOralCheckDone = true;
         g.oralChecksDone++;
       }
 
       if(mode==="quick"){
-        g.dailyQuizCount = Math.min(7, (g.dailyQuizCount || 0) + 1);
-        g.dailyQuizDone = g.dailyQuizCount >= 7;
         g.studyActions++;
         addStat(g,"energy",-3);
       }
     });
 
+    if(mode !== "cert"){
+      markQuestionsUsed(questions);
+    }
+
     setQuiz({
       mode,
       certId:cert?.id || null,
       certName:cert?.name || null,
-      examId:exam?.id || null,
-      examTitle:exam?.title || null,
       questions,
       index:0,
       correct:0,
       wrong:0
     });
 
-    if(mode==="exam") {
-      examDismissedRef.current = null;
-    }
-
     setQuizFeedback(null);
-    setOverlay(mode==="exam" ? "exam" : mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
-  },[
-    canDoMainActivity,
-    game.dailyOralCheckCount,
-    game.dailyQuizCount,
-    game.quizHistory,
-    game.examResults,
-    updateGame
-  ]);
-
-  const examAutoOpenedRef = useRef(null);
-
-  useEffect(()=>{
-    if(!currentExam || quiz || game.isGameOver) return;
-    if(game.examResults?.[currentExam.id]) return;
-    const key=`${game.day}-${game.timeIndex}-${currentExam.id}`;
-    if(examAutoOpenedRef.current===key) return;
-    examAutoOpenedRef.current=key;
-    setToast(`📝 ${currentExam.title} bắt đầu!`);
-    startQuiz("exam",null,currentExam);
-  },[currentExam,quiz,game.day,game.timeIndex,game.examResults,game.isGameOver,startQuiz]);
-
-  /* -----------------------------------------
-     KỲ THI THEO MỐC
-     Giữa kỳ / cuối kỳ / thi THPT tự động mở khi tới đúng mốc.
-  ----------------------------------------- */
+    setOverlay(mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
+  },[canDoMainActivity,game.dailyOralCheckDone,updateGame,selectQuizQuestions,markQuestionsUsed]);
 
   const answerQuiz = useCallback((choiceIndex)=>{
     if(!quiz || quizFeedback) return;
@@ -4130,21 +1997,17 @@ function App(){
 
     if(correct){
       updateGame(g=>{
-        addAchievement(g,5);
-        addKnowledge(g,5);
+        addCompetition(g,5);
+        addStat(g,"study",5);
       });
       beep(760,.08);
     }else{
       beep(180,.13);
       updateGame(g=>{
-        addAchievement(g,-3);
-        addKnowledge(g,-3);
+        addCompetition(g,-3);
+        addStat(g,"study",-3);
       });
     }
-
-    updateGame(g=>{
-      g.quizHistory = [...(g.quizHistory || []), question.id].filter(Boolean).slice(-300);
-    });
 
     setQuizFeedback({
       correct,
@@ -4166,65 +2029,28 @@ function App(){
 
     if(quiz.index >= quiz.questions.length - 1){
 
-      if(quiz.mode==="exam"){
-        const exam = EXAM_SCHEDULE.find(e=>e.id===quiz.examId);
-
-        updateGame(g=>{
-          if(quiz.examId){
-            g.examResults = g.examResults || {};
-            g.examResults[quiz.examId] = {
-              title:quiz.examTitle || exam?.title || "Kỳ thi",
-              correct:finalCorrect,
-              wrong:quiz.wrong,
-              total:quiz.questions.length,
-              competition:finalCorrect * 5,
-              day:g.day
-            };
-
-            // Điểm thi đua của kỳ thi phải được cộng thật vào tổng điểm.
-            addCompetition(g, finalCorrect * 5);
-          }
-        });
-
-        setToast(
-          `🎓 ${exam?.title || "Kỳ thi"}: ${finalCorrect}/${quiz.questions.length} câu đúng • +${finalCorrect*5} điểm thi đua`
-        );
-      }
-
       if(quiz.mode==="quick"){
         updateGame(g=>{
-          g.dailyQuizDone = (g.dailyQuizCount || 0) >= 7;
-          if(finalCorrect===10){
-            addStat(g,"study",5);
+          if(finalCorrect===5){
             addStat(g,"skill",2);
-          }else if(finalCorrect>=8){
-            addStat(g,"study",4);
-          }else if(finalCorrect>=6){
-            addStat(g,"study",2);
-          }else if(finalCorrect>=4){
-            addStat(g,"study",1);
           }
-          addCompetition(g, finalCorrect);
         });
 
         setToast(
-          `📚 Hoàn thành quiz: ${finalCorrect}/10 câu đúng`
+          `📚 Hoàn thành quiz: ${finalCorrect}/${quiz.questions.length} câu đúng`
         );
       }
 
       if(quiz.mode==="oral"){
         updateGame(g=>{
           if(finalCorrect===3){
-            addStat(g,"study",5);
             addStat(g,"reputation",4);
           }else if(finalCorrect===2){
-            addStat(g,"study",2);
             addStat(g,"reputation",2);
           }else if(finalCorrect===0){
             addStat(g,"mood",-4);
             addStat(g,"reputation",-2);
           }
-          addCompetition(g, finalCorrect * 2);
         });
 
         setToast(
@@ -4243,7 +2069,6 @@ function App(){
               }
 
               addStat(g,"skill",3);
-              addCompetition(g,3);
             });
 
             setToast(`🎓 Đậu ${cert.name}!`);
@@ -4349,9 +2174,7 @@ function App(){
       addMoney(g,-asset.price);
 
       Object.entries(asset.bonus || {}).forEach(([key,val])=>{
-        if(key === "knowledge") addKnowledge(g,val);
-        else if(key === "money") addMoney(g,val);
-        else addStat(g,key,val);
+        addStat(g,key,val);
       });
     });
 
@@ -4391,13 +2214,13 @@ function App(){
     if(!canDoMainActivity()) return;
 
     updateGame(g=>{
-      if((g.mainActivityCount || 0) >= 2) return;
+      if((g.mainActivityCount || 0) >= 1) return;
       job.apply(g);
       g.jobActions++;
-      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
+      g.mainActivityCount = Math.min(1, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = `Việc làm: ${job.name}`;
-      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
-      g.mainActivityUsed = g.mainActivityCount >= 2;
+      g.mainActivityLabels = [g.mainActivityLabel].slice(0,1);
+      g.mainActivityUsed = g.mainActivityCount >= 1;
     });
 
     setOverlay(null);
@@ -4415,13 +2238,13 @@ function App(){
     }
 
     updateGame(g=>{
-      if((g.mainActivityCount || 0) >= 2) return;
+      if((g.mainActivityCount || 0) >= 1) return;
       addStat(g,"energy",-3);
       npc.apply(g);
-      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
+      g.mainActivityCount = Math.min(1, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = npc.action;
-      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
-      g.mainActivityUsed = g.mainActivityCount >= 2;
+      g.mainActivityLabels = [g.mainActivityLabel].slice(0,1);
+      g.mainActivityUsed = g.mainActivityCount >= 1;
     });
 
     setToast(`${npc.icon} ${npc.name}: ${npc.action}`);
@@ -4431,14 +2254,14 @@ function App(){
     if(!canDoMainActivity()) return;
 
     updateGame(g=>{
-      if((g.mainActivityCount || 0) >= 2) return;
+      if((g.mainActivityCount || 0) >= 1) return;
       addStat(g,"energy",25);
       addStat(g,"hp",5);
       addStat(g,"mood",5);
-      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
+      g.mainActivityCount = Math.min(1, (g.mainActivityCount || 0) + 1);
       g.mainActivityLabel = "Nghỉ ngơi";
-      g.mainActivityLabels = [...(g.mainActivityLabels || []), g.mainActivityLabel].slice(0,2);
-      g.mainActivityUsed = g.mainActivityCount >= 2;
+      g.mainActivityLabels = [g.mainActivityLabel].slice(0,1);
+      g.mainActivityUsed = g.mainActivityCount >= 1;
     });
 
     setToast("🛏️ Nghỉ ngơi giúp bạn hồi phục.");
@@ -4503,14 +2326,11 @@ function App(){
       const loaded = normalizeState(decodeSaveCode(saveCode));
 
       setGame(loaded);
+      setSecondsLeft(SLOT_SECONDS);
       setOverlay(null);
       setToast("✅ Đã nạp game thành công.");
-    }catch(error){
-      if(error?.message === "SAVE_OLD_SEASON") {
-        setToast("🆕 Mã lưu thuộc Season khác nên không thể nạp vào Season 2.");
-      } else {
-        setToast("❌ Mã lưu không hợp lệ hoặc đã lỗi thời.");
-      }
+    }catch{
+      setToast("❌ Mã lưu không hợp lệ.");
     }
   };
 
@@ -4543,14 +2363,11 @@ function App(){
         );
 
         setGame(loaded);
+        setSecondsLeft(SLOT_SECONDS);
         setOverlay(null);
         setToast("✅ Đã nhập file save.");
-      }catch(error){
-        if(error?.message === "SAVE_OLD_SEASON") {
-          setToast("🆕 File save thuộc Season khác nên không thể nạp vào Season 2.");
-        } else {
-          setToast("❌ File save không hợp lệ hoặc đã lỗi thời.");
-        }
+      }catch{
+        setToast("❌ File save không hợp lệ.");
       }
     };
 
@@ -4564,12 +2381,12 @@ function App(){
     const fresh = createInitialState();
 
     setGame(fresh);
+    setSecondsLeft(SLOT_SECONDS);
+    setAutoTime(true);
     setOverlay(null);
     setQuiz(null);
     setQuizFeedback(null);
     setSaveCode("");
-    setPlayerNameDraft("");
-    examDismissedRef.current = null;
 
     setToast("🌱 Hành trình mới bắt đầu!");
   };
@@ -4582,13 +2399,13 @@ function App(){
     {
       icon:"📚",
       title:"Quiz 10 câu",
-      desc:"Tối đa 7 lượt/ngày • chống lặp câu",
+      desc:"Ôn tập 460 câu: 180 câu gốc + HSK 4–5 + English B1–B2",
       action:()=>startQuiz("quick")
     },
     {
       icon:"🧑‍🏫",
       title:"Kiểm tra miệng",
-      desc:"3 câu / lượt • tối đa 4 lượt/ngày",
+      desc:"3 câu / ngày",
       action:()=>startQuiz("oral"),
       disabled:false
     },
@@ -4636,87 +2453,6 @@ function App(){
 
   const getFashion = (id)=>FASHION.find(x=>x.id===id);
 
-  const fashionVisual = (id, slot)=>{
-    const item = getFashion(id);
-    if(!item) return {kind:slot, tone:"default", detail:""};
-
-    const idv = item.id;
-    if(slot === "shirt") {
-      let tone = "white";
-      if(/black|leather/.test(idv)) tone = "black";
-      else if(/blue|denim|jersey/.test(idv)) tone = "blue";
-      else if(/pink/.test(idv)) tone = "pink";
-      else if(/green/.test(idv)) tone = "mint";
-      else if(/red/.test(idv)) tone = "red";
-      else if(/yellow/.test(idv)) tone = "yellow";
-      else if(/gray/.test(idv)) tone = "gray";
-      else if(/cream/.test(idv)) tone = "cream";
-      const detail = /hoodie/.test(idv) ? "hoodie" : /jacket/.test(idv) ? "jacket" : /varsity/.test(idv) ? "varsity" : /cardigan/.test(idv) ? "cardigan" : /sweater/.test(idv) ? "sweater" : /jersey/.test(idv) ? "jersey" : /tee/.test(idv) ? "tee" : "shirt";
-      return {kind:"shirt",tone,detail};
-    }
-
-    if(slot === "pants") {
-      const tone = /white/.test(idv) ? "white" : /gray/.test(idv) ? "gray" : /green/.test(idv) ? "green" : /beige|kaki/.test(idv) ? "beige" : /blue/.test(idv) ? "blue" : "black";
-      const detail = /skirt/.test(idv) ? "skirt" : /short/.test(idv) ? "short" : /wide/.test(idv) ? "wide" : /cargo/.test(idv) ? "cargo" : "pants";
-      return {kind:"bottom",tone,detail};
-    }
-
-    if(slot === "shoes") {
-      const tone = /red/.test(idv) ? "red" : /pink/.test(idv) ? "pink" : /black|loafer|boots/.test(idv) ? "black" : "white";
-      return {kind:"shoes",tone,detail:/boots/.test(idv)?"boots":/loafer/.test(idv)?"loafer":"sneaker"};
-    }
-
-    if(slot === "hair") {
-      const tone = /brown/.test(idv) ? "brown" : /blue/.test(idv) ? "blue" : /pink/.test(idv) ? "pink" : "black";
-      const detail = /long/.test(idv) ? "long" : /short/.test(idv) ? "short" : /wavy/.test(idv) ? "wavy" : "long";
-      return {kind:"hair",tone,detail};
-    }
-
-    return {kind:slot,tone:"default",detail:""};
-  };
-
-  const renderOutfitAvatar = (size="large")=>{
-    const shirt = fashionVisual(game.outfit.shirt,"shirt");
-    const bottom = fashionVisual(game.outfit.pants,"pants");
-    const shoes = fashionVisual(game.outfit.shoes,"shoes");
-    const hair = fashionVisual(game.outfit.hair,"hair");
-    return (
-      <div className={`outfit-avatar outfit-avatar-${size}`}>
-        <div className={`avatar-hair hair-${hair.tone} hair-${hair.detail}`} />
-        <div className="avatar-head">
-          <span className="avatar-ear avatar-ear-left" />
-          <span className="avatar-ear avatar-ear-right" />
-          <span className="avatar-face">
-            <span className="avatar-brow avatar-brow-left" />
-            <span className="avatar-brow avatar-brow-right" />
-            <span className="avatar-eye avatar-eye-left"><i /></span>
-            <span className="avatar-eye avatar-eye-right"><i /></span>
-            <span className="avatar-nose" />
-            <span className="avatar-mouth"><i /></span>
-            <span className="avatar-blush avatar-blush-left" />
-            <span className="avatar-blush avatar-blush-right" />
-          </span>
-        </div>
-        <div className={`avatar-neck neck-${shirt.tone}`} />
-        <div className={`avatar-shirt shirt-${shirt.tone} shirt-${shirt.detail}`}>
-          <span className="shirt-collar" />
-          <span className="shirt-front-detail" />
-        </div>
-        <div className={`avatar-bottom bottom-${bottom.tone} bottom-${bottom.detail}`} />
-        <div className="avatar-legs">
-          <span className={`avatar-leg leg-${bottom.tone}`} />
-          <span className={`avatar-leg leg-${bottom.tone}`} />
-        </div>
-        <div className={`avatar-shoes shoes-${shoes.tone} shoes-${shoes.detail}`}>
-          <span />
-          <span />
-        </div>
-        {game.outfit.bag && <div className="avatar-bag">🎒</div>}
-        {game.outfit.accessory && <div className="avatar-accessory">{getFashion(game.outfit.accessory)?.icon}</div>}
-      </div>
-    );
-  };
-
   const characterParts = [
     getFashion(game.outfit.hair),
     getFashion(game.outfit.shirt),
@@ -4730,45 +2466,25 @@ function App(){
      SCENES
   ========================================================= */
 
-  const chooseDailyEvent = useCallback((choiceIndex)=>{
-    if(!game.dailyEvent || game.dailyEventResolved) return;
-    const raw = DAILY_EVENTS.find(e=>e.id===game.dailyEvent.id);
-    const choice = raw?.choices?.[choiceIndex] || EVENT_CHOICES[game.dailyEvent.id]?.[choiceIndex];
-    if(!choice) return;
-
-    updateGame(g=>{
-      choice.apply(g);
-      g.dailyEventResolved = true;
-      g.dailyEvent = {
-        ...g.dailyEvent,
-        resolved:true,
-        chosen:choiceIndex,
-        result:choice.result
-      };
-    });
-
-    setToast(`✨ ${choice.result}`);
-  },[game.dailyEvent,game.dailyEventResolved,updateGame]);
-
   const renderClass = ()=>(
     <>
       <div className="event-card">
-        <div className="event-icon">{game.dailyEvent?.icon || "🎲"}</div>
-        <div style={{flex:1}}>
-          <div className="event-title">🎲 Sự kiện ngẫu nhiên hôm nay</div>
-          <b>{game.dailyEvent?.title || "Ngày mới"}</b>
-          <div className="muted">{game.dailyEvent?.text}</div>
-          {game.dailyEvent?.resolved ? (
-            <div className="event-result">✅ {game.dailyEvent.result}</div>
-          ) : (
-            <div style={{display:"grid",gap:8,marginTop:10}}>
-              {(game.dailyEvent?.choices || []).map((choice,i)=>(
-                <Button key={i} onClick={()=>chooseDailyEvent(i)}>
-                  {choice.label}<br/><small>{choice.result}</small>
-                </Button>
-              ))}
-            </div>
-          )}
+        <div className="event-icon">
+          {game.dailyEvent?.icon || "🎲"}
+        </div>
+
+        <div>
+          <div className="event-title">
+            {game.dailyEvent?.title || "Ngày mới"}
+          </div>
+
+          <div className="muted">
+            {game.dailyEvent?.text}
+          </div>
+
+          <div className="event-result">
+            {game.dailyEvent?.result}
+          </div>
         </div>
       </div>
 
@@ -4851,8 +2567,7 @@ function App(){
         icon:"🍔",
         price:35000,
         effect:{energy:25,mood:5}
-      },
-      {name:"Mì cay",icon:"🍜",price:40000,effect:{energy:22,mood:7}},{name:"Cơm gà",icon:"🍗",price:45000,effect:{energy:28,study:2}},{name:"Pizza",icon:"🍕",price:55000,effect:{energy:25,mood:10}},{name:"Sinh tố",icon:"🥤",price:28000,effect:{energy:15,mood:6}},{name:"Bánh mì",icon:"🥖",price:18000,effect:{energy:14}},{name:"Matcha latte",icon:"🍵",price:38000,effect:{mood:8,study:3}},{name:"Cơm cuộn",icon:"🍙",price:32000,effect:{energy:18,study:2}},{name:"Kem",icon:"🍦",price:22000,effect:{mood:12}}
+      }
     ];
 
     return (
@@ -4991,7 +2706,18 @@ function App(){
         <div className="section-title">👕 Nhân vật của bạn</div>
 
         <div className="character female-character">
-          {renderOutfitAvatar("large")}
+          <div className="female-avatar">👩🏻‍🎓</div>
+          <div className="worn-clothes">
+            <span className="worn-shirt">{getFashion(game.outfit.shirt)?.icon || "👕"}</span>
+            <span className="worn-bottom">{getFashion(game.outfit.pants)?.icon || "👖"}</span>
+            <span className="worn-shoes">{getFashion(game.outfit.shoes)?.icon || "👟"}</span>
+          </div>
+          {game.outfit.bag && (
+            <span className="worn-bag">{getFashion(game.outfit.bag)?.icon || "🎒"}</span>
+          )}
+          {game.outfit.accessory && (
+            <span className="worn-accessory">{getFashion(game.outfit.accessory)?.icon || ""}</span>
+          )}
           <div className="female-outfit-caption">
             {getFashion(game.outfit.hair)?.name || "Tóc tự nhiên"}
           </div>
@@ -5183,20 +2909,13 @@ function App(){
     return (
       <Modal
         title={
-          quiz.mode==="exam"
-            ? `📝 ${quiz.examTitle || "Kỳ thi"}`
-            : quiz.mode==="oral"
-            ? "🧑‍🏫 Kiểm tra miệng — 3 câu"
+          quiz.mode==="oral"
+            ? "🧑‍🏫 Kiểm tra miệng — 15 phút"
             : quiz.mode==="cert"
             ? `🎓 Thi ${quiz.certName}`
             : "📚 Quiz nhanh"
         }
         onClose={()=>{
-          if(quiz.mode==="exam") {
-            examDismissedRef.current = currentExam
-              ? `${currentExam.day}-${currentExam.timeIndex}`
-              : null;
-          }
           setQuiz(null);
           setQuizFeedback(null);
           setOverlay(null);
@@ -5210,12 +2929,6 @@ function App(){
           <span>
             ✅ {quiz.correct} &nbsp; ❌ {quiz.wrong}
           </span>
-
-          {quiz.mode==="exam" && (
-            <span className="exam-live-badge">
-              ⏸️ Thời gian đang tạm dừng
-            </span>
-          )}
         </div>
 
         <div className="quiz-question">
@@ -5261,8 +2974,8 @@ function App(){
           }`}>
             <b>
               {quizFeedback.correct
-                ? "✅ Chính xác! +5 thành tích • +5 tri thức"
-                : "❌ Sai! -3 thành tích • -3 tri thức"}
+                ? "✅ Chính xác! +5 điểm thành tích • +5 điểm tri thức"
+                : "❌ Sai! -3 điểm thành tích • -3 điểm tri thức"}
             </b>
 
             <p>{quizFeedback.explanation}</p>
@@ -5366,17 +3079,6 @@ function App(){
       title="🏆 Bảng thi đua"
       onClose={()=>setOverlay(null)}
     >
-      <div className="online-status">
-        <span>🟢 {onlineCount || (onlineReady ? 1 : 0)} người đang online/gần đây</span>
-        <small>
-          {onlineReady ? "Bảng điểm online đồng bộ mỗi vài giây" : "Chế độ offline / demo cục bộ"}
-        </small>
-      </div>
-
-      {onlineError && (
-        <div className="online-warning">⚠️ {onlineError}</div>
-      )}
-
       <div className="leaderboard">
         {leaderboard.map((row,index)=>(
           <div
@@ -5390,8 +3092,7 @@ function App(){
             </div>
 
             <div className="rank-name">
-              <span>{row.icon} {row.name}</span>
-              <small>{row.type}</small>
+              {row.icon} {row.name}
             </div>
 
             <div className="rank-points">
@@ -5439,135 +3140,6 @@ function App(){
             </button>
           );
         })}
-      </div>
-    </Modal>
-  );
-
-  const renderGuideModal = ()=> (
-    <Modal
-      title="📖 Hướng dẫn chơi"
-      onClose={()=>setOverlay(null)}
-      wide
-    >
-      <div className="guide-wrap">
-        <div className="guide-hero">
-          <div className="guide-hero-icon">🌸</div>
-          <div>
-            <h2>Chào mừng đến với Thanh Xuân Rực Rỡ!</h2>
-            <p>
-              Bạn sẽ trải qua 100 ngày học tập, kết bạn, kiếm tiền,
-              săn chứng chỉ, phối đồ và tích điểm thi đua.
-            </p>
-          </div>
-        </div>
-
-        <div className="guide-grid">
-          <div className="guide-card">
-            <h3>⏱️ 1. Thời gian</h3>
-            <p>
-              Mỗi mốc kéo dài <b>30 giây</b> và đồng hồ chạy liên tục.
-              Mở tủ đồ, túi, nhật ký hay hồ sơ <b>không làm dừng thời gian</b>.
-            </p>
-            <p>
-              Khi sang mốc mới, bạn nhận lại <b>2 lượt hoạt động chính</b>.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>📝 2. Kỳ thi trong hành trình</h3>
-            <p>
-              Có <b>5 kỳ thi</b>: Giữa kỳ 1 (ngày 8), Cuối kỳ 1 (ngày 17),
-              Giữa kỳ 2 (ngày 26), Cuối kỳ 2 (ngày 35) và Thi THPT (ngày 45).
-            </p>
-            <p>
-              Mỗi kỳ có <b>5 câu cho 8 môn học = 40 câu</b>. Mỗi kỳ dùng một bộ đề riêng,
-              không lấy lại câu trong kho ôn tập hiện có + 260 câu mới. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>⚡ 3. Hoạt động chính</h3>
-            <p>
-              Mỗi mốc được làm tối đa <b>2 việc chính</b>.
-            </p>
-            <p>
-              Ví dụ: Quiz 5 câu, Kiểm tra miệng, Nghỉ ngơi, Việc làm,
-              tương tác NPC hoặc thi chứng chỉ.
-            </p>
-            <p>
-              Khi đủ 2 lượt, chờ sang mốc tiếp theo để làm tiếp.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>📚 4. Học tập</h3>
-            <p>
-              <b>Quiz 10 câu/ngày</b> giúp tăng thành tích và tri thức.
-              Mỗi câu đúng được <b>+5 thành tích +5 tri thức</b>; mỗi câu sai bị
-              <b>-3 thành tích -3 tri thức</b>. Câu đã làm gần đây sẽ được hạn chế lặp lại.
-            </p>
-            <p>
-              <b>Kiểm tra miệng</b> có thể thực hiện 1 lần mỗi ngày.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>🏆 5. Thi đua</h3>
-            <p>
-              Điểm thi đua của bạn dùng để so với NPC và các người chơi mô phỏng trên bảng xếp hạng.
-            </p>
-            <p>
-              Mỗi khi đồng hồ sang mốc mới, mỗi NPC nhận ngẫu nhiên
-              <b> +1 đến +5 điểm</b> thi đua.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>🛠️ 6. Kỹ năng & ⚡ Năng lượng</h3>
-            <p>
-              <b>Kỹ năng</b> tối đa <b>500</b> và <b>Năng lượng</b> là 2 chỉ số khác nhau.
-            </p>
-            <p>
-              Mỗi lần đi làm đều tăng kỹ năng; nghề càng cao cấp cho càng nhiều kỹ năng.
-            </p>
-            <p>
-              Kỹ năng giúp mở một số công việc; Năng lượng bị tiêu hao khi
-              làm các hoạt động và có thể phục hồi bằng Nghỉ ngơi hoặc đồ ăn.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>💼 7. Việc làm & 🎓 Chứng chỉ</h3>
-            <p>
-              Việc làm giúp kiếm tiền và có thể tăng một số chỉ số.
-              Một số nghề yêu cầu chứng chỉ hoặc mức kỹ năng nhất định.
-            </p>
-            <p>
-              Mua và thi chứng chỉ để mở thêm lựa chọn nghề nghiệp.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>👕 8. Tủ đồ</h3>
-            <p>
-              Mua quần áo trong cửa hàng, sau đó vào <b>Tủ đồ</b> để mặc.
-              Bạn có thể thay áo, quần, giày, tóc và phụ kiện.
-            </p>
-          </div>
-
-          <div className="guide-card">
-            <h3>💾 9. Lưu game</h3>
-            <p>
-              Dùng mục <b>Lưu</b> để tạo mã lưu game và tải lại hành trình sau.
-              Nên lưu trước khi thử một lựa chọn quan trọng.
-            </p>
-          </div>
-        </div>
-
-        <div className="guide-tip">
-          💡 <b>Mẹo:</b> Hãy để ý đồng hồ, ưu tiên 2 hoạt động chính mỗi mốc,
-          giữ năng lượng đủ dùng và kiểm tra bảng thi đua thường xuyên.
-        </div>
       </div>
     </Modal>
   );
@@ -5626,34 +3198,6 @@ function App(){
           <h2>
             {currentTitle.icon} {currentTitle.name}
           </h2>
-
-          <div className="player-name-card">
-            <label htmlFor="player-name-input">✏️ Tên nhân vật</label>
-            <div className="player-name-row">
-              <input
-                id="player-name-input"
-                value={playerNameDraft || game.playerName}
-                placeholder="Nhập tên nhân vật"
-                maxLength={20}
-                onChange={e=>setPlayerNameDraft(e.target.value)}
-              />
-              <Button
-                onClick={()=>{
-                  const nextName = (playerNameDraft || game.playerName).trim().replace(/\s+/g," ");
-                  if(!nextName){
-                    setToast("✏️ Hãy nhập tên nhân vật.");
-                    return;
-                  }
-                  updateGame(g=>{g.playerName=nextName.slice(0,20);});
-                  setPlayerNameDraft(nextName.slice(0,20));
-                  setToast("✅ Đã đổi tên nhân vật.");
-                }}
-              >
-                Lưu tên
-              </Button>
-            </div>
-            <small>Tên này sẽ xuất hiện trên bảng xếp hạng.</small>
-          </div>
         </div>
 
         <div className="profile-stats">
@@ -5665,10 +3209,6 @@ function App(){
           <StatBar icon="💗" label="Tình cảm" value={game.stats.love}/>
           <StatBar icon="⭐" label="Danh tiếng" value={game.stats.reputation}/>
           <StatBar icon="🛠️" label="Kỹ năng" value={game.stats.skill} max={500}/>
-          <div className="profile-points">
-            <span>🏅 Thành tích: <b>{game.achievementPoints || 0}</b></span>
-            <span>🧠 Tri thức: <b>{game.knowledgePoints || 0}</b></span>
-          </div>
         </div>
       </div>
     </Modal>
@@ -5751,52 +3291,41 @@ function App(){
             </div>
 
             <div className="countdown">
-              <span>Hoạt động</span>
+              <span>Còn</span>
               <b>
-                {(game.mainActivityCount || 0)}/2
+                00:{String(secondsLeft).padStart(2,"0")}
               </b>
               <small>
-                {`🔓 ${Math.max(0, 2 - (game.mainActivityCount || 0))} hoạt động chính còn lại`}
-                <span className="muted"> • Làm đủ 2 hoạt động sẽ sang mốc tiếp theo</span>
+                {game.mainActivityCount ? "🔒 Đã dùng hoạt động chính" : "🔓 Còn 1 hoạt động chính"}
                 {game.mainActivityLabels?.length
                   ? ` • ${game.mainActivityLabels.join(" • ")}`
                   : ""}
               </small>
-
-              {todayExam && !game.examResults?.[todayExam.id] && (
-                <div className="exam-hint">
-                  {todayExam.icon} <b>{todayExam.title}</b> tại {TIME_SLOTS[todayExam.timeIndex]}
-                  {currentExam && quiz?.mode!=="exam" && (
-                    <span className="muted"> • Tự động bắt đầu</span>
-                  )}
-                </div>
-              )}
-
             </div>
           </div>
 
-          <div className="schedule-row">
-            {TIME_SLOTS.map((time,index)=>{
-              const scheduledExam = EXAM_SCHEDULE.find(
-                exam=>exam.day===game.day && exam.timeIndex===index
-              );
+          <div className="time-progress">
+            <div
+              style={{
+                width:`${(secondsLeft/SLOT_SECONDS)*100}%`
+              }}
+            />
+          </div>
 
-              return (
-                <div
-                  key={time}
-                  className={`schedule-dot ${
-                    index===game.timeIndex ? "current" : ""
-                  } ${
-                    index<game.timeIndex ? "passed" : ""
-                  } ${scheduledExam ? "exam-dot" : ""}`}
-                  title={scheduledExam
-                    ? `${time} — ${scheduledExam.title}`
-                    : time}
-                >
-                  <span>{scheduledExam ? `📝 ${time}` : time}</span>
-                </div>
-              );
-            })}
+          <div className="schedule-row">
+            {TIME_SLOTS.map((time,index)=>(
+              <div
+                key={time}
+                className={`schedule-dot ${
+                  index===game.timeIndex ? "current" : ""
+                } ${
+                  index<game.timeIndex ? "passed" : ""
+                }`}
+                title={time}
+              >
+                <span>{time}</span>
+              </div>
+            ))}
           </div>
 
         </div>
@@ -5831,6 +3360,14 @@ function App(){
           <div className="hud-money">
             💰 {money(game.stats.money)}
           </div>
+
+          <button
+            className="auto-btn"
+            onClick={()=>setAutoTime(v=>!v)}
+            disabled={game.isGameOver}
+          >
+            {autoTime ? "⏱ Tự chạy" : "⏸ Tạm dừng"}
+          </button>
 
         </div>
 
@@ -5875,7 +3412,27 @@ function App(){
             <div className="character-card">
 
               <div className="mini-character">
-                {renderOutfitAvatar("mini")}
+
+                <div>
+                  {getFashion(game.outfit.hair)?.icon}
+                </div>
+
+                <div>
+                  {getFashion(game.outfit.shirt)?.icon}
+                </div>
+
+                <div>
+                  {getFashion(game.outfit.pants)?.icon}
+                </div>
+
+                <div>
+                  {getFashion(game.outfit.shoes)?.icon}
+                </div>
+
+                <div className="mini-accessory">
+                  {getFashion(game.outfit.accessory)?.icon}
+                </div>
+
               </div>
 
               <b>
@@ -5922,10 +3479,6 @@ function App(){
 
                 <button onClick={()=>setOverlay("save")}>
                   💾 Lưu game
-                </button>
-
-                <button onClick={()=>setOverlay("guide")}>
-                  📖 Hướng dẫn
                 </button>
 
                 <button onClick={()=>setOverlay("profile")}>
@@ -6057,13 +3610,6 @@ function App(){
             <span>Lưu</span>
           </button>
 
-          <button
-            onClick={()=>setOverlay("guide")}
-          >
-            📖
-            <span>Hướng dẫn</span>
-          </button>
-
         </footer>
 
       </div>
@@ -6073,34 +3619,6 @@ function App(){
         <div className="toast">
           {toast}
         </div>
-      )}
-
-      {overlay==="nameSetup" && (
-        <Modal
-          title="🌸 Đặt tên nhân vật"
-          onClose={null}
-          wide
-        >
-          <div className="name-setup">
-            <div className="name-setup-icon">👩🏻‍🎓</div>
-            <h2>Nhân vật của bạn tên gì?</h2>
-            <p>Tên này sẽ được dùng trên hồ sơ và bảng xếp hạng.</p>
-
-            <input
-              autoFocus
-              className="name-setup-input"
-              value={playerNameDraft}
-              maxLength={20}
-              placeholder="Ví dụ: Minh Anh"
-              onChange={e=>setPlayerNameDraft(e.target.value)}
-              onKeyDown={e=>{
-                if(e.key==="Enter") confirmPlayerName();
-              }}
-            />
-
-            <Button onClick={confirmPlayerName}>✨ Bắt đầu hành trình</Button>
-          </div>
-        </Modal>
       )}
 
       {/* =====================================================
@@ -6117,11 +3635,11 @@ function App(){
 
             {quickActivities.map((a,i)=>{
               const isMain =
-                ["Quiz 5 câu","Kiểm tra miệng","Nghỉ ngơi","Việc làm"].includes(a.title);
+                ["Quiz 10 câu","Kiểm tra miệng","Nghỉ ngơi","Việc làm"].includes(a.title);
 
               const blocked =
                 Boolean(a.disabled) ||
-                (isMain && (game.mainActivityCount || 0) >= 2);
+                (isMain && (game.mainActivityCount || 0) >= 1);
 
               return (
                 <button
@@ -6133,8 +3651,8 @@ function App(){
                   <span className="activity-icon">{a.icon}</span>
                   <b>{a.title}</b>
                   <small>
-                    {isMain && (game.mainActivityCount || 0) >= 2
-                      ? `🔒 Đã đủ 2 việc chính ở mốc ${currentTime}`
+                    {isMain && (game.mainActivityCount || 0) >= 1
+                      ? `🔒 Đã dùng mốc ${currentTime}`
                       : a.desc}
                   </small>
                 </button>
@@ -6165,8 +3683,6 @@ function App(){
       {overlay==="titles" && renderTitlesModal()}
 
       {overlay==="diary" && renderDiaryModal()}
-
-      {overlay==="guide" && renderGuideModal()}
 
       {overlay==="canteen" && (
         <Modal
@@ -6210,8 +3726,7 @@ function App(){
 
       {(overlay==="quiz" ||
         overlay==="oral" ||
-        overlay==="certExam" ||
-        overlay==="exam") &&
+        overlay==="certExam") &&
         renderQuizOverlay()
       }
 
@@ -6232,7 +3747,7 @@ function App(){
             </div>
 
             <h1>
-              Hành trình 100 ngày đã kết thúc
+              Hành trình 45 ngày đã kết thúc
             </h1>
 
             <p>
@@ -6293,73 +3808,6 @@ function App(){
 
     </div>
   );
-}
-
-/* =========================================================
-   ERROR BOUNDARY
-   Nếu có lỗi runtime, hiển thị màn hình lỗi thay vì trắng toàn bộ.
-========================================================= */
-class GameErrorBoundary extends React.Component {
-  constructor(props){
-    super(props);
-    this.state = { error:null };
-  }
-
-  static getDerivedStateFromError(error){
-    return { error };
-  }
-
-  componentDidCatch(error,info){
-    console.error("Thanh Xuân Rực Rỡ runtime error:",error,info);
-  }
-
-  render(){
-    if(this.state.error){
-      return (
-        <div style={{
-          minHeight:"100vh",
-          display:"flex",
-          alignItems:"center",
-          justifyContent:"center",
-          padding:24,
-          background:"#f7f1ff",
-          color:"#34283e",
-          fontFamily:"system-ui, sans-serif"
-        }}>
-          <div style={{
-            maxWidth:720,
-            width:"100%",
-            background:"white",
-            borderRadius:18,
-            padding:24,
-            boxShadow:"0 12px 40px rgba(80,50,120,.14)"
-          }}>
-            <h2 style={{marginTop:0}}>⚠️ Game gặp lỗi runtime</h2>
-            <p>App không còn trắng toàn màn hình. Hãy kiểm tra Console để xem chi tiết.</p>
-            <pre style={{
-              whiteSpace:"pre-wrap",
-              background:"#f6f3fa",
-              padding:12,
-              borderRadius:10,
-              overflow:"auto"
-            }}>{String(this.state.error?.message || this.state.error)}</pre>
-            <button
-              onClick={()=>window.location.reload()}
-              style={{
-                border:0,
-                borderRadius:10,
-                padding:"10px 14px",
-                fontWeight:800,
-                cursor:"pointer"
-              }}
-            >↻ Tải lại game</button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
 }
 
 /* =========================================================
@@ -7148,284 +4596,36 @@ button:disabled{
 .female-character{
   overflow:hidden;
   justify-content:flex-start;
-  padding-top:10px;
+  padding-top:12px;
   gap:0;
 }
 
-.outfit-avatar{
+.female-avatar{
   position:relative;
-  width:128px;
-  height:174px;
-  margin:4px auto 0;
-  flex:none;
-}
-
-.outfit-avatar-large{
-  transform:translateY(2px);
-}
-
-.avatar-head{
-  position:absolute;
-  z-index:5;
-  left:43px;
-  top:15px;
-  width:42px;
-  height:47px;
-  border-radius:47% 47% 43% 43% / 42% 42% 55% 55%;
-  background:linear-gradient(180deg,#ffd9c8 0%,#f5c1ad 100%);
-  box-shadow:0 2px 4px rgba(80,40,110,.12), inset 0 -2px 0 rgba(192,115,97,.10);
-  overflow:visible;
-}
-
-.avatar-face{
-  position:absolute;
-  inset:0;
-  display:block;
-}
-
-.avatar-ear{
-  position:absolute;
-  z-index:-1;
-  top:21px;
-  width:7px;
-  height:12px;
-  border-radius:50%;
-  background:#f3b9a6;
-}
-.avatar-ear-left{left:-3px}.avatar-ear-right{right:-3px}
-
-.avatar-brow{
-  position:absolute;
-  top:14px;
-  width:10px;
-  height:2px;
-  border-radius:99px;
-  background:#513934;
-}
-.avatar-brow-left{left:8px;transform:rotate(-5deg)}
-.avatar-brow-right{right:8px;transform:rotate(5deg)}
-
-.avatar-eye{
-  position:absolute;
-  top:18px;
-  width:10px;
-  height:7px;
-  border:1.5px solid #44313a;
-  border-radius:55% 55% 50% 50%;
-  background:#fff;
-  overflow:hidden;
-}
-.avatar-eye-left{left:8px}.avatar-eye-right{right:8px}
-.avatar-eye i{
-  position:absolute;
-  left:3px;
-  top:1px;
-  width:4px;
-  height:4px;
-  border-radius:50%;
-  background:#3a2931;
-}
-
-.avatar-nose{
-  position:absolute;
-  left:19px;
-  top:25px;
-  width:5px;
-  height:7px;
-  border-right:1.5px solid rgba(167,100,87,.75);
-  border-bottom:1.5px solid rgba(167,100,87,.75);
-  border-radius:0 0 5px 0;
-  transform:rotate(12deg);
-}
-
-.avatar-mouth{
-  position:absolute;
-  left:14px;
-  top:34px;
-  width:14px;
-  height:7px;
-  border-bottom:2px solid #ad4f68;
-  border-radius:0 0 12px 12px;
-}
-.avatar-mouth i{
-  position:absolute;
-  left:2px;
-  right:2px;
-  bottom:0;
-  height:2px;
-  border-radius:50%;
-  background:#f6a2a5;
-}
-
-.avatar-blush{
-  position:absolute;
-  top:29px;
-  width:7px;
-  height:4px;
-  border-radius:50%;
-  background:rgba(239,132,143,.34);
-}
-.avatar-blush-left{left:4px}.avatar-blush-right{right:4px}
-
-.avatar-hair{
-  position:absolute;
-  z-index:4;
-  left:38px;
-  top:9px;
-  width:52px;
-  height:45px;
-  border-radius:50% 50% 38% 38%;
-  background:#2d2532;
-  pointer-events:none;
-}
-
-.avatar-hair::after{
-  content:"";
-  position:absolute;
-  left:3px;
-  right:3px;
-  top:26px;
-  height:28px;
-  border-radius:8px 8px 18px 18px;
-  background:inherit;
-}
-
-.hair-black{background:#2d2532}.hair-brown{background:#70452f}.hair-blue{background:#4779b8}.hair-pink{background:#d96d9d}
-.hair-short{height:38px}.hair-short::after{height:16px}
-.hair-long{height:48px}.hair-long::after{height:42px}
-.hair-wavy{border-radius:48% 52% 35% 35%; transform:rotate(-2deg)}
-
-.avatar-neck{
-  position:absolute;
-  z-index:2;
-  left:58px;
-  top:52px;
-  width:12px;
-  height:12px;
-  background:#f3c2ae;
-  border-radius:0 0 6px 6px;
-}
-
-.avatar-shirt{
-  position:absolute;
   z-index:3;
-  left:29px;
-  top:59px;
-  width:70px;
-  height:58px;
-  border-radius:16px 16px 10px 10px;
-  box-shadow:inset 0 -5px 0 rgba(0,0,0,.06),0 2px 4px rgba(70,35,90,.12);
-  overflow:hidden;
+  font-size:58px;
+  line-height:64px;
+  filter:drop-shadow(0 3px 2px rgba(80,40,110,.12));
 }
 
-.avatar-shirt::before,.avatar-shirt::after{
-  content:"";
-  position:absolute;
-  top:5px;
-  width:18px;
-  height:36px;
-  background:inherit;
-  border-radius:10px;
-}
-.avatar-shirt::before{left:-9px; transform:rotate(10deg)}
-.avatar-shirt::after{right:-9px; transform:rotate(-10deg)}
-
-.shirt-white{background:#f8f8ff}.shirt-blue{background:#4f91d8}.shirt-black{background:#34313b}.shirt-pink{background:#eaa7c7}.shirt-mint{background:#8fd5c4}.shirt-red{background:#d95762}.shirt-yellow{background:#f0c95a}.shirt-gray{background:#9b9ba8}.shirt-cream{background:#e9dcc3}
-.shirt-hoodie{border-radius:18px 18px 11px 11px}.shirt-jacket{border:3px solid rgba(0,0,0,.1)}.shirt-varsity{border:3px solid rgba(255,255,255,.65)}.shirt-cardigan{box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}.shirt-sweater{border-radius:13px}.shirt-jersey::after{background:rgba(255,255,255,.25)}
-
-.shirt-collar{
-  position:absolute;
+.worn-clothes{
+  position:relative;
   z-index:2;
-  left:25px;
-  top:0;
-  width:20px;
-  height:15px;
-  background:#fff;
-  clip-path:polygon(0 0,50% 70%,100% 0,82% 100%,18% 100%);
-}
-
-.shirt-front-detail{
-  position:absolute;
-  z-index:2;
-  left:50%;
-  top:17px;
-  width:2px;
-  height:33px;
-  transform:translateX(-50%);
-  background:rgba(255,255,255,.38);
-}
-
-.avatar-bottom{
-  position:absolute;
-  z-index:2;
-  left:35px;
-  top:114px;
-  width:58px;
-  height:37px;
-  border-radius:7px 7px 13px 13px;
-  box-shadow:inset 0 -4px 0 rgba(0,0,0,.08);
-}
-
-.bottom-black{background:#30303a}.bottom-blue{background:#5b83bd}.bottom-white{background:#eeeef5}.bottom-gray{background:#8f909d}.bottom-green{background:#607d55}.bottom-beige{background:#cbb991}
-.bottom-skirt{height:42px; width:66px; left:31px; border-radius:5px 5px 17px 17px; transform:perspective(30px) rotateX(-2deg)}
-.bottom-short{height:29px; top:116px}.bottom-wide{width:66px; left:31px}.bottom-cargo{box-shadow:inset 0 -4px 0 rgba(0,0,0,.08), inset 0 0 0 2px rgba(255,255,255,.08)}
-
-.avatar-legs{
-  position:absolute;
-  z-index:1;
-  left:43px;
-  top:145px;
   display:flex;
-  gap:12px;
-}
-.avatar-leg{width:13px;height:25px;border-radius:0 0 7px 7px;background:#f0c4ae}.leg-black{background:#f0c4ae}
-
-.avatar-shoes{
-  position:absolute;
-  z-index:4;
-  left:35px;
-  top:163px;
-  display:flex;
-  gap:13px;
-}
-.avatar-shoes span{display:block;width:28px;height:10px;border-radius:10px 10px 5px 5px;background:#fff;box-shadow:0 2px 3px rgba(0,0,0,.15)}
-.shoes-black span{background:#35333d}.shoes-red span{background:#d95762}.shoes-pink span{background:#e8a4c6}.shoes-white span{background:#fff}
-.shoes-boots span{height:14px;border-radius:5px 5px 8px 8px}.shoes-loafer span{height:9px;border-radius:8px}
-
-.avatar-bag{
-  position:absolute;
-  z-index:7;
-  right:3px;
-  top:91px;
-  font-size:26px;
-  transform:rotate(5deg);
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  margin-top:-3px;
 }
 
-.avatar-accessory{
-  position:absolute;
-  z-index:8;
-  left:82px;
-  top:31px;
-  font-size:22px;
-}
-
-.outfit-avatar-mini{
-  width:74px;
-  height:104px;
-  transform:scale(.58);
-  transform-origin:top center;
-  margin:0 auto -45px;
-}
-
-.outfit-avatar-profile{
-  width:150px;
-  height:205px;
-  transform:scale(1.05);
-  transform-origin:center center;
-}
+.worn-shirt{font-size:42px; transform:scale(1.05);}
+.worn-bottom{font-size:39px; margin-left:-7px;}
+.worn-shoes{font-size:32px; margin-left:-4px;}
+.worn-bag{position:absolute; right:12px; top:92px; font-size:28px; z-index:4;}
+.worn-accessory{position:absolute; left:12px; top:42px; font-size:26px; z-index:5;}
 
 .female-outfit-caption{
-  margin-top:0;
+  margin-top:2px;
   padding:3px 8px;
   border-radius:999px;
   background:#f1e7ff;
@@ -7660,26 +4860,6 @@ button:disabled{
   margin-bottom:8px;
 }
 
-.exam-live-badge{
-  padding:4px 8px;
-  border-radius:999px;
-  background:#fff4d8;
-  color:#8a5a00;
-  font-weight:700;
-}
-
-.exam-hint{
-  margin-top:7px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-.exam-dot span{
-  font-weight:800;
-}
-
 .quiz-question{
   padding:12px;
   border-radius:13px;
@@ -7808,37 +4988,6 @@ button:disabled{
   font-size:9px;
 }
 
-/* ONLINE */
-
-.online-status{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  margin-bottom:7px;
-  border-radius:10px;
-  background:#f2fbf4;
-  color:#2d7745;
-  font-size:9px;
-  font-weight:800;
-}
-
-.online-status small{
-  color:#7b8a80;
-  font-size:8px;
-  font-weight:600;
-}
-
-.online-warning{
-  padding:8px 10px;
-  margin-bottom:7px;
-  border-radius:9px;
-  background:#fff6df;
-  color:#86651a;
-  font-size:8px;
-}
-
 /* LEADERBOARD */
 
 .leaderboard{
@@ -7937,86 +5086,6 @@ button:disabled{
 
 /* DIARY */
 
-
-.guide-wrap{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-}
-
-.guide-hero{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:16px;
-  border:1px solid rgba(120,90,170,.16);
-  border-radius:18px;
-  background:rgba(255,255,255,.78);
-}
-
-.guide-hero-icon{
-  width:58px;
-  height:58px;
-  flex:0 0 58px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:16px;
-  font-size:30px;
-  background:rgba(255,240,250,.95);
-}
-
-.guide-hero h2{
-  margin:0 0 4px;
-  font-size:20px;
-}
-
-.guide-hero p{
-  margin:0;
-  color:#5f5b70;
-  line-height:1.5;
-}
-
-.guide-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-}
-
-.guide-card{
-  padding:14px;
-  border-radius:16px;
-  border:1px solid rgba(120,90,170,.13);
-  background:#fff;
-  box-shadow:0 4px 18px rgba(75,50,120,.05);
-}
-
-.guide-card h3{
-  margin:0 0 8px;
-  font-size:15px;
-}
-
-.guide-card p{
-  margin:6px 0 0;
-  color:#625d72;
-  line-height:1.5;
-  font-size:13px;
-}
-
-.guide-tip{
-  padding:13px 14px;
-  border-radius:14px;
-  background:rgba(245,239,255,.92);
-  color:#5d5475;
-  line-height:1.5;
-}
-
-@media (max-width: 760px){
-  .guide-grid{
-    grid-template-columns:1fr;
-  }
-}
-
 .diary-list{
   display:flex;
   flex-direction:column;
@@ -8073,93 +5142,6 @@ button:disabled{
   gap:15px;
 }
 
-.player-name-card{
-  width:100%;
-  max-width:420px;
-  margin:14px auto 0;
-  padding:14px;
-  border:1px solid rgba(126,93,190,.16);
-  border-radius:18px;
-  background:rgba(255,255,255,.72);
-}
-
-.player-name-card label{
-  display:block;
-  font-weight:800;
-  margin-bottom:8px;
-}
-
-.player-name-row{
-  display:flex;
-  gap:8px;
-}
-
-.player-name-row input{
-  flex:1;
-  min-width:0;
-  border:1px solid #d9d2ea;
-  border-radius:12px;
-  padding:10px 12px;
-  background:#fff;
-  outline:none;
-}
-
-.player-name-card small{
-  display:block;
-  margin-top:7px;
-  color:#777;
-}
-
-.name-setup{
-  max-width:520px;
-  margin:0 auto;
-  padding:18px 10px 8px;
-  text-align:center;
-}
-
-.name-setup-icon{
-  font-size:72px;
-  margin-bottom:8px;
-}
-
-.name-setup h2{
-  margin:8px 0 6px;
-}
-
-.name-setup p{
-  margin:0 0 18px;
-  color:#666;
-}
-
-.name-setup-input{
-  width:100%;
-  max-width:420px;
-  border:2px solid #d9d2ea;
-  border-radius:16px;
-  padding:13px 16px;
-  font-size:17px;
-  text-align:center;
-  outline:none;
-  margin-bottom:12px;
-}
-
-.name-setup-input:focus,
-.player-name-row input:focus{
-  border-color:#a98be8;
-}
-
-.rank-name{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-  min-width:0;
-}
-
-.rank-name small{
-  color:#888;
-  font-size:11px;
-}
-
 .profile-character{
   text-align:center;
 }
@@ -8179,9 +5161,10 @@ button:disabled{
   height:43px;
 }
 
-.female-profile-character .outfit-avatar{
-  transform:scale(1.05);
-  transform-origin:center center;
+.female-profile-character .female-avatar{
+  height:auto;
+  font-size:68px;
+  line-height:70px;
 }
 
 
@@ -8452,11 +5435,3 @@ button:disabled{
   }
 }
 `;
-
-export default function AppWithErrorBoundary(){
-  return (
-    <GameErrorBoundary>
-      <App />
-    </GameErrorBoundary>
-  );
-}
