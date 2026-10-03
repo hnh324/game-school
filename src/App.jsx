@@ -3262,11 +3262,10 @@ function createInitialState(){
 }
 
 function normalizeState(raw){
+  // Nâng cấp game phải giữ nguyên tiến độ. Chỉ chặn save khác Season;
+  // version cũ vẫn được migrate bằng cách merge vào state mới.
   if(raw?.season && raw.season !== GAME_SEASON){
     throw new Error("SAVE_OLD_SEASON");
-  }
-  if(raw?.version && Number(raw.version) < GAME_VERSION){
-    throw new Error("SAVE_OLD_VERSION");
   }
 
   const base = createInitialState();
@@ -4181,6 +4180,9 @@ function App(){
               competition:finalCorrect * 5,
               day:g.day
             };
+
+            // Điểm thi đua của kỳ thi phải được cộng thật vào tổng điểm.
+            addCompetition(g, finalCorrect * 5);
           }
         });
 
@@ -4202,6 +4204,7 @@ function App(){
           }else if(finalCorrect>=4){
             addStat(g,"study",1);
           }
+          addCompetition(g, finalCorrect);
         });
 
         setToast(
@@ -4221,6 +4224,7 @@ function App(){
             addStat(g,"mood",-4);
             addStat(g,"reputation",-2);
           }
+          addCompetition(g, finalCorrect * 2);
         });
 
         setToast(
@@ -4239,6 +4243,7 @@ function App(){
               }
 
               addStat(g,"skill",3);
+              addCompetition(g,3);
             });
 
             setToast(`🎓 Đậu ${cert.name}!`);
@@ -4501,8 +4506,8 @@ function App(){
       setOverlay(null);
       setToast("✅ Đã nạp game thành công.");
     }catch(error){
-      if(error?.message === "SAVE_OLD_SEASON" || error?.message === "SAVE_OLD_VERSION") {
-        setToast("🆕 Mã lưu này thuộc Season 1. Season 2 phải bắt đầu lại từ đầu.");
+      if(error?.message === "SAVE_OLD_SEASON") {
+        setToast("🆕 Mã lưu thuộc Season khác nên không thể nạp vào Season 2.");
       } else {
         setToast("❌ Mã lưu không hợp lệ hoặc đã lỗi thời.");
       }
@@ -4541,8 +4546,8 @@ function App(){
         setOverlay(null);
         setToast("✅ Đã nhập file save.");
       }catch(error){
-        if(error?.message === "SAVE_OLD_SEASON" || error?.message === "SAVE_OLD_VERSION") {
-          setToast("🆕 File save này thuộc Season 1. Season 2 phải bắt đầu lại từ đầu.");
+        if(error?.message === "SAVE_OLD_SEASON") {
+          setToast("🆕 File save thuộc Season khác nên không thể nạp vào Season 2.");
         } else {
           setToast("❌ File save không hợp lệ hoặc đã lỗi thời.");
         }
