@@ -5,11 +5,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    Deluxe Career & Fashion Edition
    - 1 file App.jsx
    - 23 mốc thời gian / ngày
+   - 100 ngày chơi
    - Mỗi mốc 30 giây
    - Mỗi mốc tối đa 2 hoạt động chính
    - Quick Activities
    - Fashion / Outfit
-   - 380 câu hỏi ôn tập (180 câu cũ + 50 Toán 10-11 + 50 Vật lý 10-11 + 100 Modal Verbs) + 200 câu hỏi thi học kỳ/THPT
+   - kho câu hỏi ôn tập hiện có + 260 câu mới (100 HSK 4-5 + 160 tiếng Anh B1-B2) + 200 câu hỏi thi học kỳ/THPT
    - NPC
    - Nghề
    - Chứng chỉ
@@ -21,7 +22,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Supabase Auth anonymous + Postgres REST polling (không cần SDK)
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v25";
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v26";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -205,7 +206,22 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
 const addStat = (g, key, amount) => {
-  g.stats[key] = clamp(g.stats[key] + amount);
+  const max = key === "skill" ? 500 : 100;
+  g.stats[key] = Math.max(0, Math.min(max, (Number(g.stats[key]) || 0) + (Number(amount) || 0)));
+};
+
+const addAchievement = (g, amount) => {
+  g.achievementPoints = Math.max(
+    0,
+    Math.round((Number(g.achievementPoints) || 0) + (Number(amount) || 0))
+  );
+};
+
+const addKnowledge = (g, amount) => {
+  g.knowledgePoints = Math.max(
+    0,
+    Math.round((Number(g.knowledgePoints) || 0) + (Number(amount) || 0))
+  );
 };
 
 const addMoney = (g, amount) => {
@@ -224,7 +240,7 @@ const addRelationship = (g, id, amount) => {
 
 /* =========================================================
    280 CÂU HỎI ÔN TẬP
-   180 CÂU CŨ + 50 TOÁN 10-11 + 50 VẬT LÝ 10-11
+   180 CÂU CŨ + TOÁN 10-11 + 150 TOÁN 11 + 50 VẬT LÝ 10-11
 ========================================================= */
 
 const VAN_QUESTIONS = [
@@ -565,10 +581,338 @@ const MODAL_VERB_QUESTIONS = [
   ["Modal Verbs • grammar","Choose the correct sentence.",["Do you should go now?","Should you to go now?","Should you go now?","Should do you go now?"],2,"With 'should', form the question as 'Should + subject + base verb?'"]
 ];
 
+
+/* =========================================================
+   TIẾNG TRUNG HSK 4 + HSK 5
+   50 câu mỗi cấp
+========================================================= */
+const HSK4_QUESTIONS = [
+    ["HSK4 • 语法", "他___去过北京两次。", ["已经", "正在", "马上", "如果"], 0, "“已经”表示某个动作已经发生。"],
+    ["HSK4 • 词汇", "“提高”的意思最接近：", ["增加、提升", "减少", "停止", "忘记"], 0, "提高表示使水平、数量等上升。"],
+    ["HSK4 • 阅读", "因为下雨，比赛___了。", ["取消", "参加", "通过", "准备"], 0, "下雨导致比赛被取消。"],
+    ["HSK4 • 词汇", "“准时”最接近：", ["按规定时间到达", "很早到达", "经常迟到", "提前离开"], 0, "准时就是按照规定的时间。"],
+    ["HSK4 • 语法", "如果明天下雨，我们___在家学习。", ["就", "才", "又", "越"], 0, "如果……就……表示条件关系。"],
+    ["HSK4 • 词汇", "“适合”最接近：", ["合适", "困难", "浪费", "拒绝"], 0, "适合表示合适、相宜。"],
+    ["HSK4 • 语法", "我对中国历史___感兴趣。", ["非常", "已经", "马上", "虽然"], 0, "“非常”修饰形容词或心理状态。"],
+    ["HSK4 • 阅读", "他每天坚持跑步，所以身体越来越___。", ["健康", "安静", "复杂", "严格"], 0, "坚持运动有助于身体健康。"],
+    ["HSK4 • 词汇", "“估计”最接近：", ["推测", "证明", "忘记", "命令"], 0, "估计表示根据情况进行推测。"],
+    ["HSK4 • 语法", "她一边听音乐，___做作业。", ["一边", "虽然", "因为", "于是"], 0, "一边……一边……表示两个动作同时进行。"],
+    ["HSK4 • 词汇", "“经验”是指：", ["从实践中得到的认识", "一种考试", "一件衣服", "一种天气"], 0, "经验通常来自实践和经历。"],
+    ["HSK4 • 阅读", "这家饭店的菜不但便宜，而且___。", ["好吃", "迟到", "安静地", "如果"], 0, "不但……而且……连接两个积极特点。"],
+    ["HSK4 • 语法", "他昨天晚上十点___回家。", ["才", "又", "越", "被"], 0, "“才”表示动作发生得晚。"],
+    ["HSK4 • 词汇", "“复杂”的反义词是：", ["简单", "热闹", "重要", "认真"], 0, "复杂与简单相对。"],
+    ["HSK4 • 阅读", "为了提高汉语水平，她每天都___生词。", ["复习", "关闭", "邀请", "搬"], 0, "复习生词有助于提高语言水平。"],
+    ["HSK4 • 语法", "这本书___我借给你的。", ["是", "在", "把", "从"], 0, "“是……的”可用于强调过去动作的相关信息。"],
+    ["HSK4 • 词汇", "“及时”最接近：", ["在适当的时候", "很久以后", "从来没有", "完全相反"], 0, "及时表示在需要的时候迅速做出反应。"],
+    ["HSK4 • 阅读", "虽然工作很忙，但是他___每天学习汉语。", ["仍然", "已经", "马上", "只要"], 0, "虽然……但是……表示转折，“仍然”表示继续。"],
+    ["HSK4 • 语法", "请你把这份文件___我。", ["交给", "经过", "超过", "由于"], 0, "把字句中“交给我”表示递交对象。"],
+    ["HSK4 • 词汇", "“熟悉”的反义表达最接近：", ["陌生", "准确", "方便", "热情"], 0, "熟悉与陌生相对。"],
+    ["HSK4 • 词汇", "“安排”最接近：", ["计划并确定时间或顺序", "拒绝别人", "忘记事情", "改变天气"], 0, "安排表示计划并确定事情的顺序或时间。"],
+    ["HSK4 • 词汇", "“发现”最接近：", ["察觉到", "丢掉", "借给", "等待"], 0, "发现表示察觉或找到原来不知道的事情。"],
+    ["HSK4 • 语法", "他已经吃完饭了，___去散步。", ["准备", "如果", "虽然", "因为"], 0, "“准备”表示打算做某事。"],
+    ["HSK4 • 词汇", "“压力”最接近：", ["精神或生活上的负担", "假期", "奖励", "天气"], 0, "压力指让人感到负担或紧张的因素。"],
+    ["HSK4 • 阅读", "为了身体健康，他决定___早睡早起。", ["养成", "取消", "打扰", "拒绝"], 0, "养成习惯是固定搭配。"],
+    ["HSK4 • 语法", "我___没想到他会这么快回来。", ["完全", "正在", "如果", "于是"], 0, "完全可以修饰没想到，表示程度。"],
+    ["HSK4 • 词汇", "“邀请”的反义表达最接近：", ["拒绝", "参加", "准备", "联系"], 0, "邀请和拒绝在语境中相对。"],
+    ["HSK4 • 阅读", "这件衣服太贵了，我买不起，___看看别的吧。", ["还是", "已经", "如果", "虽然"], 0, "“还是”可用于提出另一选择。"],
+    ["HSK4 • 语法", "他___努力，成绩就越好。", ["越", "才", "被", "把"], 0, "越……越……表示程度随条件变化。"],
+    ["HSK4 • 词汇", "“丰富”的反义词是：", ["贫乏", "热闹", "准确", "认真"], 0, "丰富与贫乏相对。"],
+    ["HSK4 • 阅读", "她把房间打扫得___干净。", ["非常", "从来", "如果", "虽然"], 0, "非常修饰形容词干净。"],
+    ["HSK4 • 语法", "我不知道他___什么时候回来。", ["究竟", "已经", "如果", "虽然"], 0, "究竟可用于疑问宾语从句，表示追究答案。"],
+    ["HSK4 • 词汇", "“耐心”最接近：", ["不急躁地等待或处理事情", "速度很快", "容易生气", "完全安静"], 0, "耐心指不急躁、有耐性。"],
+    ["HSK4 • 阅读", "请你___我介绍一下这座城市。", ["给", "被", "从", "向"], 0, "给某人介绍是常用结构。"],
+    ["HSK4 • 语法", "他昨天没有来，___生病了。", ["可能", "必须", "虽然", "只要"], 0, "可能表示推测。"],
+    ["HSK4 • 词汇", "“顺利”的反义表达最接近：", ["困难", "准确", "热情", "及时"], 0, "顺利与困难重重的状态相对。"],
+    ["HSK4 • 阅读", "这项活动不仅有趣，___能学到很多东西。", ["还", "才", "却", "否则"], 0, "不仅……还……表示递进。"],
+    ["HSK4 • 语法", "我建议你___休息一下。", ["先", "被", "把", "越"], 0, "先表示首先做某事。"],
+    ["HSK4 • 词汇", "“通知”可以理解为：", ["告诉别人有关事情的信息", "借钱给别人", "改变价格", "离开城市"], 0, "通知表示把消息告诉有关的人。"],
+    ["HSK4 • 阅读", "天气越来越冷，大家___穿上了外套。", ["纷纷", "究竟", "仍然", "从来"], 0, "纷纷表示许多人相继做某事。"],
+    ["HSK4 • 语法", "他一到家___开始做饭。", ["就", "才", "越", "被"], 0, "一……就……表示两个动作紧接发生。"],
+    ["HSK4 • 词汇", "“误会”是指：", ["对事情产生错误理解", "提前完成工作", "认真学习", "正确判断"], 0, "误会是错误的理解或判断。"],
+    ["HSK4 • 阅读", "因为堵车，我们___迟到了十分钟。", ["所以", "但是", "虽然", "如果"], 0, "因为……所以……表示因果。"],
+    ["HSK4 • 语法", "___你有时间，欢迎来我家。", ["如果", "虽然", "否则", "于是"], 0, "如果引导条件。"],
+    ["HSK4 • 词汇", "“尊重”的反义词最接近：", ["轻视", "帮助", "理解", "信任"], 0, "尊重与轻视相对。"],
+    ["HSK4 • 阅读", "他每天听中文新闻，___自己的听力。", ["提高", "关闭", "减少", "拒绝"], 0, "提高听力是自然搭配。"],
+    ["HSK4 • 语法", "这道题没有我想象的___难。", ["那么", "已经", "马上", "如果"], 0, "没有……那么……表示比较。"],
+    ["HSK4 • 词汇", "“普通”的反义词最接近：", ["特殊", "简单", "方便", "及时"], 0, "普通与特殊相对。"],
+    ["HSK4 • 阅读", "她对中国文化非常___，经常参加相关活动。", ["感兴趣", "感动", "感谢", "感冒"], 0, "对……感兴趣是固定搭配。"],
+    ["HSK4 • 语法", "请把你的意见___大家说一说。", ["跟", "被", "从", "向着"], 0, "跟大家说表示向大家表达。"],
+
+];
+const HSK5_QUESTIONS = [
+    ["HSK5 • 词汇", "“逐渐”最接近：", ["慢慢地", "突然地", "故意地", "完全地"], 0, "逐渐表示变化慢慢发生。"],
+    ["HSK5 • 语法", "他不仅完成了任务，___提出了新的方案。", ["还", "才", "却", "否则"], 0, "不仅……还……表示递进。"],
+    ["HSK5 • 阅读", "经过长期训练，她的汉语表达能力有了明显___。", ["提高", "打扰", "拒绝", "浪费"], 0, "能力有了明显提高是自然搭配。"],
+    ["HSK5 • 词汇", "“承担责任”的意思是：", ["负责并接受应有的责任", "逃避问题", "拒绝帮助", "改变计划"], 0, "承担责任就是负责并接受责任。"],
+    ["HSK5 • 语法", "无论遇到什么困难，他都___放弃。", ["不会", "已经", "正在", "因为"], 0, "无论……都……表示条件不影响结果。"],
+    ["HSK5 • 词汇", "“普遍”的反义词最接近：", ["特殊", "普通", "常见", "广泛"], 0, "普遍与特殊在范围上相对。"],
+    ["HSK5 • 阅读", "这项措施旨在___交通拥堵问题。", ["缓解", "制造", "扩大", "隐藏"], 0, "缓解问题表示减轻其严重程度。"],
+    ["HSK5 • 词汇", "“维护”最接近：", ["保护并使其保持正常", "破坏", "转移", "取消"], 0, "维护有保护、保持正常状态之意。"],
+    ["HSK5 • 语法", "与其坐在这里担心，___马上采取行动。", ["不如", "虽然", "即使", "由于"], 0, "与其……不如……表示比较取舍。"],
+    ["HSK5 • 阅读", "由于准备充分，他___顺利通过了面试。", ["因此", "否则", "尽管", "而且"], 0, "由于……因此……表示因果。"],
+    ["HSK5 • 词汇", "“克服困难”是指：", ["设法战胜困难", "制造困难", "逃避困难", "重复错误"], 0, "克服表示战胜、解决。"],
+    ["HSK5 • 语法", "他所提出的建议___得到了大家的认可。", ["得到了", "正在", "因为", "如果"], 0, "“所+动词”构成名词性结构，后面可接谓语。"],
+    ["HSK5 • 词汇", "“显著”最接近：", ["明显", "隐蔽", "偶然", "普通"], 0, "显著表示非常明显。"],
+    ["HSK5 • 阅读", "调查结果表明，越来越多的人开始___环保生活方式。", ["采用", "阻止", "否认", "拆除"], 0, "采用生活方式表示开始使用、实行。"],
+    ["HSK5 • 语法", "只要认真准备，___能够取得好成绩。", ["就", "却", "才", "仍"], 0, "只要……就……表示充分条件。"],
+    ["HSK5 • 词汇", "“推迟”的反义词是：", ["提前", "拒绝", "增加", "减少"], 0, "推迟与提前相对。"],
+    ["HSK5 • 阅读", "尽管天气恶劣，救援人员___坚持工作。", ["仍然", "否则", "几乎", "终于"], 0, "尽管……仍然……表示让步。"],
+    ["HSK5 • 词汇", "“资源丰富”中的“丰富”最接近：", ["充足", "稀少", "危险", "狭窄"], 0, "丰富表示数量或种类很多、充足。"],
+    ["HSK5 • 语法", "他把主要精力___了研究工作。", ["放在", "超过", "经过", "由于"], 0, "把精力放在某项工作上是固定搭配。"],
+    ["HSK5 • 阅读", "面对失败，他没有灰心，反而从中___了宝贵经验。", ["吸取", "关闭", "浪费", "取消"], 0, "从失败中吸取经验是常用搭配。"],
+    ["HSK5 • 词汇", "“促进”最接近：", ["推动其发展", "阻止其发生", "隐藏信息", "减少数量"], 0, "促进表示推动事物向好的方向发展。"],
+    ["HSK5 • 词汇", "“避免”最接近：", ["设法不发生", "主动增加", "公开宣布", "立即完成"], 0, "避免表示设法不让某事发生。"],
+    ["HSK5 • 语法", "这项政策一旦实施，___会产生影响。", ["就", "虽然", "否则", "而且"], 0, "一旦……就……表示条件一发生结果随即出现。"],
+    ["HSK5 • 阅读", "专家认为，这种方法能够有效___能源消耗。", ["降低", "承担", "邀请", "恢复"], 0, "降低能源消耗是常见搭配。"],
+    ["HSK5 • 词汇", "“逐步”最接近：", ["一步一步地", "突然地", "完全地", "故意地"], 0, "逐步表示按照步骤慢慢进行。"],
+    ["HSK5 • 语法", "即使遇到困难，我们也___坚持下去。", ["要", "已经", "才", "因为"], 0, "即使……也……表示让步条件。"],
+    ["HSK5 • 词汇", "“现象”是指：", ["可以观察到的事实或表现", "一条法律", "一个人名", "一种工具"], 0, "现象是客观存在、可以观察的表现。"],
+    ["HSK5 • 阅读", "随着城市发展，公共交通的需求不断___。", ["增加", "取消", "拒绝", "隐藏"], 0, "需求不断增加是自然搭配。"],
+    ["HSK5 • 语法", "他之所以成功，___他长期坚持。", ["是因为", "即使", "否则", "虽然"], 0, "之所以……是因为……表示原因。"],
+    ["HSK5 • 词汇", "“明显”的近义词是：", ["显著", "模糊", "偶然", "秘密"], 0, "明显与显著意思接近。"],
+    ["HSK5 • 阅读", "这个问题涉及多个方面，不能___处理。", ["简单地", "已经", "从来", "突然"], 0, "复杂问题不能简单地处理。"],
+    ["HSK5 • 语法", "除非你亲自说明，___很难解决这个误会。", ["否则", "因此", "虽然", "而且"], 0, "除非……否则……表示条件。"],
+    ["HSK5 • 词汇", "“承担”最接近：", ["负责接受", "主动逃避", "随意改变", "完全拒绝"], 0, "承担表示负责或接受某种任务、责任。"],
+    ["HSK5 • 阅读", "公司正在___新的管理制度。", ["实施", "消失", "拒绝", "误会"], 0, "实施制度表示把制度付诸实践。"],
+    ["HSK5 • 语法", "他宁可少赚一点，也不愿意___原则。", ["违反", "恢复", "促进", "适应"], 0, "宁可……也不……表示取舍。"],
+    ["HSK5 • 词汇", "“适应”最接近：", ["逐渐习惯并能应对", "完全拒绝", "马上离开", "公开批评"], 0, "适应表示逐渐习惯环境或情况。"],
+    ["HSK5 • 阅读", "为了保证质量，所有产品都必须经过严格的___。", ["检查", "邀请", "取消", "转移"], 0, "产品需要经过严格检查。"],
+    ["HSK5 • 语法", "他虽然经验不足，___学习能力很强。", ["但是", "因此", "否则", "于是"], 0, "虽然……但是……表示转折。"],
+    ["HSK5 • 词汇", "“趋势”最接近：", ["事物发展的方向", "一次考试", "个人情绪", "一件家具"], 0, "趋势表示事物发展的方向。"],
+    ["HSK5 • 阅读", "数据显示，网上购物已经成为一种越来越普遍的___。", ["现象", "责任", "机会", "压力"], 0, "普遍的社会现象是常见搭配。"],
+    ["HSK5 • 语法", "只要条件允许，我们___尽快完成项目。", ["就会", "却", "否则", "虽然"], 0, "只要……就……表示充分条件。"],
+    ["HSK5 • 词汇", "“改善”与下列哪项最接近？", ["使情况变得更好", "使情况更复杂", "停止工作", "拒绝帮助"], 0, "改善表示使原来的情况变好。"],
+    ["HSK5 • 阅读", "双方经过多次讨论，终于达成了___。", ["共识", "压力", "误会", "冲突"], 0, "达成共识是固定搭配。"],
+    ["HSK5 • 语法", "与其不断抱怨，___想办法解决问题。", ["不如", "即使", "除非", "由于"], 0, "与其……不如……表示选择更好的做法。"],
+    ["HSK5 • 词汇", "“客观”的反义词最接近：", ["主观", "准确", "实际", "公正"], 0, "客观与主观相对。"],
+    ["HSK5 • 阅读", "这项研究为未来的技术发展提供了重要的___。", ["依据", "拒绝", "争论", "障碍"], 0, "提供依据是常用搭配。"],
+    ["HSK5 • 语法", "无论结果如何，他___会认真总结经验。", ["都", "才", "却", "如果"], 0, "无论……都……表示无条件结果。"],
+    ["HSK5 • 词汇", "“障碍”最接近：", ["阻碍事情发展的因素", "成功的方法", "奖励", "计划"], 0, "障碍是阻碍事情发展的因素。"],
+    ["HSK5 • 阅读", "在竞争激烈的环境中，企业必须不断___创新。", ["加强", "取消", "减少", "拒绝"], 0, "加强创新能力是合理搭配。"],
+    ["HSK5 • 词汇", "“维持”最接近：", ["保持某种状态", "突然改变", "彻底取消", "公开讨论"], 0, "维持表示使某种状态继续保持。"],
+
+];
+
+const EN_DAO_NGU = [
+
+    ["部分倒装", "Never have I seen such a beautiful view.", ["Never have I seen such a beautiful view.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "倒装结构为 Never + 助动词 + 主语 + 动词。"],
+    ["部分倒装", "Hardly had I arrived when the meeting started.", ["Hardly had I arrived when the meeting started.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Hardly...when...使用过去完成时倒装。"],
+    ["部分倒装", "So difficult was the exam that many students complained.", ["So difficult was the exam that many students complained.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adjective 置于句首可形成倒装。"],
+    ["部分倒装", "Under no circumstances ___ this door.", ["should you open", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Under no circumstances 要求部分倒装。"],
+    ["部分倒装", "Little did they know what would happen next.", ["Little did they know what would happen next.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Little 置于句首表示几乎不知道，需倒装。"],
+    ["部分倒装", "Only then ___ why she was upset.", ["did I realize", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only then 置于句首后主句倒装。"],
+    ["部分倒装", "No sooner had he left than the phone rang.", ["No sooner had he left than the phone rang.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "No sooner...than...使用倒装和过去完成时。"],
+    ["条件倒装", "Had I known earlier, I would have helped.", ["Had I known earlier, I would have helped.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 3 bỏ if: Had + S + V3."],
+    ["条件倒装", "Were I you, I would accept the offer.", ["Were I you, I would accept the offer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 2: Were + S..."],
+    ["条件倒装", "Should you need help, call me.", ["Should you need help, call me.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Should + S... thay cho If S should..."],
+    ["部分倒装", "Not only did she apologize, but she also offered to help.", ["Not only did she apologize, but she also offered to help.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Not only ở đầu câu yêu cầu đảo trợ động từ."],
+    ["部分倒装", "Seldom does he complain about his workload.", ["Seldom does he complain about his workload.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Seldom mang nghĩa hiếm khi và gây đảo ngữ khi đứng đầu."],
+    ["部分倒装", "On no account should you reveal the password.", ["On no account should you reveal the password.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "On no account = under no circumstances, dùng đảo ngữ."],
+    ["phần đảo ngữ", "Only by working together can we solve the problem.", ["Only by working together can we solve the problem.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only + cụm trạng ngữ ở đầu câu kéo theo đảo ngữ."],
+    ["phần đảo ngữ", "So quickly did she answer that everyone was surprised.", ["So quickly did she answer that everyone was surprised.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adverb ở đầu câu có thể dùng đảo ngữ."],
+    ["phần đảo ngữ", "Neither did I know the answer.", ["Neither did I know the answer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Neither + trợ động từ + chủ ngữ dùng để đồng tình với phủ định."],
+    ["phần đảo ngữ", "Nowhere else can you find a view like this.", ["Nowhere else can you find a view like this.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Trạng từ phủ định/giới hạn ở đầu câu gây đảo ngữ."],
+    ["phần đảo ngữ", "Only after reading the report did we understand the problem.", ["Only after reading the report did we understand the problem.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Only after + phrase at the beginning triggers inversion."],
+    ["phần đảo ngữ", "At no time should employees share confidential data.", ["At no time should employees share confidential data.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "At no time is a negative/restrictive phrase that triggers inversion."],
+    ["phần đảo ngữ", "Barely had the show begun when the lights went out.", ["Barely had the show begun when the lights went out.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Barely...when... uses inversion with past perfect."],
+
+];
+
+const EN_THUC_GIA_DINH = [
+
+    ["subjunctive", "The teacher insisted that he ___ the report again.", ["rewrite", "rewrites", "rewrote", "rewriting"], 0, "Sau insist that, dùng subjunctive: động từ nguyên mẫu."],
+    ["subjunctive", "It is essential that every student ___ on time.", ["be", "is", "was", "being"], 0, "Sau It is essential that dùng động từ nguyên mẫu trong subjunctive."],
+    ["subjunctive", "The manager recommended that she ___ earlier.", ["leave", "leaves", "left", "leaving"], 0, "Recommend that + bare infinitive."],
+    ["subjunctive", "They demanded that the company ___ action immediately.", ["take", "takes", "took", "taking"], 0, "Demand that + bare infinitive."],
+    ["subjunctive", "I suggest that he ___ a doctor.", ["see", "sees", "saw", "seeing"], 0, "Suggest that + bare infinitive trong cấu trúc giả định."],
+    ["subjunctive", "It is important that he ___ honest.", ["be", "is", "was", "being"], 0, "Be là dạng nguyên mẫu trong subjunctive."],
+    ["subjunctive", "The committee proposed that the rule ___ changed.", ["be", "is", "was", "being"], 0, "Propose that + subject + be + V3."],
+    ["subjunctive", "She insisted that we ___ immediately.", ["go", "went", "goes", "going"], 0, "Insist that + bare infinitive."],
+    ["subjunctive", "The doctor advised that he ___ smoking.", ["stop", "stops", "stopped", "stopping"], 0, "Advise that có thể dùng subjunctive trong văn phong trang trọng."],
+    ["subjunctive", "It is vital that every applicant ___ the form.", ["complete", "completes", "completed", "completing"], 0, "It is vital that + bare infinitive."],
+    ["subjunctive", "The law requires that each employee ___ identification.", ["carry", "carries", "carried", "carrying"], 0, "Require that + bare infinitive."],
+    ["subjunctive", "The coach ordered that the players ___ silent.", ["remain", "remains", "remained", "remaining"], 0, "Order that + bare infinitive."],
+    ["subjunctive", "It was recommended that he ___ the course.", ["take", "takes", "took", "taking"], 0, "Recommend that + bare infinitive."],
+    ["subjunctive", "The board requested that the proposal ___ revised.", ["be", "is", "was", "being"], 0, "Request that + be + past participle."],
+    ["subjunctive", "Her parents insisted that she ___ home early.", ["return", "returns", "returned", "returning"], 0, "Insist that + bare infinitive."],
+    ["subjunctive", "It is crucial that the data ___ accurate.", ["be", "is", "was", "being"], 0, "Crucial that + be trong subjunctive."],
+    ["subjunctive", "The judge ordered that the witness ___ the question.", ["answer", "answers", "answered", "answering"], 0, "Order that + bare infinitive."],
+    ["subjunctive", "They suggested that the meeting ___ postponed.", ["be", "is", "was", "being"], 0, "Suggest that + be + V3."],
+    ["subjunctive", "It is necessary that he ___ prepared.", ["be", "is", "was", "being"], 0, "Necessary that + bare infinitive."],
+    ["subjunctive", "The director demanded that the work ___ finished today.", ["be", "is", "was", "being"], 0, "Demand that + be + V3."],
+
+];
+
+const EN_TRANG_TU_RUT_GON = [
+
+    ["reduced adverbial clause", "While ___ to work, she met an old friend.", ["walking", "walked", "walks", "to walk"], 0, "Rút gọn while + S + V thành while + V-ing khi chủ ngữ giống nhau."],
+    ["reduced adverbial clause", "When ___ the report, check all figures carefully.", ["writing", "written", "writes", "to write"], 0, "When + V-ing là dạng rút gọn của mệnh đề trạng ngữ chủ động."],
+    ["reduced adverbial clause", "After ___ the email, he called his manager.", ["sending", "sent", "sends", "to send"], 0, "After + V-ing dùng khi chủ ngữ hai mệnh đề giống nhau."],
+    ["reduced adverbial clause", "Although ___ tired, she continued studying.", ["feeling", "felt", "feels", "to feel"], 0, "Although + V-ing là dạng rút gọn chủ động."],
+    ["reduced adverbial clause", "If ___ carefully, this machine is safe.", ["used", "using", "use", "to use"], 0, "If + V3 rút gọn mệnh đề bị động: If used carefully."],
+    ["reduced adverbial clause", "When ___ properly, the software works well.", ["installed", "installing", "installs", "to install"], 0, "When + V3 là dạng rút gọn bị động."],
+    ["reduced adverbial clause", "Before ___ the contract, read every clause.", ["signing", "signed", "signs", "to sign"], 0, "Before + V-ing là dạng rút gọn."],
+    ["reduced adverbial clause", "Having ___ the task, she went home.", ["finished", "finish", "finishing", "finishes"], 0, "Having + V3 diễn tả hành động xảy ra trước."],
+    ["reduced adverbial clause", "___ by the news, he remained silent.", ["Shocked", "Shocking", "Shock", "To shock"], 0, "V3 đầu câu có thể rút gọn mệnh đề bị động."],
+    ["reduced adverbial clause", "___ the instructions, they assembled the device.", ["Following", "Followed", "Follows", "To follow"], 0, "Following = while/after they followed the instructions."],
+    ["reduced adverbial clause", "If ___ in advance, the problem can be avoided.", ["planned", "planning", "plans", "to plan"], 0, "If + V3 rút gọn mệnh đề bị động."],
+    ["reduced adverbial clause", "While ___ for the bus, I read a book.", ["waiting", "waited", "waits", "to wait"], 0, "While + V-ing diễn tả hai hành động đồng thời."],
+    ["reduced adverbial clause", "After ___ the data, the team found an error.", ["analyzing", "analyzed", "analyzes", "to analyze"], 0, "After + V-ing khi chủ ngữ giống nhau."],
+    ["reduced adverbial clause", "Although ___ inexperienced, he performed well.", ["being", "been", "be", "to be"], 0, "Although + being + adjective là dạng rút gọn."],
+    ["reduced adverbial clause", "Once ___, the decision cannot be changed.", ["made", "making", "makes", "to make"], 0, "Once + V3 rút gọn mệnh đề bị động."],
+    ["reduced adverbial clause", "Having ___ the problem, we proposed a solution.", ["identified", "identify", "identifying", "identifies"], 0, "Having + V3 diễn tả hành động hoàn tất trước."],
+    ["reduced adverbial clause", "___ carefully, the medicine should be safe.", ["Taken", "Taking", "Take", "To take"], 0, "Taken carefully = if it is taken carefully."],
+    ["reduced adverbial clause", "Before ___ the presentation, she checked the slides.", ["giving", "given", "gives", "to give"], 0, "Before + V-ing."],
+    ["reduced adverbial clause", "When ___ from the top, the building looks smaller.", ["seen", "seeing", "sees", "to see"], 0, "When + V3 rút gọn mệnh đề bị động."],
+    ["reduced adverbial clause", "While ___ dinner, he listened to a podcast.", ["cooking", "cooked", "cooks", "to cook"], 0, "While + V-ing."],
+
+];
+
+const EN_MENH_DE_TRANG_NGU = [
+
+    ["adverbial clause", "___ it was raining, they continued the match.", ["Although", "Because", "Unless", "So that"], 0, "Although introduces a concessive adverbial clause."],
+    ["adverbial clause", "Call me ___ you arrive.", ["when", "unless", "although", "because"], 0, "When introduces a time clause."],
+    ["adverbial clause", "We stayed home ___ the weather was terrible.", ["because", "although", "unless", "so that"], 0, "Because introduces a reason clause."],
+    ["adverbial clause", "Take an umbrella ___ it rains.", ["in case", "although", "because", "whereas"], 0, "In case introduces a precautionary condition."],
+    ["adverbial clause", "You cannot enter ___ you have a pass.", ["unless", "although", "because", "while"], 0, "Unless means if not."],
+    ["adverbial clause", "She spoke slowly ___ everyone could understand.", ["so that", "although", "because", "unless"], 0, "So that introduces purpose."],
+    ["adverbial clause", "___ he was tired, he finished the report.", ["Even though", "Because", "Unless", "Since"], 0, "Even though introduces concession."],
+    ["adverbial clause", "I will wait here ___ you come back.", ["until", "because", "although", "unless"], 0, "Until introduces an endpoint in time."],
+    ["adverbial clause", "He studies hard ___ he can pass the exam.", ["so that", "although", "unless", "whereas"], 0, "So that expresses purpose."],
+    ["adverbial clause", "___ you hurry, you will miss the train.", ["If", "Although", "Because", "While"], 0, "If introduces a condition."],
+    ["adverbial clause", "She smiled ___ she was nervous.", ["although", "because", "unless", "so that"], 0, "Although shows contrast."],
+    ["adverbial clause", "We left early ___ we could avoid traffic.", ["so that", "because", "although", "unless"], 0, "So that expresses purpose."],
+    ["adverbial clause", "I have known him ___ we were children.", ["since", "unless", "although", "whereas"], 0, "Since introduces the starting point of a time period."],
+    ["adverbial clause", "___ you finish, you can leave.", ["Once", "Although", "Because", "Unless"], 0, "Once means when something has happened."],
+    ["adverbial clause", "She cannot relax ___ the work is finished.", ["until", "because", "although", "if"], 0, "Until marks the time before an event is completed."],
+    ["adverbial clause", "___ he apologized, she remained upset.", ["Even though", "Because", "Unless", "So that"], 0, "Even though introduces concession."],
+    ["adverbial clause", "Bring some cash ___ the card machine does not work.", ["in case", "although", "because", "whereas"], 0, "In case expresses precaution."],
+    ["adverbial clause", "He took notes ___ he would not forget the details.", ["so that", "unless", "although", "while"], 0, "So that expresses purpose."],
+    ["adverbial clause", "___ the meeting ended, everyone left.", ["After", "Unless", "Although", "Because"], 0, "After introduces a time clause."],
+    ["adverbial clause", "You can borrow my laptop ___ you return it tomorrow.", ["provided that", "although", "because", "while"], 0, "Provided that means on the condition that."],
+
+];
+
+const EN_IDIOM = [
+
+    ["idiom", "“Break the ice” means:", ["start a friendly conversation", "end a relationship", "make someone angry", "work very quickly"], 0, "Break the ice means make people feel more relaxed."],
+    ["idiom", "“Hit the nail on the head” means:", ["describe something exactly", "make a mistake", "avoid a problem", "arrive late"], 0, "It means say or do exactly the right thing."],
+    ["idiom", "“A piece of cake” means:", ["very easy", "very expensive", "very dangerous", "very boring"], 0, "A piece of cake means easy."],
+    ["idiom", "“Under the weather” means:", ["feeling ill", "feeling excited", "being outside", "being late"], 0, "Under the weather means feeling unwell."],
+    ["idiom", "“Once in a blue moon” means:", ["very rarely", "every day", "very loudly", "without warning"], 0, "It means something happens rarely."],
+    ["idiom", "“Cost an arm and a leg” means:", ["be very expensive", "be free", "be dangerous", "be simple"], 0, "The idiom means cost a lot of money."],
+    ["idiom", "“Spill the beans” means:", ["reveal a secret", "cook dinner", "make a plan", "leave quickly"], 0, "Spill the beans means reveal secret information."],
+    ["idiom", "“Call it a day” means:", ["stop working for the day", "start a project", "make a phone call", "change jobs"], 0, "It means stop working for the day."],
+    ["idiom", "“Get cold feet” means:", ["become nervous about doing something", "feel physically cold", "run fast", "become confident"], 0, "Get cold feet means lose courage."],
+    ["idiom", "“In hot water” means:", ["in trouble", "in a bath", "very successful", "very relaxed"], 0, "In hot water means in trouble."],
+    ["idiom", "“Keep an eye on” means:", ["watch carefully", "ignore", "repair", "borrow"], 0, "Keep an eye on means watch or monitor."],
+    ["idiom", "“Go the extra mile” means:", ["make extra effort", "travel abroad", "stop early", "avoid responsibility"], 0, "It means make more effort than expected."],
+    ["idiom", "“Bite the bullet” means:", ["face a difficult situation bravely", "eat quickly", "avoid a decision", "complain loudly"], 0, "Bite the bullet means endure something difficult."],
+    ["idiom", "“The ball is in your court” means:", ["it is your turn to act", "you are playing tennis", "you have lost", "the game is over"], 0, "It means the next action is your responsibility."],
+    ["idiom", "“On the same page” means:", ["share the same understanding", "read the same book", "disagree strongly", "work alone"], 0, "It means have the same understanding."],
+    ["idiom", "“Miss the boat” means:", ["miss an opportunity", "travel by ship", "arrive early", "change direction"], 0, "Miss the boat means lose an opportunity."],
+    ["idiom", "“Back to square one” means:", ["return to the beginning", "win easily", "finish a task", "take a shortcut"], 0, "It means start again from the beginning."],
+    ["idiom", "“Pull someone’s leg” means:", ["joke with someone", "help someone walk", "criticize someone", "follow someone"], 0, "Pull someone’s leg means tease or joke."],
+    ["idiom", "“A blessing in disguise” means:", ["something that seems bad but turns out good", "a hidden gift card", "a religious event", "an obvious success"], 0, "It describes an apparent problem with a positive result."],
+    ["idiom", "“Beat around the bush” means:", ["avoid saying something directly", "work in a garden", "speak clearly", "finish quickly"], 0, "It means avoid the main point."],
+
+];
+
+const EN_PHRASAL_VERB = [
+
+    ["phrasal verb", "Please ___ the lights before you leave.", ["turn off", "turn into", "turn over", "turn up"], 0, "Turn off = switch off."],
+    ["phrasal verb", "I need to ___ this word in the dictionary.", ["look up", "look after", "look into", "look out"], 0, "Look up = search for information."],
+    ["phrasal verb", "She ___ her little brother every afternoon.", ["looks after", "looks up", "looks into", "looks for"], 0, "Look after = take care of."],
+    ["phrasal verb", "The meeting was ___ until Friday.", ["put off", "put on", "put out", "put up"], 0, "Put off = postpone."],
+    ["phrasal verb", "We have ___ milk, so I will buy some.", ["run out of", "run into", "run over", "run away"], 0, "Run out of = have none left."],
+    ["phrasal verb", "He ___ an old friend at the station.", ["ran into", "ran out of", "ran over", "ran away"], 0, "Run into = meet unexpectedly."],
+    ["phrasal verb", "Please ___ your shoes before entering.", ["take off", "take after", "take up", "take in"], 0, "Take off = remove."],
+    ["phrasal verb", "She decided to ___ yoga.", ["take up", "take off", "take over", "take after"], 0, "Take up = begin a hobby/activity."],
+    ["phrasal verb", "Can you ___ this form?", ["fill in", "fill out", "fill up", "fill over"], 0, "Fill in = complete information on a form."],
+    ["phrasal verb", "The plane ___ on time.", ["took off", "took after", "took up", "took in"], 0, "Take off = leave the ground."],
+    ["phrasal verb", "We need to ___ the problem before deciding.", ["figure out", "figure up", "figure off", "figure into"], 0, "Figure out = understand or solve."],
+    ["phrasal verb", "He ___ smoking last year.", ["gave up", "gave in", "gave out", "gave away"], 0, "Give up = stop doing something."],
+    ["phrasal verb", "The car ___ on the way home.", ["broke down", "broke into", "broke up", "broke off"], 0, "Break down = stop working."],
+    ["phrasal verb", "They ___ the old building.", ["knocked down", "knocked out", "knocked up", "knocked over"], 0, "Knock down = demolish."],
+    ["phrasal verb", "I will ___ you ___ at 8 a.m.", ["pick / up", "pick / out", "pick / on", "pick / over"], 0, "Pick someone up = collect someone by car."],
+    ["phrasal verb", "She ___ the invitation because she was busy.", ["turned down", "turned off", "turned into", "turned over"], 0, "Turn down = reject."],
+    ["phrasal verb", "He ___ the meaning of the word.", ["found out", "found over", "found off", "found up"], 0, "Find out = discover information."],
+    ["phrasal verb", "Please ___ the children while I cook.", ["look after", "look up", "look into", "look out"], 0, "Look after = take care of."],
+    ["phrasal verb", "The company will ___ a new product next month.", ["bring out", "bring up", "bring in", "bring off"], 0, "Bring out = release or publish."],
+    ["phrasal verb", "We need to ___ a solution together.", ["come up with", "come across", "come down", "come over"], 0, "Come up with = think of or create."],
+
+];
+
+const EN_DONG_NGHIA = [
+
+    ["synonym", "“Rapid” is closest in meaning to:", ["fast", "quiet", "weak", "rare"], 0, "Rapid = fast."],
+    ["synonym", "“Purchase” is closest in meaning to:", ["buy", "sell", "borrow", "repair"], 0, "Purchase = buy."],
+    ["synonym", "“Assist” is closest in meaning to:", ["help", "avoid", "refuse", "delay"], 0, "Assist = help."],
+    ["synonym", "“Accurate” is closest in meaning to:", ["correct", "expensive", "simple", "recent"], 0, "Accurate = correct."],
+    ["synonym", "“Essential” is closest in meaning to:", ["necessary", "optional", "temporary", "ordinary"], 0, "Essential = necessary."],
+    ["synonym", "“Huge” is closest in meaning to:", ["enormous", "tiny", "narrow", "weak"], 0, "Huge = enormous."],
+    ["synonym", "“Reliable” is closest in meaning to:", ["dependable", "dangerous", "expensive", "uncertain"], 0, "Reliable = dependable."],
+    ["synonym", "“Difficult” is closest in meaning to:", ["challenging", "empty", "polite", "familiar"], 0, "Difficult = challenging."],
+    ["synonym", "“Improve” is closest in meaning to:", ["enhance", "damage", "remove", "hide"], 0, "Improve = enhance."],
+    ["synonym", "“Objective” is closest in meaning to:", ["goal", "mistake", "method", "argument"], 0, "Objective = goal."],
+    ["synonym", "“Purchase” is closest in meaning to:", ["acquire", "lose", "throw", "repair"], 0, "Acquire can mean obtain or purchase."],
+    ["synonym", "“Brief” is closest in meaning to:", ["short", "wide", "heavy", "late"], 0, "Brief = short."],
+    ["synonym", "“Select” is closest in meaning to:", ["choose", "reject", "copy", "divide"], 0, "Select = choose."],
+    ["synonym", "“Modify” is closest in meaning to:", ["change", "destroy", "repeat", "measure"], 0, "Modify = change."],
+    ["synonym", "“Maintain” is closest in meaning to:", ["keep", "remove", "forget", "sell"], 0, "Maintain = keep in good condition."],
+    ["synonym", "“Complex” is closest in meaning to:", ["complicated", "cheap", "friendly", "empty"], 0, "Complex = complicated."],
+    ["synonym", "“Obtain” is closest in meaning to:", ["get", "lose", "hide", "return"], 0, "Obtain = get."],
+    ["synonym", "“Require” is closest in meaning to:", ["need", "offer", "avoid", "borrow"], 0, "Require = need."],
+    ["synonym", "“Approximately” is closest in meaning to:", ["roughly", "exactly", "never", "immediately"], 0, "Approximately = roughly."],
+    ["synonym", "“Previous” is closest in meaning to:", ["earlier", "future", "current", "separate"], 0, "Previous = earlier."],
+
+];
+
+const EN_TRAI_NGHIA = [
+
+    ["antonym", "The opposite of “expand” is:", ["contract", "increase", "develop", "extend"], 0, "Expand ↔ contract."],
+    ["antonym", "The opposite of “ancient” is:", ["modern", "old", "historic", "traditional"], 0, "Ancient ↔ modern."],
+    ["antonym", "The opposite of “generous” is:", ["selfish", "kind", "helpful", "polite"], 0, "Generous ↔ selfish."],
+    ["antonym", "The opposite of “temporary” is:", ["permanent", "brief", "short", "recent"], 0, "Temporary ↔ permanent."],
+    ["antonym", "The opposite of “accept” is:", ["reject", "receive", "allow", "agree"], 0, "Accept ↔ reject."],
+    ["antonym", "The opposite of “increase” is:", ["decrease", "improve", "grow", "expand"], 0, "Increase ↔ decrease."],
+    ["antonym", "The opposite of “visible” is:", ["hidden", "clear", "bright", "obvious"], 0, "Visible ↔ hidden."],
+    ["antonym", "The opposite of “flexible” is:", ["rigid", "adaptable", "soft", "useful"], 0, "Flexible ↔ rigid."],
+    ["antonym", "The opposite of “optimistic” is:", ["pessimistic", "hopeful", "positive", "confident"], 0, "Optimistic ↔ pessimistic."],
+    ["antonym", "The opposite of “include” is:", ["exclude", "contain", "add", "accept"], 0, "Include ↔ exclude."],
+    ["antonym", "The opposite of “major” is:", ["minor", "important", "large", "main"], 0, "Major ↔ minor."],
+    ["antonym", "The opposite of “accurate” is:", ["incorrect", "precise", "correct", "exact"], 0, "Accurate ↔ incorrect."],
+    ["antonym", "The opposite of “frequent” is:", ["rare", "regular", "common", "usual"], 0, "Frequent ↔ rare."],
+    ["antonym", "The opposite of “strengthen” is:", ["weaken", "support", "improve", "build"], 0, "Strengthen ↔ weaken."],
+    ["antonym", "The opposite of “arrive” is:", ["depart", "reach", "enter", "come"], 0, "Arrive ↔ depart."],
+    ["antonym", "The opposite of “complicated” is:", ["simple", "difficult", "detailed", "advanced"], 0, "Complicated ↔ simple."],
+    ["antonym", "The opposite of “polite” is:", ["rude", "friendly", "formal", "kind"], 0, "Polite ↔ rude."],
+    ["antonym", "The opposite of “profit” is:", ["loss", "income", "salary", "benefit"], 0, "Profit ↔ loss."],
+    ["antonym", "The opposite of “maximum” is:", ["minimum", "highest", "largest", "top"], 0, "Maximum ↔ minimum."],
+    ["antonym", "The opposite of “permit” is:", ["forbid", "allow", "approve", "accept"], 0, "Permit ↔ forbid."],
+
+];
+
+const TOAN_11_QUESTIONS = [["Lượng giác", "Giá trị của sin(0) bằng?", ["0", "1", "-1", "√2/2"], 0, "sin(0)=0."], ["Lượng giác", "Giá trị của sin(π/6) bằng?", ["1/2", "0", "1", "-1"], 0, "sin(π/6)=1/2."], ["Lượng giác", "Giá trị của sin(π/4) bằng?", ["√2/2", "0", "1", "-1"], 0, "sin(π/4)=√2/2."], ["Lượng giác", "Giá trị của sin(π/3) bằng?", ["√3/2", "0", "1", "-1"], 0, "sin(π/3)=√3/2."], ["Lượng giác", "Giá trị của sin(π/2) bằng?", ["1", "0", "-1", "√2/2"], 0, "sin(π/2)=1."], ["Lượng giác", "Giá trị của cos(0) bằng?", ["1", "0", "-1", "√2/2"], 0, "cos(0)=1."], ["Lượng giác", "Giá trị của cos(π/3) bằng?", ["1/2", "0", "1", "-1"], 0, "cos(π/3)=1/2."], ["Lượng giác", "Giá trị của cos(π/2) bằng?", ["0", "1", "-1", "√2/2"], 0, "cos(π/2)=0."], ["Lượng giác", "Giá trị của cos(π) bằng?", ["-1", "0", "1", "√2/2"], 0, "cos(π)=-1."], ["Lượng giác", "Giá trị của tan(0) bằng?", ["0", "1", "-1", "√2/2"], 0, "tan(0)=0."], ["Lượng giác", "Giá trị của tan(π/4) bằng?", ["1", "0", "-1", "√2/2"], 0, "tan(π/4)=1."], ["Lượng giác", "Giá trị của tan(π/6) bằng?", ["√3/3", "0", "1", "-1"], 0, "tan(π/6)=√3/3."], ["Lượng giác", "Giá trị của cot(π/4) bằng?", ["1", "0", "-1", "√2/2"], 0, "cot(π/4)=1."], ["Lượng giác", "Giá trị của cot(π/3) bằng?", ["√3/3", "0", "1", "-1"], 0, "cot(π/3)=√3/3."], ["Lượng giác", "Giá trị của cot(π/6) bằng?", ["√3", "0", "1", "-1"], 0, "cot(π/6)=√3."], ["Lượng giác", "Công thức đúng của sin²x+cos²x là?", ["1", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin²x+cos²x=1."], ["Lượng giác", "Công thức đúng của 1+tan²x là?", ["1/cos²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: 1+tan²x=1/cos²x."], ["Lượng giác", "Công thức đúng của sin 2x là?", ["2sin x cos x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin 2x=2sin x cos x."], ["Lượng giác", "Công thức đúng của cos 2x là?", ["1-2sin²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos 2x=1-2sin²x."], ["Lượng giác", "Công thức đúng của sin(a+b) là?", ["sin a cos b + cos a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(a+b)=sin a cos b + cos a sin b."], ["Lượng giác", "Công thức đúng của cos(a+b) là?", ["cos a cos b - sin a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos(a+b)=cos a cos b - sin a sin b."], ["Lượng giác", "Công thức đúng của sin(a-b) là?", ["sin a cos b - cos a sin b", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(a-b)=sin a cos b - cos a sin b."], ["Lượng giác", "Công thức đúng của tan(a+b) là?", ["(tan a+tan b)/(1-tan a tan b)", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: tan(a+b)=(tan a+tan b)/(1-tan a tan b)."], ["Lượng giác", "Công thức đúng của sin²x là?", ["(1-cos 2x)/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin²x=(1-cos 2x)/2."], ["Lượng giác", "Công thức đúng của cos²x là?", ["(1+cos 2x)/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cos²x=(1+cos 2x)/2."], ["Lượng giác", "Công thức đúng của sin x cos x là?", ["sin 2x/2", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin x cos x=sin 2x/2."], ["Lượng giác", "Công thức đúng của cot x là?", ["cos x/sin x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: cot x=cos x/sin x."], ["Lượng giác", "Công thức đúng của tan x là?", ["sin x/cos x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: tan x=sin x/cos x."], ["Lượng giác", "Công thức đúng của 1+cot²x là?", ["1/sin²x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: 1+cot²x=1/sin²x."], ["Lượng giác", "Công thức đúng của sin(-x) là?", ["-sin x", "0", "1", "2"], 0, "Công thức lượng giác cơ bản: sin(-x)=-sin x."], ["Cấp số cộng", "Cho cấp số cộng u₁=2, d=3. Giá trị u_5 là?", ["14", "17", "11", "17"], 0, "u_n=u₁+(n-1)d=14."], ["Cấp số cộng", "Cho cấp số cộng u₁=3, d=4. Giá trị u_6 là?", ["23", "27", "19", "27"], 0, "u_n=u₁+(n-1)d=23."], ["Cấp số cộng", "Cho cấp số cộng u₁=4, d=5. Giá trị u_7 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=5, d=6. Giá trị u_8 là?", ["47", "53", "41", "53"], 0, "u_n=u₁+(n-1)d=47."], ["Cấp số cộng", "Cho cấp số cộng u₁=6, d=7. Giá trị u_9 là?", ["62", "69", "55", "69"], 0, "u_n=u₁+(n-1)d=62."], ["Cấp số cộng", "Cho cấp số cộng u₁=7, d=3. Giá trị u_10 là?", ["34", "37", "31", "37"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=8, d=4. Giá trị u_5 là?", ["24", "28", "20", "28"], 0, "u_n=u₁+(n-1)d=24."], ["Cấp số cộng", "Cho cấp số cộng u₁=9, d=5. Giá trị u_6 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=10, d=6. Giá trị u_7 là?", ["46", "52", "40", "52"], 0, "u_n=u₁+(n-1)d=46."], ["Cấp số cộng", "Cho cấp số cộng u₁=11, d=7. Giá trị u_8 là?", ["60", "67", "53", "67"], 0, "u_n=u₁+(n-1)d=60."], ["Cấp số cộng", "Cho cấp số cộng u₁=12, d=3. Giá trị u_9 là?", ["36", "39", "33", "39"], 0, "u_n=u₁+(n-1)d=36."], ["Cấp số cộng", "Cho cấp số cộng u₁=13, d=4. Giá trị u_10 là?", ["49", "53", "45", "53"], 0, "u_n=u₁+(n-1)d=49."], ["Cấp số cộng", "Cho cấp số cộng u₁=14, d=5. Giá trị u_5 là?", ["34", "39", "29", "39"], 0, "u_n=u₁+(n-1)d=34."], ["Cấp số cộng", "Cho cấp số cộng u₁=15, d=6. Giá trị u_6 là?", ["45", "51", "39", "51"], 0, "u_n=u₁+(n-1)d=45."], ["Cấp số cộng", "Cho cấp số cộng u₁=16, d=7. Giá trị u_7 là?", ["58", "65", "51", "65"], 0, "u_n=u₁+(n-1)d=58."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=2. Giá trị u_4 là?", ["8", "16", "4", "8"], 0, "u_n=8."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=3. Tổng 5 số hạng đầu bằng?", ["242", "244", "726", "162"], 0, "S_n=242."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=4. Giá trị u_6 là?", ["3072", "12288", "768", "72"], 0, "u_n=3072."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=2. Tổng 7 số hạng đầu bằng?", ["508", "512", "1016", "256"], 0, "S_n=508."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=3. Giá trị u_8 là?", ["10935", "32805", "3645", "120"], 0, "u_n=10935."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=4. Tổng 4 số hạng đầu bằng?", ["85", "86", "340", "64"], 0, "S_n=85."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=2. Giá trị u_5 là?", ["32", "64", "16", "20"], 0, "u_n=32."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=3. Tổng 6 số hạng đầu bằng?", ["1092", "1095", "3276", "729"], 0, "S_n=1092."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=4. Giá trị u_7 là?", ["16384", "65536", "4096", "112"], 0, "u_n=16384."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=2. Tổng 8 số hạng đầu bằng?", ["1275", "1280", "2550", "640"], 0, "S_n=1275."], ["Cấp số nhân", "Cho cấp số nhân u₁=1, q=3. Giá trị u_4 là?", ["27", "81", "9", "12"], 0, "u_n=27."], ["Cấp số nhân", "Cho cấp số nhân u₁=2, q=4. Tổng 5 số hạng đầu bằng?", ["682", "684", "2728", "512"], 0, "S_n=682."], ["Cấp số nhân", "Cho cấp số nhân u₁=3, q=2. Giá trị u_6 là?", ["96", "192", "48", "36"], 0, "u_n=96."], ["Cấp số nhân", "Cho cấp số nhân u₁=4, q=3. Tổng 7 số hạng đầu bằng?", ["4372", "4376", "13116", "2916"], 0, "S_n=4372."], ["Cấp số nhân", "Cho cấp số nhân u₁=5, q=4. Giá trị u_8 là?", ["81920", "327680", "20480", "160"], 0, "u_n=81920."], ["Giới hạn dãy số", "lim n→∞ (2n+1)/n bằng?", ["2", "1", "3", "0"], 0, "Giới hạn bằng 2."], ["Giới hạn dãy số", "lim n→∞ (3n+2)/n bằng?", ["3", "2", "5", "0"], 0, "Giới hạn bằng 3."], ["Giới hạn dãy số", "lim n→∞ (4n+3)/n bằng?", ["4", "3", "7", "0"], 0, "Giới hạn bằng 4."], ["Giới hạn dãy số", "lim n→∞ (5n+4)/n bằng?", ["5", "4", "9", "0"], 0, "Giới hạn bằng 5."], ["Giới hạn dãy số", "lim n→∞ (6n+5)/n bằng?", ["6", "5", "11", "0"], 0, "Giới hạn bằng 6."], ["Giới hạn dãy số", "lim n→∞ (7n+1)/n bằng?", ["7", "1", "8", "0"], 0, "Giới hạn bằng 7."], ["Giới hạn dãy số", "lim n→∞ (2n+2)/n bằng?", ["2", "2", "4", "0"], 0, "Giới hạn bằng 2."], ["Giới hạn dãy số", "lim n→∞ (3n+3)/n bằng?", ["3", "3", "6", "0"], 0, "Giới hạn bằng 3."], ["Giới hạn dãy số", "lim n→∞ (4/n+4/n²) bằng?", ["0", "4", "4", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (5/n+5/n²) bằng?", ["0", "5", "5", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (6/n+1/n²) bằng?", ["0", "6", "1", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (7/n+2/n²) bằng?", ["0", "7", "2", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (2/n+3/n²) bằng?", ["0", "2", "3", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (3/n+4/n²) bằng?", ["0", "3", "4", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn dãy số", "lim n→∞ (4/n+5/n²) bằng?", ["0", "4", "5", "1"], 0, "Các số hạng chứa 1/n đều tiến về 0."], ["Giới hạn hàm số", "lim x→1 (1x+2) bằng?", ["3", "4", "3", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 3."], ["Giới hạn hàm số", "lim x→2 (2x+3) bằng?", ["7", "8", "5", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 7."], ["Giới hạn hàm số", "lim x→3 (3x+4) bằng?", ["13", "14", "7", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 13."], ["Giới hạn hàm số", "lim x→1 (4x+5) bằng?", ["9", "10", "9", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 9."], ["Giới hạn hàm số", "lim x→2 (5x+6) bằng?", ["16", "17", "11", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 16."], ["Giới hạn hàm số", "lim x→3 (6x+2) bằng?", ["20", "21", "8", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 20."], ["Giới hạn hàm số", "lim x→1 (1x+3) bằng?", ["4", "5", "4", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 4."], ["Giới hạn hàm số", "lim x→2 (2x+4) bằng?", ["8", "9", "6", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 8."], ["Giới hạn hàm số", "lim x→3 (3x+5) bằng?", ["14", "15", "8", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 14."], ["Giới hạn hàm số", "lim x→1 (4x+6) bằng?", ["10", "11", "10", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 10."], ["Giới hạn hàm số", "lim x→2 (5x+2) bằng?", ["12", "13", "7", "2"], 0, "Hàm đa thức liên tục nên giới hạn bằng 12."], ["Giới hạn hàm số", "lim x→3 (6x+3) bằng?", ["21", "22", "9", "3"], 0, "Hàm đa thức liên tục nên giới hạn bằng 21."], ["Giới hạn hàm số", "lim x→1 (1x+4) bằng?", ["5", "6", "5", "4"], 0, "Hàm đa thức liên tục nên giới hạn bằng 5."], ["Giới hạn hàm số", "lim x→2 (2x+5) bằng?", ["9", "10", "7", "5"], 0, "Hàm đa thức liên tục nên giới hạn bằng 9."], ["Giới hạn hàm số", "lim x→3 (3x+6) bằng?", ["15", "16", "9", "6"], 0, "Hàm đa thức liên tục nên giới hạn bằng 15."], ["Hàm số liên tục", "Với f(x)=x²+3x, giá trị f(0) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=0 được 0."], ["Hàm số liên tục", "Với f(x)=2x-5, giá trị f(3) bằng?", ["1", "2", "0", "0"], 0, "Thay x=3 được 1."], ["Hàm số liên tục", "Với f(x)=x³, giá trị f(-1) bằng?", ["-1", "0", "-2", "0"], 0, "Thay x=-1 được -1."], ["Hàm số liên tục", "Với f(x)=5x+2, giá trị f(2) bằng?", ["12", "13", "11", "0"], 0, "Thay x=2 được 12."], ["Hàm số liên tục", "Với f(x)=x²-4, giá trị f(2) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=2 được 0."], ["Hàm số liên tục", "Với f(x)=3x², giá trị f(1) bằng?", ["3", "4", "2", "0"], 0, "Thay x=1 được 3."], ["Hàm số liên tục", "Với f(x)=x²+x, giá trị f(-2) bằng?", ["2", "3", "1", "0"], 0, "Thay x=-2 được 2."], ["Hàm số liên tục", "Với f(x)=4x-1, giá trị f(0) bằng?", ["-1", "0", "-2", "0"], 0, "Thay x=0 được -1."], ["Hàm số liên tục", "Với f(x)=x³+1, giá trị f(1) bằng?", ["2", "3", "1", "0"], 0, "Thay x=1 được 2."], ["Hàm số liên tục", "Với f(x)=2x²+1, giá trị f(-1) bằng?", ["3", "4", "2", "0"], 0, "Thay x=-1 được 3."], ["Hàm số liên tục", "Với f(x)=x²+2x, giá trị f(0) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=0 được 0."], ["Hàm số liên tục", "Với f(x)=7x, giá trị f(2) bằng?", ["14", "15", "13", "0"], 0, "Thay x=2 được 14."], ["Hàm số liên tục", "Với f(x)=x³-x, giá trị f(1) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=1 được 0."], ["Hàm số liên tục", "Với f(x)=x²-1, giá trị f(-1) bằng?", ["0", "1", "-1", "0"], 0, "Thay x=-1 được 0."], ["Hàm số liên tục", "Với f(x)=3x+4, giá trị f(-2) bằng?", ["-2", "-1", "-3", "0"], 0, "Thay x=-2 được -2."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+1x là?", ["4x+1", "2x+1", "4x", "2x²+1"], 0, "f"(x)=4x+1."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+2x là?", ["6x+2", "3x+2", "6x", "3x²+2"], 0, "f"(x)=6x+2."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+3x là?", ["8x+3", "4x+3", "8x", "4x²+3"], 0, "f"(x)=8x+3."], ["Đạo hàm", "Đạo hàm của f(x)=5x²+4x là?", ["10x+4", "5x+4", "10x", "5x²+4"], 0, "f"(x)=10x+4."], ["Đạo hàm", "Đạo hàm của f(x)=6x²+1x là?", ["12x+1", "6x+1", "12x", "6x²+1"], 0, "f"(x)=12x+1."], ["Đạo hàm", "Đạo hàm của f(x)=7x²+2x là?", ["14x+2", "7x+2", "14x", "7x²+2"], 0, "f"(x)=14x+2."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+3x là?", ["4x+3", "2x+3", "4x", "2x²+3"], 0, "f"(x)=4x+3."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+4x là?", ["6x+4", "3x+4", "6x", "3x²+4"], 0, "f"(x)=6x+4."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+1x là?", ["8x+1", "4x+1", "8x", "4x²+1"], 0, "f"(x)=8x+1."], ["Đạo hàm", "Đạo hàm của f(x)=5x²+2x là?", ["10x+2", "5x+2", "10x", "5x²+2"], 0, "f"(x)=10x+2."], ["Đạo hàm", "Đạo hàm của f(x)=6x²+3x là?", ["12x+3", "6x+3", "12x", "6x²+3"], 0, "f"(x)=12x+3."], ["Đạo hàm", "Đạo hàm của f(x)=7x²+4x là?", ["14x+4", "7x+4", "14x", "7x²+4"], 0, "f"(x)=14x+4."], ["Đạo hàm", "Đạo hàm của f(x)=2x²+1x là?", ["4x+1", "2x+1", "4x", "2x²+1"], 0, "f"(x)=4x+1."], ["Đạo hàm", "Đạo hàm của f(x)=3x²+2x là?", ["6x+2", "3x+2", "6x", "3x²+2"], 0, "f"(x)=6x+2."], ["Đạo hàm", "Đạo hàm của f(x)=4x²+3x là?", ["8x+3", "4x+3", "8x", "4x²+3"], 0, "f"(x)=8x+3."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+2x, f"(1) bằng?", ["4", "5", "2", "3"], 0, "f"(1)=4."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+3x, f"(2) bằng?", ["11", "12", "8", "7"], 0, "f"(2)=11."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+4x, f"(3) bằng?", ["22", "23", "18", "13"], 0, "f"(3)=22."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+5x, f"(1) bằng?", ["13", "14", "8", "9"], 0, "f"(1)=13."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+2x, f"(2) bằng?", ["22", "23", "20", "12"], 0, "f"(2)=22."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+3x, f"(3) bằng?", ["9", "10", "6", "6"], 0, "f"(3)=9."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+4x, f"(1) bằng?", ["8", "9", "4", "6"], 0, "f"(1)=8."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+5x, f"(2) bằng?", ["17", "18", "12", "11"], 0, "f"(2)=17."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+2x, f"(3) bằng?", ["26", "27", "24", "14"], 0, "f"(3)=26."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+3x, f"(1) bằng?", ["13", "14", "10", "8"], 0, "f"(1)=13."], ["Ứng dụng đạo hàm", "Với f(x)=1x²+4x, f"(2) bằng?", ["8", "9", "4", "6"], 0, "f"(2)=8."], ["Ứng dụng đạo hàm", "Với f(x)=2x²+5x, f"(3) bằng?", ["17", "18", "12", "11"], 0, "f"(3)=17."], ["Ứng dụng đạo hàm", "Với f(x)=3x²+2x, f"(1) bằng?", ["8", "9", "6", "5"], 0, "f"(1)=8."], ["Ứng dụng đạo hàm", "Với f(x)=4x²+3x, f"(2) bằng?", ["19", "20", "16", "11"], 0, "f"(2)=19."], ["Ứng dụng đạo hàm", "Với f(x)=5x²+4x, f"(3) bằng?", ["34", "35", "30", "19"], 0, "f"(3)=34."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 2 của 8 phần tử là?", ["56", "28", "16", "64"], 0, "A(8,2)=56."], ["Tổ hợp - xác suất", "Số tổ hợp chập 3 của 9 phần tử là?", ["84", "504", "27", "12"], 0, "C(9,3)=84."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 4 của 10 phần tử là?", ["5040", "210", "40", "10000"], 0, "A(10,4)=5040."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 2 của 8 phần tử là?", ["56", "28", "16", "64"], 0, "A(8,2)=56."], ["Tổ hợp - xác suất", "Số tổ hợp chập 3 của 9 phần tử là?", ["84", "504", "27", "12"], 0, "C(9,3)=84."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 4 của 10 phần tử là?", ["5040", "210", "40", "10000"], 0, "A(10,4)=5040."], ["Tổ hợp - xác suất", "Số tổ hợp chập 2 của 5 phần tử là?", ["10", "20", "10", "7"], 0, "C(5,2)=10."], ["Tổ hợp - xác suất", "Số chỉnh hợp chập 3 của 6 phần tử là?", ["120", "20", "18", "216"], 0, "A(6,3)=120."], ["Tổ hợp - xác suất", "Số tổ hợp chập 4 của 7 phần tử là?", ["35", "840", "28", "11"], 0, "C(7,4)=35."]];
+
+const EXTRA_LANGUAGE_QUESTIONS = [
+  ...toQuestions("HSK 4", "hsk4", HSK4_QUESTIONS),
+  ...toQuestions("HSK 5", "hsk5", HSK5_QUESTIONS),
+  ...toQuestions("Tiếng Anh • Đảo ngữ", "english_inversion", EN_DAO_NGU),
+  ...toQuestions("Tiếng Anh • Thức giả định", "english_subjunctive", EN_THUC_GIA_DINH),
+  ...toQuestions("Tiếng Anh • Trạng từ rút gọn", "english_reduced", EN_TRANG_TU_RUT_GON),
+  ...toQuestions("Tiếng Anh • Mệnh đề trạng ngữ", "english_adverbial", EN_MENH_DE_TRANG_NGU),
+  ...toQuestions("Tiếng Anh • Idiom", "english_idiom", EN_IDIOM),
+  ...toQuestions("Tiếng Anh • Phrasal verb", "english_phrasal", EN_PHRASAL_VERB),
+  ...toQuestions("Tiếng Anh • Đồng nghĩa", "english_synonym", EN_DONG_NGHIA),
+  ...toQuestions("Tiếng Anh • Trái nghĩa", "english_antonym", EN_TRAI_NGHIA),
+];
+
 const QUIZ_BANK = [
   ...toQuestions("Ngữ văn", "van", VAN_QUESTIONS),
   ...toQuestions("Vật lý", "ly", LY_QUESTIONS),
   ...toQuestions("Toán", "toan10_11", TOAN_10_11_QUESTIONS),
+  ...toQuestions("Toán 11", "toan11", TOAN_11_QUESTIONS),
   ...toQuestions("Vật lý", "ly10_11", LY_10_11_QUESTIONS),
   ...toQuestions("Hóa học", "hoa", HOA_QUESTIONS),
   ...toQuestions("Sinh học", "sinh", SINH_QUESTIONS),
@@ -578,12 +922,13 @@ const QUIZ_BANK = [
   ...toQuestions("GDCD", "gdcd", GDCD_QUESTIONS),
   ...toQuestions("Đố mẹo", "meo", MEO_QUESTIONS),
   ...toQuestions("Modal Verbs", "modalverb", MODAL_VERB_QUESTIONS),
+  ...EXTRA_LANGUAGE_QUESTIONS,
 ];
 
 /* =========================================================
    CÁC KỲ THI TRONG NĂM HỌC
    5 kỳ thi × 8 môn × 5 câu = 200 câu riêng biệt.
-   Bộ đề thi độc lập với kho 380 câu ôn tập phía trên.
+   Bộ đề thi độc lập với kho ôn tập hiện có + 260 câu mới phía trên.
 ========================================================= */
 const EXAM_SUBJECTS = ["Ngữ văn", "Vật lý", "Hóa học", "Sinh học", "Lịch sử", "Địa lý", "Tiếng Anh", "GDCD"];
 
@@ -1008,6 +1353,9 @@ const FASHION = [
   { id:"hair_blue", category:"Tóc", name:"Tóc highlight xanh", icon:"💙", price:140000, desc:"Cá tính", bonus:{reputation:8} },
   { id:"hair_pink", category:"Tóc", name:"Tóc highlight hồng", icon:"🩷", price:150000, desc:"Cute", bonus:{love:8} },
 ];
+const EXTRA_FASHION=[
+{id:"shirt_lavender",category:"Áo",name:"Sơ mi lavender",icon:"💜",price:60000,desc:"Pastel",bonus:{mood:5,love:2}},{id:"hoodie_blue",category:"Áo",name:"Hoodie xanh trời",icon:"🩵",price:95000,desc:"Dịu mắt",bonus:{mood:6,energy:2}},{id:"tee_green",category:"Áo",name:"T-shirt xanh lá",icon:"💚",price:55000,desc:"Tươi mới",bonus:{friends:4}},{id:"varsity_pink",category:"Áo",name:"Varsity hồng",icon:"🎀",price:150000,desc:"Campus",bonus:{love:6,friends:4}},{id:"pants_brown",category:"Quần",name:"Quần nâu vintage",icon:"👖",price:80000,desc:"Vintage",bonus:{mood:4}},{id:"skirt_blue",category:"Quần",name:"Chân váy xanh",icon:"💙",price:85000,desc:"Fresh",bonus:{friends:4}},{id:"wide_black",category:"Quần",name:"Quần ống rộng đen",icon:"🖤",price:105000,desc:"Minimal",bonus:{reputation:5}},{id:"sneaker_green",category:"Giày",name:"Sneaker xanh mint",icon:"👟",price:125000,desc:"Fresh step",bonus:{mood:5,energy:2}},{id:"sneaker_purple",category:"Giày",name:"Sneaker tím",icon:"👟",price:135000,desc:"Color pop",bonus:{love:5}},{id:"boots_brown",category:"Giày",name:"Boot nâu",icon:"🥾",price:210000,desc:"Vintage cool",bonus:{reputation:8}},{id:"bag_green",category:"Balo",name:"Balo xanh mint",icon:"🎒",price:110000,desc:"Campus",bonus:{friends:5}},{id:"bag_laptop",category:"Balo",name:"Balo laptop",icon:"💼",price:180000,desc:"Học tập",bonus:{skill:5,study:3}},{id:"watch_sport",category:"Phụ kiện",name:"Đồng hồ thể thao",icon:"⌚",price:190000,desc:"Năng động",bonus:{energy:4,skill:3}},{id:"earbuds",category:"Phụ kiện",name:"Tai nghe không dây",icon:"🎧",price:240000,desc:"Gọn nhẹ",bonus:{mood:8,skill:3}},{id:"ring_silver",category:"Phụ kiện",name:"Nhẫn bạc",icon:"💍",price:260000,desc:"Tinh tế",bonus:{love:8,reputation:4}},{id:"cap_white",category:"Phụ kiện",name:"Mũ trắng",icon:"🧢",price:40000,desc:"Clean",bonus:{mood:3}},{id:"hair_ash",category:"Tóc",name:"Tóc nâu khói",icon:"💇",price:120000,desc:"Trendy",bonus:{reputation:5,mood:4}},{id:"hair_pink",category:"Tóc",name:"Tóc hồng pastel",icon:"💇",price:160000,desc:"Nổi bật",bonus:{love:6,reputation:4}}];
+FASHION.push(...EXTRA_FASHION);
 
 const FASHION_CATEGORIES = ["Áo", "Quần", "Giày", "Balo", "Phụ kiện", "Tóc"];
 
@@ -1326,6 +1674,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,25000);
       addStat(g,"energy",-8);
+      addStat(g,"skill",1);
       addCompetition(g,2);
     }
   },
@@ -1341,6 +1690,7 @@ const JOBS = [
       addMoney(g,30000);
       addStat(g,"energy",-12);
       addStat(g,"mood",-2);
+      addStat(g,"skill",2);
       addCompetition(g,2);
     }
   },
@@ -1371,6 +1721,7 @@ const JOBS = [
       addMoney(g,100000);
       addStat(g,"energy",-20);
       addStat(g,"reputation",3);
+      addStat(g,"skill",4);
       addCompetition(g,6);
     }
   },
@@ -1401,10 +1752,115 @@ const JOBS = [
       addMoney(g,200000);
       addStat(g,"energy",-10);
       addStat(g,"reputation",4);
+      addStat(g,"skill",5);
       addCompetition(g,8);
     }
   }
 ];
+
+/* =========================================================
+   NGHỀ MỚI — ĐI LÀM LUÔN TĂNG KỸ NĂNG
+========================================================= */
+const EXTRA_JOBS = [
+  {
+    id:"content_writer",
+    name:"Cộng tác viên viết nội dung",
+    icon:"✍️",
+    pay:70000,
+    energy:10,
+    desc:"Cần kỹ năng ≥ 60. Viết bài giúp tăng kỹ năng ngôn ngữ.",
+    can:g=>g.stats.skill>=60,
+    apply:g=>{
+      addMoney(g,70000);
+      addStat(g,"energy",-10);
+      addStat(g,"skill",5);
+      addStat(g,"reputation",2);
+      addCompetition(g,4);
+    }
+  },
+  {
+    id:"barista",
+    name:"Phụ barista",
+    icon:"☕",
+    pay:60000,
+    energy:12,
+    desc:"Cần kỹ năng ≥ 40. Rèn tốc độ và giao tiếp.",
+    can:g=>g.stats.skill>=40,
+    apply:g=>{
+      addMoney(g,60000);
+      addStat(g,"energy",-12);
+      addStat(g,"skill",3);
+      addStat(g,"friends",2);
+      addCompetition(g,3);
+    }
+  },
+  {
+    id:"social_media",
+    name:"Quản lý mạng xã hội",
+    icon:"📱",
+    pay:90000,
+    energy:10,
+    desc:"Cần kỹ năng ≥ 120 và chứng chỉ MOS.",
+    can:g=>g.stats.skill>=120 && g.certificates.includes("cert_mos"),
+    apply:g=>{
+      addMoney(g,90000);
+      addStat(g,"energy",-10);
+      addStat(g,"skill",6);
+      addStat(g,"reputation",3);
+      addCompetition(g,5);
+    }
+  },
+  {
+    id:"chinese_tutor",
+    name:"Trợ giảng tiếng Trung",
+    icon:"🇨🇳",
+    pay:130000,
+    energy:12,
+    desc:"Cần HSK 4 và kỹ năng ≥ 180.",
+    can:g=>g.certificates.includes("cert_hsk4") && g.stats.skill>=180,
+    apply:g=>{
+      addMoney(g,130000);
+      addStat(g,"energy",-12);
+      addStat(g,"skill",7);
+      addStat(g,"reputation",4);
+      addCompetition(g,6);
+    }
+  },
+  {
+    id:"chinese_translator",
+    name:"Cộng tác viên dịch Trung",
+    icon:"🀄",
+    pay:220000,
+    energy:14,
+    desc:"Cần HSK 5 và kỹ năng ≥ 300.",
+    can:g=>g.certificates.includes("cert_hsk5") && g.stats.skill>=300,
+    apply:g=>{
+      addMoney(g,220000);
+      addStat(g,"energy",-14);
+      addStat(g,"skill",9);
+      addStat(g,"reputation",5);
+      addCompetition(g,8);
+    }
+  },
+  {
+    id:"data_analyst",
+    name:"Trợ lý phân tích dữ liệu",
+    icon:"📊",
+    pay:180000,
+    energy:14,
+    desc:"Cần MOS và kỹ năng ≥ 250.",
+    can:g=>g.certificates.includes("cert_mos") && g.stats.skill>=250,
+    apply:g=>{
+      addMoney(g,180000);
+      addStat(g,"energy",-14);
+      addStat(g,"skill",8);
+      addStat(g,"reputation",4);
+      addCompetition(g,7);
+    }
+  }
+];
+
+JOBS.push(...EXTRA_JOBS);
 
 /* =========================================================
    CHỨNG CHỈ
@@ -1537,6 +1993,32 @@ const ASSETS = [
   {id:"condo",name:"Căn hộ",icon:"🏢",price:20000000,desc:"Không gian riêng",bonus:{mood:12,energy:5}},
   {id:"villa",name:"Biệt thự",icon:"🏡",price:60000000,desc:"Tài sản mơ ước",bonus:{mood:18,reputation:15}},
 ];
+const EXTRA_ASSETS=[{id:"laptop",name:"Laptop học tập",icon:"💻",price:3500000,desc:"Học và làm việc",bonus:{skill:15,study:6}},{id:"tablet",name:"Máy tính bảng",icon:"📱",price:2200000,desc:"Ghi chú",bonus:{study:8,mood:4}},{id:"camera",name:"Máy ảnh",icon:"📷",price:2800000,desc:"Sáng tạo",bonus:{skill:10,reputation:5}},{id:"motorbike_premium",name:"Xe tay ga premium",icon:"🛵",price:1500000,desc:"Di chuyển",bonus:{energy:8,reputation:5}},{id:"studio",name:"Phòng studio",icon:"🎙️",price:12000000,desc:"Không gian sáng tạo",bonus:{skill:20,mood:10}},{id:"mini_library",name:"Tủ sách lớn",icon:"📚",price:1800000,desc:"Kho tri thức",bonus:{study:12,skill:8}},{id:"gaming_pc",name:"PC gaming",icon:"🖥️",price:6500000,desc:"Công nghệ",bonus:{mood:12,skill:12}},{id:"coffee_shop",name:"Góc cà phê riêng",icon:"☕",price:9000000,desc:"Thư giãn",bonus:{mood:15,friends:8}}];
+ASSETS.push(...EXTRA_ASSETS);
+
+const MORE_ASSETS = [
+  {id:"smartwatch",name:"Smartwatch",icon:"⌚",price:1800000,desc:"Theo dõi lịch học và vận động",bonus:{energy:6,skill:5}},
+  {id:"headphones",name:"Tai nghe chống ồn",icon:"🎧",price:2400000,desc:"Tập trung học tập",bonus:{study:10,mood:6}},
+  {id:"e_reader",name:"Máy đọc sách",icon:"📖",price:3200000,desc:"Thư viện di động",bonus:{study:14,knowledge:10}},
+  {id:"mechanical_keyboard",name:"Bàn phím cơ",icon:"⌨️",price:2800000,desc:"Góc học tập xịn hơn",bonus:{skill:8,mood:5}},
+  {id:"desk",name:"Bàn học thông minh",icon:"🪑",price:4500000,desc:"Tối ưu góc học tập",bonus:{study:12,skill:10}},
+  {id:"bookshelf",name:"Kệ sách mini",icon:"🗄️",price:2500000,desc:"Mở rộng kho sách",bonus:{study:10,knowledge:8}},
+  {id:"bicycle_pro",name:"Xe đạp thể thao",icon:"🚴",price:4200000,desc:"Di chuyển và rèn luyện",bonus:{energy:10,reputation:5}},
+  {id:"electric_scooter",name:"Xe máy điện",icon:"🛴",price:12000000,desc:"Di chuyển hiện đại",bonus:{energy:12,reputation:8}},
+  {id:"compact_car",name:"Ô tô gia đình",icon:"🚙",price:28000000,desc:"Tiện nghi hằng ngày",bonus:{energy:15,reputation:10,mood:8}},
+  {id:"sports_car",name:"Xe thể thao",icon:"🏁",price:85000000,desc:"Tài sản cực hiếm",bonus:{reputation:22,mood:15}},
+  {id:"penthouse",name:"Penthouse",icon:"🌆",price:120000000,desc:"Không gian sống cao cấp",bonus:{mood:25,reputation:22,energy:8}},
+  {id:"beach_house",name:"Nhà nghỉ ven biển",icon:"🏖️",price:160000000,desc:"Nghỉ dưỡng cuối tuần",bonus:{mood:30,reputation:18}},
+  {id:"office_room",name:"Văn phòng riêng",icon:"🏢",price:45000000,desc:"Không gian làm việc chuyên nghiệp",bonus:{skill:22,reputation:12}},
+  {id:"co_working",name:"Phòng co-working",icon:"🧑‍💻",price:18000000,desc:"Môi trường học và làm việc",bonus:{skill:15,friends:12}},
+  {id:"mini_cafe",name:"Quán cà phê mini",icon:"☕",price:55000000,desc:"Tài sản kinh doanh",bonus:{money:0,reputation:15,friends:15}},
+  {id:"online_store",name:"Cửa hàng online",icon:"🛒",price:30000000,desc:"Kinh doanh nhỏ",bonus:{reputation:12,skill:18}},
+  {id:"investment_fund",name:"Danh mục đầu tư",icon:"📊",price:75000000,desc:"Tài sản tài chính",bonus:{knowledge:20,reputation:20}},
+  {id:"gold_collection",name:"Bộ sưu tập vàng",icon:"🥇",price:95000000,desc:"Tài sản tích lũy",bonus:{reputation:18,mood:10}},
+  {id:"art_collection",name:"Bộ sưu tập nghệ thuật",icon:"🖼️",price:68000000,desc:"Đồ sưu tầm giá trị",bonus:{mood:18,reputation:20}},
+  {id:"private_library",name:"Thư viện riêng",icon:"🏛️",price:90000000,desc:"Không gian tri thức cá nhân",bonus:{study:20,skill:20,knowledge:25}}
+];
+ASSETS.push(...MORE_ASSETS);
 
 /* =========================================================
    TITLE
@@ -1547,7 +2029,7 @@ const TITLES = [
   {id:"diligent",name:"Người Chăm Chỉ",icon:"📚",desc:"8 lần học",condition:g=>g.studyActions>=8},
   {id:"scholar",name:"Học Bá",icon:"🏆",desc:"Kiến thức ≥ 85",condition:g=>g.stats.study>=85},
   {id:"social",name:"Tâm Điểm Lớp",icon:"🤝",desc:"Bạn bè ≥ 85",condition:g=>g.stats.friends>=85},
-  {id:"skill",name:"Đa Năng",icon:"🛠️",desc:"Kỹ năng ≥ 80",condition:g=>g.stats.skill>=80},
+  {id:"skill",name:"Đa Năng",icon:"🛠️",desc:"Kỹ năng ≥ 400",condition:g=>g.stats.skill>=400},
   {id:"love",name:"Thanh Xuân Có Đôi",icon:"💗",desc:"Tình cảm ≥ 80",condition:g=>g.stats.love>=80},
   {id:"certificate",name:"Bộ Sưu Tập Chứng Chỉ",icon:"🎓",desc:"Có ≥ 3 chứng chỉ",condition:g=>g.certificates.length>=3},
   {id:"fashion",name:"Fashionista Học Đường",icon:"👗",desc:"Có ≥ 15 món thời trang",condition:g=>g.wardrobe.length>=15},
@@ -1556,6 +2038,8 @@ const TITLES = [
   {id:"competition",name:"Ngôi Sao Thi Đua",icon:"🌟",desc:"≥ 100 điểm thi đua",condition:g=>g.competitionPoints>=100},
   {id:"legend",name:"Thanh Xuân Rực Rỡ",icon:"✨",desc:"Hoàn thành hành trình",condition:g=>g.isGameOver},
 ];
+TITLES.push({id:"asset_tycoon",name:"Ông Trùm Tài Sản",icon:"🏦",desc:"Sở hữu ≥ 15 tài sản",condition:g=>g.assets.length>=15},{id:"property_king",name:"Vua Bất Động Sản",icon:"🏙️",desc:"Sở hữu ≥ 5 tài sản nhà ở",condition:g=>g.assets.filter(id=>["condo","villa","penthouse","beach_house"].includes(id)).length>=5},{id:"tech_collector",name:"Tín Đồ Công Nghệ",icon:"💻",desc:"Sở hữu ≥ 6 tài sản công nghệ",condition:g=>g.assets.filter(id=>["laptop","tablet","camera","gaming_pc","smartwatch","headphones","e_reader","mechanical_keyboard"].includes(id)).length>=6},{id:"luxury_life",name:"Cuộc Sống Xa Hoa",icon:"💎",desc:"Sở hữu ≥ 3 tài sản cao cấp",condition:g=>g.assets.filter(id=>["sports_car","penthouse","beach_house","investment_fund","gold_collection","art_collection","private_library"].includes(id)).length>=3},{id:"business_owner",name:"Chủ Doanh Nghiệp Trẻ",icon:"🏪",desc:"Sở hữu quán cà phê hoặc cửa hàng online",condition:g=>g.assets.includes("mini_cafe")||g.assets.includes("online_store")});
+TITLES.push({id:"math_master",name:"Chiến Thần Toán 11",icon:"🧮",desc:"Đã làm ≥ 30 câu Toán 11",condition:g=>g.quizHistory.filter(id=>String(id).startsWith("toan11")).length>=30},{id:"quiz_marathon",name:"Máy Cày Quiz",icon:"🔥",desc:"Đã làm ≥ 100 câu",condition:g=>g.quizHistory.length>=100},{id:"knowledge_hero",name:"Kho Báu Tri Thức",icon:"🧠",desc:"Tri thức ≥ 200",condition:g=>g.knowledgePoints>=200},{id:"achievement_hunter",name:"Thợ Săn Thành Tích",icon:"🏅",desc:"Thành tích ≥ 200",condition:g=>g.achievementPoints>=200},{id:"shopaholic",name:"Đại Gia Học Đường",icon:"🛍️",desc:"Có ≥ 30 món thời trang",condition:g=>g.wardrobe.length>=30},{id:"collector",name:"Nhà Sưu Tầm",icon:"🎁",desc:"Có ≥ 8 tài sản",condition:g=>g.assets.length>=15},{id:"career_climber",name:"Bậc Thầy Sự Nghiệp",icon:"💼",desc:"Kỹ năng ≥ 450 và ≥ 5 chứng chỉ",condition:g=>g.stats.skill>=450&&g.certificates.length>=5},{id:"language_lover",name:"Polyglot",icon:"🌏",desc:"Có HSK 4 và HSK 5",condition:g=>g.certificates.includes("cert_hsk4")&&g.certificates.includes("cert_hsk5")},{id:"english_pro",name:"English Pro",icon:"🇬🇧",desc:"TOEIC và kỹ năng ≥ 350",condition:g=>g.certificates.includes("cert_toeic")&&g.stats.skill>=350},{id:"worker",name:"Người Ham Làm",icon:"⚒️",desc:"Làm việc ≥ 15 lần",condition:g=>g.jobActions>=15},{id:"fashion_star",name:"Ngôi Sao Phong Cách",icon:"✨",desc:"Danh tiếng ≥ 90 và ≥ 20 món",condition:g=>g.stats.reputation>=90&&g.wardrobe.length>=20},{id:"rich_student",name:"Học Sinh Có Của",icon:"💰",desc:"Có ≥ 5.000.000đ",condition:g=>g.stats.money>=5000000});
 
 /* =========================================================
    SAVE / LOAD
@@ -1627,7 +2111,7 @@ function createInitialState(){
     version:17,
     isGameOver:false,
     day:1,
-    totalDays:45,
+    totalDays:100,
     timeIndex:0,
     location:"class",
     playerName:"",
@@ -1677,6 +2161,8 @@ function createInitialState(){
     diaryEntries:[],
 
     competitionPoints:0,
+    achievementPoints:0,
+    knowledgePoints:0,
 
     npcCompetition:{
       lan:42,
@@ -1715,7 +2201,11 @@ function createInitialState(){
     lastEventId:null,
     dayStart:null,
 
-    selectedTitle:"starter"
+    selectedTitle:"starter",
+
+    // Chống lặp câu hỏi: lưu ID các câu gần đây và khóa quiz nhanh 1 lần/ngày.
+    quizHistory:[],
+    dailyQuizDone:false
   };
 
   const ev = pickDailyEvent(null);
@@ -1743,6 +2233,7 @@ function normalizeState(raw){
     wardrobe:Array.isArray(raw?.wardrobe) ? raw.wardrobe : base.wardrobe,
     bag:Array.isArray(raw?.bag) ? raw.bag : base.bag,
     diaryEntries:Array.isArray(raw?.diaryEntries) ? raw.diaryEntries : [],
+    quizHistory:Array.isArray(raw?.quizHistory) ? raw.quizHistory : [],
     npcCompetition:{
       ...base.npcCompetition,
       ...(raw?.npcCompetition || {})
@@ -1776,8 +2267,14 @@ function normalizeState(raw){
   };
 
   g.playerName = String(g.playerName || "").trim().slice(0,20);
+  g.achievementPoints = Math.max(0, Math.round(Number(g.achievementPoints) || 0));
+  g.knowledgePoints = Math.max(0, Math.round(Number(g.knowledgePoints) || 0));
+  g.dailyQuizDone = Boolean(g.dailyQuizDone);
+  g.quizHistory = Array.isArray(g.quizHistory)
+    ? g.quizHistory.filter(Boolean).slice(-300)
+    : [];
 
-  g.day = Math.max(1, Math.min(g.totalDays || 45, Number(g.day) || 1));
+  g.day = Math.max(1, Math.min(g.totalDays || 100, Number(g.day) || 1));
   g.timeIndex = Math.max(0, Math.min(TIME_SLOTS.length - 1, Number(g.timeIndex) || 0));
   const legacyCount = g.mainActivityCount == null
     ? (g.mainActivityUsed ? 1 : 0)
@@ -1800,7 +2297,8 @@ function normalizeState(raw){
     "reputation",
     "skill"
   ]){
-    g.stats[key] = clamp(g.stats[key]);
+    const max = key === "skill" ? 500 : 100;
+    g.stats[key] = Math.max(0, Math.min(max, Number(g.stats[key]) || 0));
   }
 
   g.stats.money = Math.max(0, Number(g.stats.money) || 0);
@@ -1837,7 +2335,7 @@ function Modal({title,onClose,children,wide=false}){
   );
 }
 
-function StatBar({icon,label,value}){
+function StatBar({icon,label,value,max=100}){
   return (
     <div className="stat">
       <div className="stat-top">
@@ -1847,7 +2345,7 @@ function StatBar({icon,label,value}){
       <div className="bar">
         <div
           className="bar-fill"
-          style={{width:`${clamp(value)}%`}}
+          style={{width:`${Math.max(0,Math.min(100,(Number(value)||0)/max*100))}%`}}
         />
       </div>
     </div>
@@ -2297,6 +2795,7 @@ function App(){
       next.timeIndex = 0;
 
       next.dailyOralCheckDone = false;
+      next.dailyQuizDone = false;
       next.mainActivityUsed = false;
       next.mainActivityLabel = null;
       next.mainActivityCount = 0;
@@ -2378,9 +2877,8 @@ function App(){
   ----------------------------------------- */
 
   useEffect(()=>{
-    // Quiz 5 câu và kiểm tra miệng là các hoạt động cần tập trung:
-    // thời gian của mốc sẽ tạm dừng trong suốt lúc làm bài.
-    const quizTimePaused = overlay === "quiz" || overlay === "oral" || overlay === "nameSetup";
+    // Quiz thường không dừng đồng hồ. Chỉ các kỳ kiểm tra chính thức mới khóa thời gian.
+    const quizTimePaused = overlay === "exam" || overlay === "nameSetup";
 
     if(
       !autoTime ||
@@ -2393,7 +2891,7 @@ function App(){
     const timer = setInterval(()=>{
       setSecondsLeft(prev=>{
         // Bảo vệ thêm cho tick đã xếp hàng ngay lúc modal vừa mở.
-        if(overlay === "quiz" || overlay === "oral" || overlay === "nameSetup") return prev;
+        if(overlay === "exam" || overlay === "nameSetup") return prev;
 
         if(prev > 1){
           return prev - 1;
@@ -2466,15 +2964,30 @@ function App(){
       return;
     }
 
-    const questions =
-      mode==="cert"
-        ? cert.questions.map((q,i)=>({
-            ...q,
-            id:`${cert.id}-${i}`
-          }))
-        : mode==="exam"
-        ? getExamQuestions(exam)
-        : shuffle(QUIZ_BANK).slice(0,mode==="oral" ? 3 : 5);
+    let questions;
+
+    if(mode==="cert"){
+      questions = cert.questions.map((q,i)=>({
+        ...q,
+        id:`${cert.id}-${i}`
+      }));
+    }else if(mode==="exam"){
+      questions = getExamQuestions(exam);
+    }else if(mode==="oral"){
+      const recent = new Set(game.quizHistory || []);
+      const fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
+      questions = shuffle(fresh.length >= 3 ? fresh : QUIZ_BANK).slice(0,3);
+    }else{
+      if(game.dailyQuizDone){
+        setToast("📚 Quiz hôm nay đã hoàn thành. Sang ngày mới để nhận 10 câu mới.");
+        return;
+      }
+
+      const recent = new Set(game.quizHistory || []);
+      let fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
+      if(fresh.length < 10) fresh = QUIZ_BANK;
+      questions = shuffle(fresh).slice(0,10);
+    }
 
     if(!questions.length){
       setToast("❌ Không tìm thấy bộ đề.");
@@ -2524,7 +3037,14 @@ function App(){
 
     setQuizFeedback(null);
     setOverlay(mode==="exam" ? "exam" : mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
-  },[canDoMainActivity,game.dailyOralCheckDone,game.examResults,updateGame]);
+  },[
+    canDoMainActivity,
+    game.dailyOralCheckDone,
+    game.dailyQuizDone,
+    game.quizHistory,
+    game.examResults,
+    updateGame
+  ]);
 
   /* -----------------------------------------
      TỰ ĐỘNG MỞ KỲ THI TẠI ĐÚNG MỐC
@@ -2551,12 +3071,22 @@ function App(){
     const correct = choiceIndex === question.answer;
 
     if(correct){
-      updateGame(g=>addCompetition(g,5));
+      updateGame(g=>{
+        addAchievement(g,5);
+        addKnowledge(g,5);
+      });
       beep(760,.08);
     }else{
       beep(180,.13);
-      updateGame(g=>addStat(g,"study",-2));
+      updateGame(g=>{
+        addAchievement(g,-3);
+        addKnowledge(g,-3);
+      });
     }
+
+    updateGame(g=>{
+      g.quizHistory = [...(g.quizHistory || []), question.id].filter(Boolean).slice(-300);
+    });
 
     setQuizFeedback({
       correct,
@@ -2603,18 +3133,21 @@ function App(){
 
       if(quiz.mode==="quick"){
         updateGame(g=>{
-          if(finalCorrect===5){
+          g.dailyQuizDone = true;
+          if(finalCorrect===10){
             addStat(g,"study",5);
             addStat(g,"skill",2);
-          }else if(finalCorrect===4){
-            addStat(g,"study",3);
-          }else if(finalCorrect===3){
+          }else if(finalCorrect>=8){
+            addStat(g,"study",4);
+          }else if(finalCorrect>=6){
+            addStat(g,"study",2);
+          }else if(finalCorrect>=4){
             addStat(g,"study",1);
           }
         });
 
         setToast(
-          `📚 Hoàn thành quiz: ${finalCorrect}/5 câu đúng`
+          `📚 Hoàn thành quiz: ${finalCorrect}/10 câu đúng`
         );
       }
 
@@ -2753,7 +3286,9 @@ function App(){
       addMoney(g,-asset.price);
 
       Object.entries(asset.bonus || {}).forEach(([key,val])=>{
-        addStat(g,key,val);
+        if(key === "knowledge") addKnowledge(g,val);
+        else if(key === "money") addMoney(g,val);
+        else addStat(g,key,val);
       });
     });
 
@@ -2980,8 +3515,8 @@ function App(){
   const quickActivities = [
     {
       icon:"📚",
-      title:"Quiz 5 câu",
-      desc:"Ôn tập 380 câu",
+      title:"Quiz 10 câu",
+      desc:"Ôn tập • chống lặp câu",
       action:()=>startQuiz("quick")
     },
     {
@@ -3230,7 +3765,8 @@ function App(){
         icon:"🍔",
         price:35000,
         effect:{energy:25,mood:5}
-      }
+      },
+      {name:"Mì cay",icon:"🍜",price:40000,effect:{energy:22,mood:7}},{name:"Cơm gà",icon:"🍗",price:45000,effect:{energy:28,study:2}},{name:"Pizza",icon:"🍕",price:55000,effect:{energy:25,mood:10}},{name:"Sinh tố",icon:"🥤",price:28000,effect:{energy:15,mood:6}},{name:"Bánh mì",icon:"🥖",price:18000,effect:{energy:14}},{name:"Matcha latte",icon:"🍵",price:38000,effect:{mood:8,study:3}},{name:"Cơm cuộn",icon:"🍙",price:32000,effect:{energy:18,study:2}},{name:"Kem",icon:"🍦",price:22000,effect:{mood:12}}
     ];
 
     return (
@@ -3640,8 +4176,8 @@ function App(){
           }`}>
             <b>
               {quizFeedback.correct
-                ? "✅ Chính xác! +5 điểm thi đua"
-                : "❌ Sai! Kiến thức -2"}
+                ? "✅ Chính xác! +5 thành tích • +5 tri thức"
+                : "❌ Sai! -3 thành tích • -3 tri thức"}
             </b>
 
             <p>{quizFeedback.explanation}</p>
@@ -3860,7 +4396,7 @@ function App(){
             </p>
             <p>
               Mỗi kỳ có <b>5 câu cho 8 môn học = 40 câu</b>. Mỗi kỳ dùng một bộ đề riêng,
-              không lấy lại câu trong kho 380 câu ôn tập. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
+              không lấy lại câu trong kho ôn tập hiện có + 260 câu mới. Trong lúc thi, <b>đồng hồ tạm dừng</b> và chạy lại sau khi hoàn thành.
             </p>
           </div>
 
@@ -3881,9 +4417,9 @@ function App(){
           <div className="guide-card">
             <h3>📚 4. Học tập</h3>
             <p>
-              <b>Quiz 5 câu</b> giúp tăng kiến thức và điểm thi đua.
-              Mỗi câu đúng được <b>+5 điểm thi đua</b>; mỗi câu sai bị
-              <b> -2 kiến thức</b>.
+              <b>Quiz 10 câu/ngày</b> giúp tăng thành tích và tri thức.
+              Mỗi câu đúng được <b>+5 thành tích +5 tri thức</b>; mỗi câu sai bị
+              <b>-3 thành tích -3 tri thức</b>. Câu đã làm gần đây sẽ được hạn chế lặp lại.
             </p>
             <p>
               <b>Kiểm tra miệng</b> có thể thực hiện 1 lần mỗi ngày.
@@ -3904,7 +4440,10 @@ function App(){
           <div className="guide-card">
             <h3>🛠️ 6. Kỹ năng & ⚡ Năng lượng</h3>
             <p>
-              <b>Kỹ năng</b> và <b>Năng lượng</b> là 2 chỉ số khác nhau.
+              <b>Kỹ năng</b> tối đa <b>500</b> và <b>Năng lượng</b> là 2 chỉ số khác nhau.
+            </p>
+            <p>
+              Mỗi lần đi làm đều tăng kỹ năng; nghề càng cao cấp cho càng nhiều kỹ năng.
             </p>
             <p>
               Kỹ năng giúp mở một số công việc; Năng lượng bị tiêu hao khi
@@ -4040,7 +4579,11 @@ function App(){
           <StatBar icon="🤝" label="Bạn bè" value={game.stats.friends}/>
           <StatBar icon="💗" label="Tình cảm" value={game.stats.love}/>
           <StatBar icon="⭐" label="Danh tiếng" value={game.stats.reputation}/>
-          <StatBar icon="🛠️" label="Kỹ năng" value={game.stats.skill}/>
+          <StatBar icon="🛠️" label="Kỹ năng" value={game.stats.skill} max={500}/>
+          <div className="profile-points">
+            <span>🏅 Thành tích: <b>{game.achievementPoints || 0}</b></span>
+            <span>🧠 Tri thức: <b>{game.knowledgePoints || 0}</b></span>
+          </div>
         </div>
       </div>
     </Modal>
