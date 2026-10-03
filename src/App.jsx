@@ -3250,13 +3250,13 @@ function createInitialState(){
     dailyOralCheckCount:0
   };
 
-  const events = pickDailyEvents([],3);
+  const events = pickDailyEvents([],1);
   g.dayStart = snapshotDay(g);
   g.dailyEvents = events.map(eventData);
   g.dailyEventIndex = 0;
   g.dailyEventResolved = false;
   g.dailyEvent = g.dailyEvents[0] || null;
-  g.lastEventId = events.at(-1)?.id || null;
+  g.lastEventId = events[0]?.id || null;
 
   return g;
 }
@@ -3342,6 +3342,14 @@ function normalizeState(raw){
   g.mainActivityUsed = g.mainActivityCount >= 2;
   g.mainActivityLabel = g.mainActivityLabels.join(" • ");
   g.mainActivityLabel = g.mainActivityLabel || null;
+
+  // Giữ nguyên save hiện tại, nhưng Season 2 chỉ dùng 1 sự kiện/ngày.
+  // Nếu save cũ đang có nhiều event, giữ đúng event hiện tại và không reset tiến độ.
+  if(!g.dailyEvent && Array.isArray(g.dailyEvents) && g.dailyEvents.length){
+    g.dailyEvent = g.dailyEvents[g.dailyEventIndex || 0] || g.dailyEvents[0];
+  }
+  g.dailyEvents = g.dailyEvent ? [g.dailyEvent] : [];
+  g.dailyEventIndex = 0;
 
   for(const key of [
     "hp",
@@ -3870,13 +3878,13 @@ function App(){
         today:0
       }));
 
-      const events = pickDailyEvents(next.lastEventId ? [next.lastEventId] : [],3);
+      const events = pickDailyEvents(next.lastEventId ? [next.lastEventId] : [],1);
       next.dayStart = snapshotDay(next);
       next.dailyEvents = events.map(eventData);
       next.dailyEventIndex = 0;
       next.dailyEventResolved = false;
       next.dailyEvent = next.dailyEvents[0] || null;
-      next.lastEventId = events.at(-1)?.id || null;
+      next.lastEventId = events[0]?.id || null;
 
       return normalizeState(next);
     });
@@ -3951,20 +3959,6 @@ function App(){
     }
   },[game.mainActivityCount,game.isGameOver,advanceTime]);
 
-  useEffect(()=>{
-    if(!game.dailyEventResolved || !game.dailyEvents?.length || game.isGameOver) return;
-    if((game.dailyEventIndex||0) >= game.dailyEvents.length-1) return;
-    const id=setTimeout(()=>{
-      updateGame(g=>{
-        const nextIndex=(g.dailyEventIndex||0)+1;
-        g.dailyEventIndex=nextIndex;
-        g.dailyEventResolved=false;
-        g.dailyEvent=g.dailyEvents[nextIndex] || null;
-      });
-    },450);
-    return ()=>clearTimeout(id);
-  },[game.dailyEventResolved,game.dailyEventIndex,game.dailyEvents,game.isGameOver,updateGame]);
-
   /* -----------------------------------------
      DAY CHANGE TOAST
   ----------------------------------------- */
@@ -4014,6 +4008,10 @@ function App(){
       }
     }
 
+    if(!canDoMainActivity()){
+      return;
+    }
+
     if(mode==="exam") {
       if(!exam) {
         setToast("📝 Không xác định được kỳ thi.");
@@ -4024,8 +4022,6 @@ function App(){
         setToast(`✅ ${exam.title} đã hoàn thành.`);
         return;
       }
-    }else if(mode!=="quick" && mode!=="oral" && !canDoMainActivity()){
-      return;
     }
 
     let questions;
@@ -4054,11 +4050,13 @@ function App(){
     }
 
     updateGame(g=>{
-      if(mode!=="quick" && mode!=="oral"){
+      {
         g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
         g.mainActivityLabel =
+          mode==="quick" ? "📚 Quiz 10 câu" :
+          mode==="oral" ? "🧑‍🏫 Kiểm tra miệng" :
           mode==="exam" ? `📝 ${exam.title}` :
-          mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
+          mode==="cert" ? `🎓 Thi ${cert?.name || "chứng chỉ"}` :
           "Hoạt động";
         g.mainActivityLabels = [
           ...(g.mainActivityLabels || []),
@@ -4752,7 +4750,7 @@ function App(){
       <div className="event-card">
         <div className="event-icon">{game.dailyEvent?.icon || "🎲"}</div>
         <div style={{flex:1}}>
-          <div className="event-title">🎲 Sự kiện ngẫu nhiên {Math.min((game.dailyEventIndex||0)+1,3)}/3</div>
+          <div className="event-title">🎲 Sự kiện ngẫu nhiên hôm nay</div>
           <b>{game.dailyEvent?.title || "Ngày mới"}</b>
           <div className="muted">{game.dailyEvent?.text}</div>
           {game.dailyEvent?.resolved ? (
