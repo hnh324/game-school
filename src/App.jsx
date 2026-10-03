@@ -2205,7 +2205,9 @@ function createInitialState(){
 
     // Chống lặp câu hỏi: lưu ID các câu gần đây và khóa quiz nhanh 1 lần/ngày.
     quizHistory:[],
-    dailyQuizDone:false
+    dailyQuizDone:false,
+    dailyQuizCount:0,
+    dailyOralCheckCount:0
   };
 
   const ev = pickDailyEvent(null);
@@ -2269,7 +2271,10 @@ function normalizeState(raw){
   g.playerName = String(g.playerName || "").trim().slice(0,20);
   g.achievementPoints = Math.max(0, Math.round(Number(g.achievementPoints) || 0));
   g.knowledgePoints = Math.max(0, Math.round(Number(g.knowledgePoints) || 0));
-  g.dailyQuizDone = Boolean(g.dailyQuizDone);
+  g.dailyQuizCount = Math.max(0, Math.min(7, Number(g.dailyQuizCount) || (g.dailyQuizDone ? 1 : 0)));
+  g.dailyOralCheckCount = Math.max(0, Math.min(4, Number(g.dailyOralCheckCount) || (g.dailyOralCheckDone ? 1 : 0)));
+  g.dailyQuizDone = g.dailyQuizCount >= 7;
+  g.dailyOralCheckDone = g.dailyOralCheckCount >= 4;
   g.quizHistory = Array.isArray(g.quizHistory)
     ? g.quizHistory.filter(Boolean).slice(-300)
     : [];
@@ -2796,6 +2801,8 @@ function App(){
 
       next.dailyOralCheckDone = false;
       next.dailyQuizDone = false;
+      next.dailyQuizCount = 0;
+      next.dailyOralCheckCount = 0;
       next.mainActivityUsed = false;
       next.mainActivityLabel = null;
       next.mainActivityCount = 0;
@@ -2945,6 +2952,22 @@ function App(){
   ========================================================= */
 
   const startQuiz = useCallback((mode="quick",cert=null,exam=null)=>{
+    if(mode==="quick") {
+      const count = Number(game.dailyQuizCount) || 0;
+      if(count >= 7) {
+        setToast("📚 Bạn đã dùng hết 7 lượt quiz hôm nay. Sang ngày mới để làm tiếp.");
+        return;
+      }
+    }
+
+    if(mode==="oral") {
+      const count = Number(game.dailyOralCheckCount) || 0;
+      if(count >= 4) {
+        setToast("🧑‍🏫 Bạn đã dùng hết 4 lượt kiểm tra miệng hôm nay. Sang ngày mới để làm tiếp.");
+        return;
+      }
+    }
+
     if(mode==="exam") {
       if(!exam) {
         setToast("📝 Không xác định được kỳ thi.");
@@ -2955,12 +2978,7 @@ function App(){
         setToast(`✅ ${exam.title} đã hoàn thành.`);
         return;
       }
-    }else if(!canDoMainActivity()){
-      return;
-    }
-
-    if(mode==="oral" && game.dailyOralCheckDone){
-      setToast("🧑‍🏫 Bạn đã hoàn thành kiểm tra miệng hôm nay.");
+    }else if(mode!=="quick" && mode!=="oral" && !canDoMainActivity()){
       return;
     }
 
@@ -2978,11 +2996,6 @@ function App(){
       const fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
       questions = shuffle(fresh.length >= 3 ? fresh : QUIZ_BANK).slice(0,3);
     }else{
-      if(game.dailyQuizDone){
-        setToast("📚 Quiz hôm nay đã hoàn thành. Sang ngày mới để nhận 10 câu mới.");
-        return;
-      }
-
       const recent = new Set(game.quizHistory || []);
       let fresh = QUIZ_BANK.filter(q=>!recent.has(q.id));
       if(fresh.length < 10) fresh = QUIZ_BANK;
@@ -2995,24 +3008,28 @@ function App(){
     }
 
     updateGame(g=>{
-      g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
-      g.mainActivityLabel =
-        mode==="exam" ? `📝 ${exam.title}` :
-        mode==="oral" ? "Kiểm tra miệng" :
-        mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
-        "Quiz nhanh";
-      g.mainActivityLabels = [
-        ...(g.mainActivityLabels || []),
-        g.mainActivityLabel
-      ].slice(0,2);
-      g.mainActivityUsed = g.mainActivityCount >= 2;
+      if(mode!=="quick" && mode!=="oral"){
+        g.mainActivityCount = Math.min(2, (g.mainActivityCount || 0) + 1);
+        g.mainActivityLabel =
+          mode==="exam" ? `📝 ${exam.title}` :
+          mode==="cert" ? `Thi ${cert?.name || "chứng chỉ"}` :
+          "Hoạt động";
+        g.mainActivityLabels = [
+          ...(g.mainActivityLabels || []),
+          g.mainActivityLabel
+        ].slice(0,2);
+        g.mainActivityUsed = g.mainActivityCount >= 2;
+      }
 
       if(mode==="oral"){
-        g.dailyOralCheckDone = true;
+        g.dailyOralCheckCount = Math.min(4, (g.dailyOralCheckCount || 0) + 1);
+        g.dailyOralCheckDone = g.dailyOralCheckCount >= 4;
         g.oralChecksDone++;
       }
 
       if(mode==="quick"){
+        g.dailyQuizCount = Math.min(7, (g.dailyQuizCount || 0) + 1);
+        g.dailyQuizDone = g.dailyQuizCount >= 7;
         g.studyActions++;
         addStat(g,"energy",-3);
       }
@@ -3039,8 +3056,8 @@ function App(){
     setOverlay(mode==="exam" ? "exam" : mode==="oral" ? "oral" : mode==="cert" ? "certExam" : "quiz");
   },[
     canDoMainActivity,
-    game.dailyOralCheckDone,
-    game.dailyQuizDone,
+    game.dailyOralCheckCount,
+    game.dailyQuizCount,
     game.quizHistory,
     game.examResults,
     updateGame
@@ -3133,7 +3150,7 @@ function App(){
 
       if(quiz.mode==="quick"){
         updateGame(g=>{
-          g.dailyQuizDone = true;
+          g.dailyQuizDone = (g.dailyQuizCount || 0) >= 7;
           if(finalCorrect===10){
             addStat(g,"study",5);
             addStat(g,"skill",2);
@@ -3516,13 +3533,13 @@ function App(){
     {
       icon:"📚",
       title:"Quiz 10 câu",
-      desc:"Ôn tập • chống lặp câu",
+      desc:"Tối đa 7 lượt/ngày • chống lặp câu",
       action:()=>startQuiz("quick")
     },
     {
       icon:"🧑‍🏫",
       title:"Kiểm tra miệng",
-      desc:"3 câu / ngày",
+      desc:"3 câu / lượt • tối đa 4 lượt/ngày",
       action:()=>startQuiz("oral"),
       disabled:false
     },
