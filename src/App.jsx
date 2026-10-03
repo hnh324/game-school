@@ -25,7 +25,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 const GAME_SEASON = "season_2";
 const GAME_VERSION = 27;
 const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_season_2";
-const SLOT_SECONDS = 30;
 
 /* =========================================================
    MULTIPLAYER ONLINE — SUPABASE
@@ -1457,187 +1456,1222 @@ const NPCS = [
 
 const DAILY_EVENTS = [
   {
-    id:"teacher",
-    icon:"🧑‍🏫",
-    title:"Được giáo viên khen",
-    text:"Bạn phát biểu rất tốt trong lớp.",
-    result:"Kiến thức +3 • Danh tiếng +5 • Thi đua +4",
-    apply:g=>{
-      addStat(g,"study",3);
-      addStat(g,"reputation",5);
-      addCompetition(g,4);
-    }
+    id:"event_001",
+    icon:"🔔",
+    title:"Chuông báo thức hỏng",
+    text:"Sáng nay chuông không reo, bạn phải tự tỉnh bằng ánh sáng ngoài cửa sổ.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
   },
   {
-    id:"festival",
-    icon:"🎉",
-    title:"Trường tổ chức ngày hội",
-    text:"Cả trường náo nhiệt với nhiều hoạt động.",
-    result:"Tâm trạng +8 • Bạn bè +5 • Thi đua +3",
-    apply:g=>{
-      addStat(g,"mood",8);
-      addStat(g,"friends",5);
-      addCompetition(g,3);
-    }
+    id:"event_002",
+    icon:"🥤",
+    title:"Quầy nước mới",
+    text:"Một quầy nước nhỏ vừa mở trước cổng trường và đông nghịt học sinh.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
   },
   {
-    id:"test",
-    icon:"📄",
-    title:"Kiểm tra bất ngờ",
-    text:"Giáo viên bất ngờ phát đề.",
-    result:"Kiến thức -4 • Danh tiếng +2 • Thi đua +2",
-    apply:g=>{
-      addStat(g,"study",-4);
-      addStat(g,"reputation",2);
-      addCompetition(g,2);
-    }
+    id:"event_003",
+    icon:"📝",
+    title:"Bạn quên vở",
+    text:"Đến tiết học, bạn mới phát hiện quyển vở quan trọng đang ở nhà.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
   },
   {
-    id:"wallet",
-    icon:"💸",
-    title:"Làm rơi ví",
-    text:"Một khoản tiền nhỏ bị thất lạc.",
-    result:"Tiền -30.000đ • Tâm trạng -4",
-    apply:g=>{
-      addMoney(g,-30000);
-      addStat(g,"mood",-4);
-    }
+    id:"event_004",
+    icon:"🧩",
+    title:"Câu đố trên bảng",
+    text:"Giáo viên viết một câu đố vui lên bảng và cả lớp cùng suy nghĩ.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
   },
   {
-    id:"snack",
-    icon:"🍪",
-    title:"Bạn cho đồ ăn",
-    text:"Một người bạn bất ngờ chia đồ ăn cho bạn.",
-    result:"Năng lượng +5 • Tâm trạng +5",
-    apply:g=>{
-      addStat(g,"energy",5);
-      addStat(g,"mood",5);
-    }
+    id:"event_005",
+    icon:"🎧",
+    title:"Tai nghe thất lạc",
+    text:"Bạn phát hiện một chiếc tai nghe quen thuộc nằm dưới gầm bàn.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
   },
   {
-    id:"rain",
-    icon:"🌧️",
-    title:"Trời mưa",
-    text:"Mưa lớn khiến việc di chuyển khó khăn.",
-    result:"Năng lượng -5 • Tâm trạng -3",
-    apply:g=>{
-      addStat(g,"energy",-5);
-      addStat(g,"mood",-3);
-    }
+    id:"event_006",
+    icon:"📣",
+    title:"Loa trường thông báo",
+    text:"Một thông báo bất ngờ khiến cả hành lang xôn xao.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
   },
   {
-    id:"club",
-    icon:"🎯",
-    title:"CLB tuyển thành viên",
-    text:"Bạn được mời tham gia một CLB mới.",
-    result:"Kỹ năng +4 • Bạn bè +3",
-    apply:g=>{
-      addStat(g,"skill",4);
-      addStat(g,"friends",3);
-    }
+    id:"event_007",
+    icon:"🧃",
+    title:"Bạn mang nước cho bạn",
+    text:"Một người bạn thấy bạn mệt nên đưa chai nước mát.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
   },
   {
-    id:"lunch",
-    icon:"🍱",
-    title:"Được mời ăn trưa",
-    text:"Một người bạn mời bạn ăn trưa.",
-    result:"Tiền +20.000đ • Tâm trạng +4",
-    apply:g=>{
-      addMoney(g,20000);
-      addStat(g,"mood",4);
-    }
+    id:"event_008",
+    icon:"🪑",
+    title:"Đổi chỗ ngồi",
+    text:"Giáo viên sắp xếp lại chỗ ngồi và bạn có một người bạn bàn mới.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
   },
   {
-    id:"library",
-    icon:"📚",
-    title:"Tìm được tài liệu hay",
-    text:"Bạn tình cờ tìm thấy một cuốn sách hữu ích.",
-    result:"Kiến thức +5",
-    apply:g=>{
-      addStat(g,"study",5);
-      g.studyActions++;
-    }
+    id:"event_009",
+    icon:"✏️",
+    title:"Mượn được bút đẹp",
+    text:"Bạn cùng lớp cho mượn một chiếc bút rất dễ viết.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
   },
   {
-    id:"sport",
-    icon:"🏅",
-    title:"Ngày hội thể thao",
-    text:"Bạn tham gia một trận đấu vui vẻ.",
-    result:"HP +3 • Bạn bè +4 • Năng lượng -5",
-    apply:g=>{
-      addStat(g,"hp",3);
-      addStat(g,"friends",4);
-      addStat(g,"energy",-5);
-    }
+    id:"event_010",
+    icon:"📷",
+    title:"Ảnh kỷ yếu thử",
+    text:"Lớp tranh thủ chụp vài tấm ảnh kỷ yếu thử trong giờ nghỉ.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
   },
   {
-    id:"contest",
-    icon:"💻",
-    title:"Cuộc thi online",
-    text:"Bạn được rủ tham gia một cuộc thi kiến thức.",
-    result:"Kỹ năng +3 • Thi đua +5",
-    apply:g=>{
-      addStat(g,"skill",3);
-      addCompetition(g,5);
-    }
+    id:"event_011",
+    icon:"🎤",
+    title:"Mic bị hỏng",
+    text:"Đến lượt thuyết trình thì chiếc micro bất ngờ không hoạt động.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
   },
   {
-    id:"bus",
-    icon:"🚌",
-    title:"Trễ xe buýt",
-    text:"Bạn phải chờ xe lâu hơn bình thường.",
-    result:"Năng lượng -8 • Tâm trạng -3",
-    apply:g=>{
-      addStat(g,"energy",-8);
-      addStat(g,"mood",-3);
-    }
+    id:"event_012",
+    icon:"🧠",
+    title:"Thầy cô hỏi khó",
+    text:"Bạn nhận được một câu hỏi khó hơn bình thường nhưng rất thú vị.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
   },
   {
-    id:"message",
-    icon:"📱",
-    title:"Bạn cũ nhắn tin",
-    text:"Một người bạn cũ bất ngờ liên lạc.",
-    result:"Bạn bè +5 • Tâm trạng +4",
-    apply:g=>{
-      addStat(g,"friends",5);
-      addStat(g,"mood",4);
-    }
+    id:"event_013",
+    icon:"🗂️",
+    title:"Tìm thấy hồ sơ cũ",
+    text:"Bạn tìm thấy một tập tài liệu cũ có nhiều ghi chú hữu ích.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
   },
   {
-    id:"coupon",
-    icon:"🎟️",
-    title:"Nhận voucher",
-    text:"Bạn nhận được voucher từ một cửa hàng.",
-    result:"Tiền +15.000đ",
-    apply:g=>addMoney(g,15000)
+    id:"event_014",
+    icon:"🧼",
+    title:"Xà phòng hết",
+    text:"Nhà vệ sinh trường vừa hết xà phòng đúng lúc bạn cần.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
   },
   {
-    id:"clean",
+    id:"event_015",
+    icon:"🍞",
+    title:"Tiệm bánh giảm giá",
+    text:"Tiệm bánh gần trường giảm giá một số món vào cuối buổi.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_016",
+    icon:"🚲",
+    title:"Lốp xe mềm",
+    text:"Lốp xe của bạn hơi non khi chuẩn bị về nhà.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_017",
+    icon:"🌳",
+    title:"Gốc cây quen thuộc",
+    text:"Bạn tìm được một góc yên tĩnh dưới gốc cây trong sân trường.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_018",
+    icon:"🎲",
+    title:"Trò chơi giờ nghỉ",
+    text:"Nhóm bạn rủ bạn chơi một trò chơi nhanh trong giờ nghỉ.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_019",
+    icon:"📖",
+    title:"Sách bị đánh dấu",
+    text:"Bạn mượn một cuốn sách có sẵn những dòng ghi chú rất thú vị.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_020",
+    icon:"🧑‍🎨",
+    title:"Bạn khoe tranh",
+    text:"Một người bạn cho bạn xem bức tranh mới hoàn thành.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_021",
+    icon:"🎹",
+    title:"Âm nhạc hành lang",
+    text:"Có tiếng đàn vang lên ở phòng sinh hoạt khiến mọi người dừng lại nghe.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_022",
+    icon:"🍀",
+    title:"Nhặt được cỏ bốn lá",
+    text:"Bạn bắt gặp một nhánh cỏ bốn lá bên sân trường.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_023",
+    icon:"📌",
+    title:"Thông báo cuộc thi",
+    text:"Bảng tin vừa đăng một cuộc thi mà bạn có thể tham gia.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_024",
+    icon:"🧑‍💻",
+    title:"Máy tính trống",
+    text:"Phòng máy còn một máy tính trống ngay trước giờ học.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_025",
+    icon:"🧴",
+    title:"Kem chống nắng",
+    text:"Một người bạn nhắc bạn trời hôm nay nắng gắt.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_026",
+    icon:"🥪",
+    title:"Hộp cơm dư",
+    text:"Bạn cùng lớp có một phần đồ ăn dư và hỏi bạn có muốn dùng không.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_027",
     icon:"🧹",
-    title:"Dọn lớp",
-    text:"Bạn ở lại giúp lớp dọn dẹp.",
-    result:"Danh tiếng +3 • Bạn bè +2 • Thi đua +2",
-    apply:g=>{
-      addStat(g,"reputation",3);
-      addStat(g,"friends",2);
-      addCompetition(g,2);
-    }
+    title:"Phân công trực nhật",
+    text:"Bạn được giao một phần việc trực nhật hơi khác thường.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_028",
+    icon:"📚",
+    title:"Kệ sách mới",
+    text:"Thư viện vừa bổ sung một kệ sách theo chủ đề bạn thích.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_029",
+    icon:"🧮",
+    title:"Bài toán mẹo",
+    text:"Một bài toán mẹo xuất hiện trong nhóm chat lớp.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_030",
+    icon:"💡",
+    title:"Ý tưởng dự án",
+    text:"Bạn bất chợt nghĩ ra một ý tưởng cho dự án nhóm.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_031",
+    icon:"🎫",
+    title:"Vé sự kiện trường",
+    text:"Bạn được tặng một vé tham dự hoạt động ngoại khóa.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_032",
+    icon:"🏸",
+    title:"Cầu lông giờ nghỉ",
+    text:"Sân thể thao đang trống và một nhóm bạn rủ bạn đánh cầu.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_033",
+    icon:"🩹",
+    title:"Xước nhẹ",
+    text:"Bạn bị xước tay nhẹ khi làm đồ thủ công.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_034",
+    icon:"☕",
+    title:"Góc học tập mới",
+    text:"Quán gần trường vừa có một góc học tập yên tĩnh.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_035",
+    icon:"🛍️",
+    title:"Cửa hàng tiện lợi",
+    text:"Bạn ghé cửa hàng và thấy một món đồ đang được giảm giá.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_036",
+    icon:"🧑‍🔬",
+    title:"Thí nghiệm thú vị",
+    text:"Tiết thực hành có một thí nghiệm khiến cả lớp bất ngờ.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_037",
+    icon:"🌈",
+    title:"Cầu vồng sau mưa",
+    text:"Sau cơn mưa, cả sân trường nhìn thấy một chiếc cầu vồng.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_038",
+    icon:"📱",
+    title:"Điện thoại sắp hết pin",
+    text:"Bạn nhận ra pin điện thoại chỉ còn rất ít trước khi tan học.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_039",
+    icon:"🔋",
+    title:"Tìm thấy sạc dự phòng",
+    text:"Một người bạn cho bạn mượn sạc dự phòng.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_040",
+    icon:"🎒",
+    title:"Cặp nặng bất thường",
+    text:"Hôm nay chiếc cặp của bạn nặng hơn hẳn vì mang quá nhiều sách.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_041",
+    icon:"🧑‍🤝‍🧑",
+    title:"Bạn mới chuyển lớp",
+    text:"Một học sinh mới đến lớp và cần người hướng dẫn.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_042",
+    icon:"🎯",
+    title:"Bảng thành tích lớp",
+    text:"Lớp cập nhật bảng thành tích tuần và bạn có tên trong đó.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_043",
+    icon:"📢",
+    title:"Bạn được gọi tên",
+    text:"Tên bạn được nhắc trong một thông báo của trường.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_044",
+    icon:"🧸",
+    title:"Gian hàng gây quỹ",
+    text:"CLB tổ chức gian hàng nhỏ để gây quỹ.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_045",
+    icon:"🍉",
+    title:"Chia trái cây",
+    text:"Một nhóm bạn mang trái cây đến chia cho mọi người.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_046",
+    icon:"🧢",
+    title:"Quên mũ",
+    text:"Bạn ra ngoài trời mà quên mang mũ.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_047",
+    icon:"🌡️",
+    title:"Phòng học nóng",
+    text:"Điều hòa lớp học hoạt động chập chờn.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_048",
+    icon:"❄️",
+    title:"Phòng học lạnh",
+    text:"Điều hòa hôm nay lại chạy quá lạnh.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_049",
+    icon:"📝",
+    title:"Bạn được nhờ soát bài",
+    text:"Một người bạn nhờ bạn đọc lại bài trước khi nộp.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_050",
+    icon:"🎨",
+    title:"Trang trí bảng lớp",
+    text:"Lớp chuẩn bị trang trí bảng cho một dịp đặc biệt.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_051",
+    icon:"📦",
+    title:"Gói hàng bất ngờ",
+    text:"Bạn nhận một gói hàng nhỏ mà mình đã gần quên mất.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_052",
+    icon:"💌",
+    title:"Mảnh giấy động viên",
+    text:"Bạn tìm thấy một mảnh giấy nhỏ với lời chúc dễ thương.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_053",
+    icon:"🪴",
+    title:"Cây lớp cần chăm",
+    text:"Chậu cây của lớp hơi héo và cần người chăm sóc.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_054",
+    icon:"🐱",
+    title:"Mèo trước cổng",
+    text:"Một chú mèo thân thiện xuất hiện gần cổng trường.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_055",
+    icon:"🐶",
+    title:"Chó lạc đường",
+    text:"Một chú chó đi lạc quanh khu vực trường.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_056",
+    icon:"🕊️",
+    title:"Chim bay vào lớp",
+    text:"Một chú chim nhỏ bay vào lớp rồi đậu trên cửa sổ.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_057",
+    icon:"🌱",
+    title:"Trồng cây cùng CLB",
+    text:"CLB xanh rủ bạn tham gia trồng thêm cây trong sân.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_058",
+    icon:"♻️",
+    title:"Đổi rác lấy quà",
+    text:"Trường tổ chức hoạt động đổi chai nhựa lấy quà nhỏ.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_059",
+    icon:"🚰",
+    title:"Máy nước mới",
+    text:"Trường lắp một máy nước uống mới.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_060",
+    icon:"🧃",
+    title:"Hộp sữa miễn phí",
+    text:"Bạn nhận được một hộp sữa trong chương trình của trường.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_061",
+    icon:"🍜",
+    title:"Món mới ở căn tin",
+    text:"Căn tin thử bán một món mới và mời học sinh góp ý.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_062",
+    icon:"🍦",
+    title:"Xe kem trước cổng",
+    text:"Một xe kem xuất hiện ngay giờ tan học.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_063",
+    icon:"🎈",
+    title:"Bóng bay sân trường",
+    text:"Sân trường được trang trí bằng rất nhiều bóng bay.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_064",
+    icon:"🎭",
+    title:"Tập kịch đột xuất",
+    text:"Đội văn nghệ thiếu một người cho buổi tập.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_065",
+    icon:"💃",
+    title:"Tập nhảy",
+    text:"Bạn bè rủ bạn thử một động tác nhảy mới.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_066",
+    icon:"🎸",
+    title:"Bạn mang đàn",
+    text:"Một người bạn mang đàn đến và chơi vài bài sau giờ học.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_067",
+    icon:"🎬",
+    title:"Xem phim tài liệu",
+    text:"CLB học thuật chiếu một phim tài liệu ngắn.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_068",
+    icon:"🧪",
+    title:"Phòng thí nghiệm mở",
+    text:"Phòng thực hành mở cửa thêm một khoảng thời gian.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_069",
+    icon:"📐",
+    title:"Mượn thước",
+    text:"Bạn cần một chiếc thước nhưng chỉ có bạn bên cạnh có.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_070",
+    icon:"🖊️",
+    title:"Bút hết mực",
+    text:"Chiếc bút của bạn hết mực đúng lúc cần ghi chép.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_071",
+    icon:"📎",
+    title:"Kẹp giấy thất lạc",
+    text:"Bạn tìm thấy một chiếc kẹp giấy hữu ích trong ngăn bàn.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_072",
+    icon:"🗃️",
+    title:"Tủ đồ lộn xộn",
+    text:"Bạn phải sắp xếp lại ngăn tủ cá nhân.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_073",
+    icon:"🧽",
+    title:"Bảng trắng khó xóa",
+    text:"Bảng lớp bị bám mực và cần người xử lý.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_074",
+    icon:"🧯",
+    title:"Tập huấn an toàn",
+    text:"Trường tổ chức buổi hướng dẫn an toàn ngắn.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_075",
+    icon:"🚪",
+    title:"Cửa phòng kẹt",
+    text:"Cửa phòng học bị kẹt và cần vài người hỗ trợ.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_076",
+    icon:"🛗",
+    title:"Thang máy đông",
+    text:"Bạn phải chọn giữa chờ thang máy hoặc đi cầu thang.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_077",
+    icon:"🪜",
+    title:"Giúp lấy đồ",
+    text:"Một món đồ ở trên cao cần người hỗ trợ lấy xuống.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_078",
+    icon:"🧤",
+    title:"Quên đồ thể thao",
+    text:"Bạn nhận ra mình để quên một món đồ cần cho tiết thể dục.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_079",
+    icon:"🏃",
+    title:"Chạy bộ ngắn",
+    text:"Một người bạn rủ bạn chạy vài vòng quanh sân.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_080",
+    icon:"🧘",
+    title:"Góc thư giãn",
+    text:"Bạn tìm thấy một góc yên tĩnh để ngồi thở một lát.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_081",
+    icon:"🎧",
+    title:"Podcast mới",
+    text:"Bạn được giới thiệu một podcast học tập khá thú vị.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_082",
+    icon:"📰",
+    title:"Tin tốt của lớp",
+    text:"Lớp nhận được một tin vui từ giáo viên chủ nhiệm.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_083",
+    icon:"📊",
+    title:"Bảng khảo sát",
+    text:"Bạn được mời tham gia khảo sát ý kiến học sinh.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_084",
+    icon:"🗣️",
+    title:"Luyện thuyết trình",
+    text:"Một người bạn muốn luyện nói trước khi thuyết trình.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_085",
+    icon:"🌐",
+    title:"Trang web hữu ích",
+    text:"Bạn được gửi một trang web hỗ trợ học tập.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_086",
+    icon:"⌨️",
+    title:"Phím máy tính kẹt",
+    text:"Một phím trên máy tính phòng học bị kẹt.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_087",
+    icon:"🖨️",
+    title:"Máy in hết giấy",
+    text:"Cả nhóm đang cần in tài liệu nhưng máy in hết giấy.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_088",
+    icon:"📬",
+    title:"Thư tay",
+    text:"Bạn nhận được một lá thư tay từ một người bạn.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_089",
+    icon:"🧩",
+    title:"Ghép hình giờ nghỉ",
+    text:"Bạn thấy một bộ ghép hình nhỏ và thử hoàn thành nó.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_090",
+    icon:"🎁",
+    title:"Quà sinh nhật bạn",
+    text:"Một người bạn tổ chức sinh nhật đơn giản sau giờ học.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_091",
+    icon:"🎂",
+    title:"Bánh sinh nhật dư",
+    text:"Sau buổi sinh nhật còn một phần bánh được chia cho bạn.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_092",
+    icon:"🌙",
+    title:"Tan học muộn",
+    text:"Bạn phải ở lại trường lâu hơn dự kiến.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_093",
+    icon:"🌞",
+    title:"Sáng trời đẹp",
+    text:"Thời tiết đẹp khiến mọi người có thêm năng lượng.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_094",
+    icon:"🌬️",
+    title:"Gió mạnh",
+    text:"Gió mạnh làm vài tờ giấy bay khắp sân.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
+  },
+  {
+    id:"event_095",
+    icon:"📄",
+    title:"Tài liệu bị bay",
+    text:"Một tập tài liệu của bạn bị gió thổi rơi xuống hành lang.",
+    result:"HP +3; Năng lượng -2",
+    apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}
+  },
+  {
+    id:"event_096",
+    icon:"🧑‍🏫",
+    title:"Cô giáo nhờ việc",
+    text:"Giáo viên nhờ bạn hỗ trợ một việc nhỏ trước giờ học.",
+    result:"Kiến thức -2; Kỹ năng +2",
+    apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}
+  },
+  {
+    id:"event_097",
+    icon:"🏆",
+    title:"Cúp lưu động",
+    text:"Lớp được giữ chiếc cúp thành tích trong một tuần.",
+    result:"Kiến thức +4; Tâm trạng +2",
+    apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}
+  },
+  {
+    id:"event_098",
+    icon:"🪪",
+    title:"Tìm thấy thẻ học sinh",
+    text:"Bạn phát hiện một chiếc thẻ học sinh bị đánh rơi.",
+    result:"Năng lượng +6; Tâm trạng +5",
+    apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}
+  },
+  {
+    id:"event_099",
+    icon:"🔑",
+    title:"Chìa khóa thất lạc",
+    text:"Bạn thấy một chiếc chìa khóa ở hành lang.",
+    result:"Tiền +20,000đ; Tâm trạng +3",
+    apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}
+  },
+  {
+    id:"event_100",
+    icon:"💳",
+    title:"Thẻ xe buýt",
+    text:"Bạn tìm thấy một thẻ xe buýt có vẻ bị bỏ quên.",
+    result:"Bạn bè +5; Tâm trạng +4",
+    apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}
   }
 ];
 
+const EVENT_CHOICES = {
+  event_001:[
+    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_002:[
+    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Quan sát trước",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_003:[
+    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Tập trung việc khác",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_004:[
+    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_005:[
+    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nghỉ một chút",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_006:[
+    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_007:[
+    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Quan sát trước",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_008:[
+    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Tập trung việc khác",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_009:[
+    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_010:[
+    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_011:[
+    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Để sau rồi tính",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_012:[
+    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Quan sát trước",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_013:[
+    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_014:[
+    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_015:[
+    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nghỉ một chút",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_016:[
+    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_017:[
+    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Quan sát trước",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_018:[
+    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_019:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_020:[
+    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nghỉ một chút",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_021:[
+    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Để sau rồi tính",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_022:[
+    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Quan sát trước",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_023:[
+    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Tập trung việc khác",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_024:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_025:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_026:[
+    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Để sau rồi tính",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_027:[
+    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Quan sát trước",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_028:[
+    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_029:[
+    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_030:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_031:[
+    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_032:[
+    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Quan sát trước",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_033:[
+    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Tập trung việc khác",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_034:[
+    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_035:[
+    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nghỉ một chút",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_036:[
+    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_037:[
+    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Quan sát trước",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_038:[
+    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Tập trung việc khác",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_039:[
+    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_040:[
+    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_041:[
+    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Để sau rồi tính",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_042:[
+    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Quan sát trước",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_043:[
+    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_044:[
+    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_045:[
+    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nghỉ một chút",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_046:[
+    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_047:[
+    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Quan sát trước",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_048:[
+    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_049:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_050:[
+    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nghỉ một chút",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_051:[
+    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Để sau rồi tính",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_052:[
+    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Quan sát trước",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_053:[
+    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Tập trung việc khác",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_054:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_055:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_056:[
+    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Để sau rồi tính",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_057:[
+    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Quan sát trước",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_058:[
+    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_059:[
+    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_060:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_061:[
+    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_062:[
+    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Quan sát trước",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_063:[
+    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Tập trung việc khác",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_064:[
+    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_065:[
+    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nghỉ một chút",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_066:[
+    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_067:[
+    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Quan sát trước",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_068:[
+    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Tập trung việc khác",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_069:[
+    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_070:[
+    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_071:[
+    {label:"Chủ động xử lý",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Để sau rồi tính",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_072:[
+    {label:"Giúp một tay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Quan sát trước",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_073:[
+    {label:"Thử ngay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_074:[
+    {label:"Bình tĩnh giải quyết",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_075:[
+    {label:"Chọn phương án an toàn",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nghỉ một chút",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_076:[
+    {label:"Chủ động xử lý",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_077:[
+    {label:"Giúp một tay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Quan sát trước",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_078:[
+    {label:"Thử ngay",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Tập trung việc khác",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_079:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_080:[
+    {label:"Chọn phương án an toàn",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Nghỉ một chút",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_081:[
+    {label:"Chủ động xử lý",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Để sau rồi tính",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_082:[
+    {label:"Giúp một tay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Quan sát trước",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_083:[
+    {label:"Thử ngay",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Tập trung việc khác",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_084:[
+    {label:"Bình tĩnh giải quyết",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_085:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_086:[
+    {label:"Chủ động xử lý",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Để sau rồi tính",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_087:[
+    {label:"Giúp một tay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Quan sát trước",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_088:[
+    {label:"Thử ngay",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Tập trung việc khác",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ],
+  event_089:[
+    {label:"Bình tĩnh giải quyết",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Thành tích +3; Tiền +15,000đ",apply:g=>{addAchievement(g,3);addMoney(g,15000);}}
+  ],
+  event_090:[
+    {label:"Chọn phương án an toàn",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Nghỉ một chút",result:"Tiền -10,000đ; Kỹ năng +5",apply:g=>{addMoney(g,-10000);addStat(g,"skill",5);}}
+  ],
+  event_091:[
+    {label:"Chủ động xử lý",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Để sau rồi tính",result:"Kỹ năng +3; Danh tiếng +2",apply:g=>{addStat(g,"skill",3);addStat(g,"reputation",2);}}
+  ],
+  event_092:[
+    {label:"Giúp một tay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Quan sát trước",result:"Danh tiếng +4; Thi đua +5",apply:g=>{addStat(g,"reputation",4);addCompetition(g,5);}}
+  ],
+  event_093:[
+    {label:"Thử ngay",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Tập trung việc khác",result:"Kiến thức +5; HP +4",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"hp",4);}}
+  ],
+  event_094:[
+    {label:"Bình tĩnh giải quyết",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kỹ năng +4; Thành tích +4",apply:g=>{addStat(g,"skill",4);addAchievement(g,4);}}
+  ],
+  event_095:[
+    {label:"Chọn phương án an toàn",result:"HP +3; Năng lượng -2",apply:g=>{addStat(g,"hp",3);addStat(g,"energy",-2);}},
+    {label:"Nghỉ một chút",result:"Thành tích +3; Kiến thức +3",apply:g=>{addAchievement(g,3);addStat(g,"study",3);g.studyActions++;}}
+  ],
+  event_096:[
+    {label:"Chủ động xử lý",result:"Kiến thức -2; Kỹ năng +2",apply:g=>{addStat(g,"study",-2);addStat(g,"skill",2);}},
+    {label:"Để sau rồi tính",result:"Tiền -10,000đ; Tiền -5,000đ",apply:g=>{addMoney(g,-10000);addMoney(g,-5000);}}
+  ],
+  event_097:[
+    {label:"Giúp một tay",result:"Kiến thức +4; Tâm trạng +2",apply:g=>{addStat(g,"study",4);g.studyActions++;addStat(g,"mood",2);}},
+    {label:"Quan sát trước",result:"Kỹ năng +3; Tâm trạng -2",apply:g=>{addStat(g,"skill",3);addStat(g,"mood",-2);}}
+  ],
+  event_098:[
+    {label:"Thử ngay",result:"Năng lượng +6; Tâm trạng +5",apply:g=>{addStat(g,"energy",6);addStat(g,"mood",5);}},
+    {label:"Tập trung việc khác",result:"Danh tiếng +4; Kiến thức +6",apply:g=>{addStat(g,"reputation",4);addStat(g,"study",6);g.studyActions++;}}
+  ],
+  event_099:[
+    {label:"Bình tĩnh giải quyết",result:"Tiền +20,000đ; Tâm trạng +3",apply:g=>{addMoney(g,20000);addStat(g,"mood",3);}},
+    {label:"Nhờ bạn hỗ trợ",result:"Kiến thức +5; Bạn bè -1",apply:g=>{addStat(g,"study",5);g.studyActions++;addStat(g,"friends",-1);}}
+  ],
+  event_100:[
+    {label:"Chọn phương án an toàn",result:"Bạn bè +5; Tâm trạng +4",apply:g=>{addStat(g,"friends",5);addStat(g,"mood",4);}},
+    {label:"Nghỉ một chút",result:"Kỹ năng +4; Năng lượng -5",apply:g=>{addStat(g,"skill",4);addStat(g,"energy",-5);}}
+  ]
+};
+
 function eventData(ev){
   return {
-    id:ev.id,
-    icon:ev.icon,
-    title:ev.title,
-    text:ev.text,
-    result:ev.result
+    id:ev.id, icon:ev.icon, title:ev.title, text:ev.text, result:ev.result,
+    choices:(EVENT_CHOICES[ev.id] || []).map((c,i)=>({label:c.label,result:c.result,index:i}))
   };
 }
 
-function pickDailyEvent(lastId){
-  const available = DAILY_EVENTS.filter(e=>e.id !== lastId);
-  return pick(available.length ? available : DAILY_EVENTS);
+function pickDailyEvents(lastIds=[],count=3){
+  const blocked=new Set(lastIds);
+  const pool=DAILY_EVENTS.filter(e=>!blocked.has(e.id));
+  const source=pool.length>=count ? pool : DAILY_EVENTS;
+  return shuffle(source).slice(0,Math.min(count,source.length));
 }
 
 /* =========================================================
@@ -2201,6 +3235,9 @@ function createInitialState(){
     mainActivityLabels:[],
 
     dailyEvent:null,
+    dailyEvents:[],
+    dailyEventIndex:0,
+    dailyEventResolved:false,
     lastEventId:null,
     dayStart:null,
 
@@ -2213,12 +3250,13 @@ function createInitialState(){
     dailyOralCheckCount:0
   };
 
-  const ev = pickDailyEvent(null);
-
+  const events = pickDailyEvents([],3);
   g.dayStart = snapshotDay(g);
-  g.dailyEvent = eventData(ev);
-  g.lastEventId = ev.id;
-  ev.apply(g);
+  g.dailyEvents = events.map(eventData);
+  g.dailyEventIndex = 0;
+  g.dailyEventResolved = false;
+  g.dailyEvent = g.dailyEvents[0] || null;
+  g.lastEventId = events.at(-1)?.id || null;
 
   return g;
 }
@@ -2403,8 +3441,6 @@ function App(){
     return createInitialState();
   });
 
-  const [secondsLeft,setSecondsLeft] = useState(SLOT_SECONDS);
-  const [autoTime,setAutoTime] = useState(true);
 
   const [overlay,setOverlay] = useState(null);
   const [toast,setToast] = useState("");
@@ -2426,7 +3462,6 @@ function App(){
   const onlineChannelRef = useRef(null);
 
   const advancingRef = useRef(false);
-  const examAutoOpenedRef = useRef(null);
   const examDismissedRef = useRef(null);
 
   const currentTime = TIME_SLOTS[game.timeIndex];
@@ -2835,18 +3870,16 @@ function App(){
         today:0
       }));
 
-      const ev = pickDailyEvent(next.lastEventId);
-
+      const events = pickDailyEvents(next.lastEventId ? [next.lastEventId] : [],3);
       next.dayStart = snapshotDay(next);
-      next.dailyEvent = eventData(ev);
-      next.lastEventId = ev.id;
-
-      ev.apply(next);
+      next.dailyEvents = events.map(eventData);
+      next.dailyEventIndex = 0;
+      next.dailyEventResolved = false;
+      next.dailyEvent = next.dailyEvents[0] || null;
+      next.lastEventId = events.at(-1)?.id || null;
 
       return normalizeState(next);
     });
-
-    setSecondsLeft(SLOT_SECONDS);
     beep(880,.14);
   },[beep]);
 
@@ -2893,7 +3926,6 @@ function App(){
 
         return normalizeState(next);
       });
-      setSecondsLeft(SLOT_SECONDS);
       beep(700,.07);
     }
 
@@ -2901,43 +3933,37 @@ function App(){
   },[game.isGameOver,game.timeIndex,finishDay,beep]);
 
   /* -----------------------------------------
-     TIMER
+     TIME ADVANCES BY ACTIVITIES
+     Không có đồng hồ tự chạy. Mỗi mốc có đúng 2 hoạt động chính;
+     hoàn thành hoạt động thứ 2 sẽ tự chuyển sang mốc tiếp theo.
   ----------------------------------------- */
 
+  const previousMainActivityCountRef = useRef(game.mainActivityCount || 0);
+
   useEffect(()=>{
-    // Quiz thường không dừng đồng hồ. Chỉ các kỳ kiểm tra chính thức mới khóa thời gian.
-    const quizTimePaused = overlay === "exam" || overlay === "nameSetup";
+    const previous = previousMainActivityCountRef.current;
+    const current = game.mainActivityCount || 0;
+    previousMainActivityCountRef.current = current;
 
-    if(
-      !autoTime ||
-      game.isGameOver ||
-      quizTimePaused
-    ){
-      return;
+    if(previous < 2 && current >= 2 && !game.isGameOver){
+      const timer = setTimeout(()=>advanceTime(),0);
+      return ()=>clearTimeout(timer);
     }
+  },[game.mainActivityCount,game.isGameOver,advanceTime]);
 
-    const timer = setInterval(()=>{
-      setSecondsLeft(prev=>{
-        // Bảo vệ thêm cho tick đã xếp hàng ngay lúc modal vừa mở.
-        if(overlay === "exam" || overlay === "nameSetup") return prev;
-
-        if(prev > 1){
-          return prev - 1;
-        }
-
-        advanceTime();
-        return SLOT_SECONDS;
+  useEffect(()=>{
+    if(!game.dailyEventResolved || !game.dailyEvents?.length || game.isGameOver) return;
+    if((game.dailyEventIndex||0) >= game.dailyEvents.length-1) return;
+    const id=setTimeout(()=>{
+      updateGame(g=>{
+        const nextIndex=(g.dailyEventIndex||0)+1;
+        g.dailyEventIndex=nextIndex;
+        g.dailyEventResolved=false;
+        g.dailyEvent=g.dailyEvents[nextIndex] || null;
       });
-    },1000);
-
-    return ()=>clearInterval(timer);
-  },[
-    autoTime,
-    game.isGameOver,
-    game.timeIndex,
-    overlay,
-    advanceTime
-  ]);
+    },450);
+    return ()=>clearTimeout(id);
+  },[game.dailyEventResolved,game.dailyEventIndex,game.dailyEvents,game.isGameOver,updateGame]);
 
   /* -----------------------------------------
      DAY CHANGE TOAST
@@ -2964,7 +3990,6 @@ function App(){
   useEffect(()=>{
     if(game.isGameOver){
       setOverlay("ending");
-      setAutoTime(false);
     }
   },[game.isGameOver]);
 
@@ -3069,7 +4094,6 @@ function App(){
     });
 
     if(mode==="exam") {
-      setAutoTime(false);
       examDismissedRef.current = null;
     }
 
@@ -3084,23 +4108,22 @@ function App(){
     updateGame
   ]);
 
-  /* -----------------------------------------
-     TỰ ĐỘNG MỞ KỲ THI TẠI ĐÚNG MỐC
-     (đặt sau startQuiz để tránh lỗi TDZ / trắng màn hình)
-  ----------------------------------------- */
+  const examAutoOpenedRef = useRef(null);
 
   useEffect(()=>{
-    if(!currentExam || game.isGameOver) return;
-
-    const examKey = `${currentExam.day}-${currentExam.timeIndex}`;
-
-    if(examAutoOpenedRef.current === examKey) return;
+    if(!currentExam || quiz || game.isGameOver) return;
     if(game.examResults?.[currentExam.id]) return;
-    if(examDismissedRef.current === examKey) return;
-
-    examAutoOpenedRef.current = examKey;
+    const key=`${game.day}-${game.timeIndex}-${currentExam.id}`;
+    if(examAutoOpenedRef.current===key) return;
+    examAutoOpenedRef.current=key;
+    setToast(`📝 ${currentExam.title} bắt đầu!`);
     startQuiz("exam",null,currentExam);
-  },[currentExam,game.isGameOver,game.examResults,startQuiz]);
+  },[currentExam,quiz,game.day,game.timeIndex,game.examResults,game.isGameOver,startQuiz]);
+
+  /* -----------------------------------------
+     KỲ THI THEO MỐC
+     Giữa kỳ / cuối kỳ / thi THPT tự động mở khi tới đúng mốc.
+  ----------------------------------------- */
 
   const answerQuiz = useCallback((choiceIndex)=>{
     if(!quiz || quizFeedback) return;
@@ -3166,7 +4189,6 @@ function App(){
         setToast(
           `🎓 ${exam?.title || "Kỳ thi"}: ${finalCorrect}/${quiz.questions.length} câu đúng • +${finalCorrect*5} điểm thi đua`
         );
-        setAutoTime(true);
       }
 
       if(quiz.mode==="quick"){
@@ -3478,7 +4500,6 @@ function App(){
       const loaded = normalizeState(decodeSaveCode(saveCode));
 
       setGame(loaded);
-      setSecondsLeft(SLOT_SECONDS);
       setOverlay(null);
       setToast("✅ Đã nạp game thành công.");
     }catch(error){
@@ -3519,7 +4540,6 @@ function App(){
         );
 
         setGame(loaded);
-        setSecondsLeft(SLOT_SECONDS);
         setOverlay(null);
         setToast("✅ Đã nhập file save.");
       }catch(error){
@@ -3541,14 +4561,11 @@ function App(){
     const fresh = createInitialState();
 
     setGame(fresh);
-    setSecondsLeft(SLOT_SECONDS);
-    setAutoTime(true);
     setOverlay(null);
     setQuiz(null);
     setQuizFeedback(null);
     setSaveCode("");
     setPlayerNameDraft("");
-    examAutoOpenedRef.current = null;
     examDismissedRef.current = null;
 
     setToast("🌱 Hành trình mới bắt đầu!");
@@ -3710,25 +4727,45 @@ function App(){
      SCENES
   ========================================================= */
 
+  const chooseDailyEvent = useCallback((choiceIndex)=>{
+    if(!game.dailyEvent || game.dailyEventResolved) return;
+    const raw = DAILY_EVENTS.find(e=>e.id===game.dailyEvent.id);
+    const choice = raw?.choices?.[choiceIndex] || EVENT_CHOICES[game.dailyEvent.id]?.[choiceIndex];
+    if(!choice) return;
+
+    updateGame(g=>{
+      choice.apply(g);
+      g.dailyEventResolved = true;
+      g.dailyEvent = {
+        ...g.dailyEvent,
+        resolved:true,
+        chosen:choiceIndex,
+        result:choice.result
+      };
+    });
+
+    setToast(`✨ ${choice.result}`);
+  },[game.dailyEvent,game.dailyEventResolved,updateGame]);
+
   const renderClass = ()=>(
     <>
       <div className="event-card">
-        <div className="event-icon">
-          {game.dailyEvent?.icon || "🎲"}
-        </div>
-
-        <div>
-          <div className="event-title">
-            {game.dailyEvent?.title || "Ngày mới"}
-          </div>
-
-          <div className="muted">
-            {game.dailyEvent?.text}
-          </div>
-
-          <div className="event-result">
-            {game.dailyEvent?.result}
-          </div>
+        <div className="event-icon">{game.dailyEvent?.icon || "🎲"}</div>
+        <div style={{flex:1}}>
+          <div className="event-title">🎲 Sự kiện ngẫu nhiên {Math.min((game.dailyEventIndex||0)+1,3)}/3</div>
+          <b>{game.dailyEvent?.title || "Ngày mới"}</b>
+          <div className="muted">{game.dailyEvent?.text}</div>
+          {game.dailyEvent?.resolved ? (
+            <div className="event-result">✅ {game.dailyEvent.result}</div>
+          ) : (
+            <div style={{display:"grid",gap:8,marginTop:10}}>
+              {(game.dailyEvent?.choices || []).map((choice,i)=>(
+                <Button key={i} onClick={()=>chooseDailyEvent(i)}>
+                  {choice.label}<br/><small>{choice.result}</small>
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -4157,7 +5194,6 @@ function App(){
               ? `${currentExam.day}-${currentExam.timeIndex}`
               : null;
           }
-          setAutoTime(true);
           setQuiz(null);
           setQuizFeedback(null);
           setOverlay(null);
@@ -4712,13 +5748,13 @@ function App(){
             </div>
 
             <div className="countdown">
-              <span>Còn</span>
+              <span>Hoạt động</span>
               <b>
-                00:{String(secondsLeft).padStart(2,"0")}
+                {(game.mainActivityCount || 0)}/2
               </b>
               <small>
-                {`🔓 ${Math.max(0, 2 - (game.mainActivityCount || 0))}/2 hoạt động chính còn lại`}
-                <span className="muted"> • NPC +1–5 điểm/mốc</span>
+                {`🔓 ${Math.max(0, 2 - (game.mainActivityCount || 0))} hoạt động chính còn lại`}
+                <span className="muted"> • Làm đủ 2 hoạt động sẽ sang mốc tiếp theo</span>
                 {game.mainActivityLabels?.length
                   ? ` • ${game.mainActivityLabels.join(" • ")}`
                   : ""}
@@ -4728,24 +5764,12 @@ function App(){
                 <div className="exam-hint">
                   {todayExam.icon} <b>{todayExam.title}</b> tại {TIME_SLOTS[todayExam.timeIndex]}
                   {currentExam && quiz?.mode!=="exam" && (
-                    <Button
-                      onClick={()=>startQuiz("exam",null,currentExam)}
-                    >
-                      📝 Mở bài thi
-                    </Button>
+                    <span className="muted"> • Tự động bắt đầu</span>
                   )}
                 </div>
               )}
 
             </div>
-          </div>
-
-          <div className="time-progress">
-            <div
-              style={{
-                width:`${(secondsLeft/SLOT_SECONDS)*100}%`
-              }}
-            />
           </div>
 
           <div className="schedule-row">
@@ -4804,14 +5828,6 @@ function App(){
           <div className="hud-money">
             💰 {money(game.stats.money)}
           </div>
-
-          <button
-            className="auto-btn"
-            onClick={()=>setAutoTime(v=>!v)}
-            disabled={game.isGameOver}
-          >
-            {autoTime ? "⏱ Tự chạy" : "⏸ Tạm dừng"}
-          </button>
 
         </div>
 
