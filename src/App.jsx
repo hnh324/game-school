@@ -22,7 +22,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
    - Supabase Auth anonymous + Postgres REST polling (không cần SDK)
 ========================================================= */
 
-const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_v26";
+const GAME_SEASON = "season_2";
+const GAME_VERSION = 27;
+const SAVE_KEY = "thanh_xuan_ruc_ro_deluxe_season_2";
 const SLOT_SECONDS = 30;
 
 /* =========================================================
@@ -41,7 +43,8 @@ const SUPABASE_KEY = String(
 );
 
 const ONLINE_TABLE = "player_scores";
-const ONLINE_SESSION_KEY = "thanh_xuan_ruc_ro_supabase_session_v1";
+const GAME_SEASON = "season_2";
+const ONLINE_SESSION_KEY = "thanh_xuan_ruc_ro_supabase_session_season_2";
 const ONLINE_HEARTBEAT_MS = 10000;
 const ONLINE_POLL_MS = 5000;
 const hasOnlineConfig = Boolean(SUPABASE_URL && SUPABASE_KEY);
@@ -2108,7 +2111,8 @@ function emptyDailyCompetition(){
 
 function createInitialState(){
   const g = {
-    version:17,
+    version:GAME_VERSION,
+    season:GAME_SEASON,
     isGameOver:false,
     day:1,
     totalDays:100,
@@ -2221,6 +2225,13 @@ function createInitialState(){
 }
 
 function normalizeState(raw){
+  if(raw?.season && raw.season !== GAME_SEASON){
+    throw new Error("SAVE_OLD_SEASON");
+  }
+  if(raw?.version && Number(raw.version) < GAME_VERSION){
+    throw new Error("SAVE_OLD_VERSION");
+  }
+
   const base = createInitialState();
 
   const g = {
@@ -2267,6 +2278,9 @@ function normalizeState(raw){
       ...(raw?.outfit || {})
     }
   };
+
+  g.version = GAME_VERSION;
+  g.season = GAME_SEASON;
 
   g.playerName = String(g.playerName || "").trim().slice(0,20);
   g.achievementPoints = Math.max(0, Math.round(Number(g.achievementPoints) || 0));
@@ -2377,6 +2391,13 @@ function App(){
 
   const [game,setGame] = useState(()=>{
     try{
+      // Season 2: xóa save cục bộ của các mùa cũ và không kế thừa tiến trình cũ.
+      [
+        "thanh_xuan_ruc_ro_deluxe_v17",
+        "thanh_xuan_ruc_ro_deluxe_v25",
+        "thanh_xuan_ruc_ro_deluxe_v26"
+      ].forEach(key=>localStorage.removeItem(key));
+
       const saved = localStorage.getItem(SAVE_KEY);
       if(saved) return normalizeState(JSON.parse(saved));
     }catch{}
@@ -2485,7 +2506,7 @@ function App(){
     if(!hasOnlineConfig) return [];
 
     const rows = await onlineRequest(
-      `/rest/v1/${ONLINE_TABLE}?select=id,player_name,icon,points,today,day,time_index,updated_at&order=points.desc,updated_at.desc&limit=100`,
+   `/rest/v1/${ONLINE_TABLE}?select=id,player_name,icon,points,today,day,time_index,updated_at&season=eq.${GAME_SEASON}&order=points.desc,updated_at.desc&limit=100`,
       {headers:onlineAuthHeaders(accessToken)}
     );
 
@@ -2497,6 +2518,7 @@ function App(){
 
     const payload = {
       id:session.user.id,
+      season:GAME_SEASON,
       player_name:game.playerName.slice(0,20),
       icon:currentTitle.icon,
       points:Math.max(0,Math.round(game.competitionPoints)),
@@ -3460,8 +3482,12 @@ function App(){
       setSecondsLeft(SLOT_SECONDS);
       setOverlay(null);
       setToast("✅ Đã nạp game thành công.");
-    }catch{
-      setToast("❌ Mã lưu không hợp lệ.");
+    }catch(error){
+      if(error?.message === "SAVE_OLD_SEASON" || error?.message === "SAVE_OLD_VERSION") {
+        setToast("🆕 Mã lưu này thuộc Season 1. Season 2 phải bắt đầu lại từ đầu.");
+      } else {
+        setToast("❌ Mã lưu không hợp lệ hoặc đã lỗi thời.");
+      }
     }
   };
 
@@ -3497,8 +3523,12 @@ function App(){
         setSecondsLeft(SLOT_SECONDS);
         setOverlay(null);
         setToast("✅ Đã nhập file save.");
-      }catch{
-        setToast("❌ File save không hợp lệ.");
+      }catch(error){
+        if(error?.message === "SAVE_OLD_SEASON" || error?.message === "SAVE_OLD_VERSION") {
+          setToast("🆕 File save này thuộc Season 1. Season 2 phải bắt đầu lại từ đầu.");
+        } else {
+          setToast("❌ File save không hợp lệ hoặc đã lỗi thời.");
+        }
       }
     };
 
@@ -4387,7 +4417,7 @@ function App(){
           <div>
             <h2>Chào mừng đến với Thanh Xuân Rực Rỡ!</h2>
             <p>
-              Bạn sẽ trải qua 45 ngày học tập, kết bạn, kiếm tiền,
+              Bạn sẽ trải qua 100 ngày học tập, kết bạn, kiếm tiền,
               săn chứng chỉ, phối đồ và tích điểm thi đua.
             </p>
           </div>
@@ -5184,7 +5214,7 @@ function App(){
             </div>
 
             <h1>
-              Hành trình 45 ngày đã kết thúc
+              Hành trình 100 ngày đã kết thúc
             </h1>
 
             <p>
