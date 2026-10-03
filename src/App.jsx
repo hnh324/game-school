@@ -464,11 +464,26 @@ const MEO_QUESTIONS = [
 
 const varyQuestionChoices = (choices, answer, seed=0) => {
   const list = [...choices];
-  const shift = ((seed % list.length) + list.length) % list.length;
-  const reordered = list.map((_, idx) => list[(idx - shift + list.length) % list.length]);
+  const correctValue = list[answer];
+
+  // Xáo trộn ổn định theo seed thay vì luôn xoay theo cùng một quy luật.
+  // Nhờ vậy đáp án đúng được phân bố đều hơn giữa A/B/C/D.
+  let state = (Math.imul(seed + 1, 0x45d9f3b) >>> 0) || 1;
+  const rand = () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) / 4294967296;
+  };
+
+  for(let i=list.length-1;i>0;i--){
+    const j=Math.floor(rand()*(i+1));
+    [list[i],list[j]]=[list[j],list[i]];
+  }
+
   return {
-    choices: reordered,
-    answer: (answer + shift) % list.length
+    choices: list,
+    answer: list.indexOf(correctValue)
   };
 };
 
@@ -702,28 +717,26 @@ const HSK5_QUESTIONS = [
 ];
 
 const EN_DAO_NGU = [
-
-    ["部分倒装", "Never have I seen such a beautiful view.", ["Never have I seen such a beautiful view.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "倒装结构为 Never + 助动词 + 主语 + 动词。"],
-    ["部分倒装", "Hardly had I arrived when the meeting started.", ["Hardly had I arrived when the meeting started.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Hardly...when...使用过去完成时倒装。"],
-    ["部分倒装", "So difficult was the exam that many students complained.", ["So difficult was the exam that many students complained.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adjective 置于句首可形成倒装。"],
-    ["部分倒装", "Under no circumstances ___ this door.", ["should you open", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Under no circumstances 要求部分倒装。"],
-    ["部分倒装", "Little did they know what would happen next.", ["Little did they know what would happen next.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Little 置于句首表示几乎不知道，需倒装。"],
-    ["部分倒装", "Only then ___ why she was upset.", ["did I realize", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only then 置于句首后主句倒装。"],
-    ["部分倒装", "No sooner had he left than the phone rang.", ["No sooner had he left than the phone rang.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "No sooner...than...使用倒装和过去完成时。"],
-    ["条件倒装", "Had I known earlier, I would have helped.", ["Had I known earlier, I would have helped.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 3 bỏ if: Had + S + V3."],
-    ["条件倒装", "Were I you, I would accept the offer.", ["Were I you, I would accept the offer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Đảo ngữ điều kiện loại 2: Were + S..."],
-    ["条件倒装", "Should you need help, call me.", ["Should you need help, call me.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Should + S... thay cho If S should..."],
-    ["部分倒装", "Not only did she apologize, but she also offered to help.", ["Not only did she apologize, but she also offered to help.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Not only ở đầu câu yêu cầu đảo trợ động từ."],
-    ["部分倒装", "Seldom does he complain about his workload.", ["Seldom does he complain about his workload.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Seldom mang nghĩa hiếm khi và gây đảo ngữ khi đứng đầu."],
-    ["部分倒装", "On no account should you reveal the password.", ["On no account should you reveal the password.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "On no account = under no circumstances, dùng đảo ngữ."],
-    ["phần đảo ngữ", "Only by working together can we solve the problem.", ["Only by working together can we solve the problem.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Only + cụm trạng ngữ ở đầu câu kéo theo đảo ngữ."],
-    ["phần đảo ngữ", "So quickly did she answer that everyone was surprised.", ["So quickly did she answer that everyone was surprised.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "So + adverb ở đầu câu có thể dùng đảo ngữ."],
-    ["phần đảo ngữ", "Neither did I know the answer.", ["Neither did I know the answer.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Neither + trợ động từ + chủ ngữ dùng để đồng tình với phủ định."],
-    ["phần đảo ngữ", "Nowhere else can you find a view like this.", ["Nowhere else can you find a view like this.", "the word order is unchanged", "use only the past tense", "replace the auxiliary with 'to'"], 0, "Trạng từ phủ định/giới hạn ở đầu câu gây đảo ngữ."],
-    ["phần đảo ngữ", "Only after reading the report did we understand the problem.", ["Only after reading the report did we understand the problem.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Only after + phrase at the beginning triggers inversion."],
-    ["phần đảo ngữ", "At no time should employees share confidential data.", ["At no time should employees share confidential data.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "At no time is a negative/restrictive phrase that triggers inversion."],
-    ["phần đảo ngữ", "Barely had the show begun when the lights went out.", ["Barely had the show begun when the lights went out.", "the word order is unchanged", "use only the past tense", "add 'to' before the verb"], 0, "Barely...when... uses inversion with past perfect."],
-
+  ["Phần đảo ngữ", "Never ___ such a beautiful view.", ["have I seen", "I have seen", "did I see", "I saw"], 0, "Never ở đầu câu yêu cầu đảo trợ động từ: Never + have + S + V3."],
+  ["Phần đảo ngữ", "Hardly ___ when the meeting started.", ["had I arrived", "I had arrived", "did I arrive", "I arrived"], 0, "Hardly...when... dùng đảo ngữ với quá khứ hoàn thành: Hardly had + S + V3."],
+  ["Phần đảo ngữ", "So difficult ___ that many students complained.", ["was the exam", "the exam was", "did the exam be", "the exam did"], 0, "So + adjective ở đầu câu với be có dạng So + adj + be + S."],
+  ["Phần đảo ngữ", "Under no circumstances ___ this door.", ["should you open", "you should open", "you open should", "should open you"], 0, "Under no circumstances đứng đầu câu → đảo trợ động từ: should + S + V."],
+  ["Phần đảo ngữ", "Little ___ what would happen next.", ["did they know", "they knew", "had they knew", "they did knew"], 0, "Little mang nghĩa hầu như không và ở đầu câu → Little + did + S + V."],
+  ["Phần đảo ngữ", "Only then ___ why she was upset.", ["did I realize", "I realized", "had I realized", "I did realize"], 0, "Only then ở đầu câu → đảo trợ động từ: did + S + V."],
+  ["Phần đảo ngữ", "No sooner ___ than the phone rang.", ["had he left", "he had left", "did he leave", "he left"], 0, "No sooner...than... thường dùng quá khứ hoàn thành với đảo ngữ: No sooner had + S + V3."],
+  ["Đảo ngữ điều kiện", "Had I known earlier, I ___ .", ["would have helped", "will have helped", "would help", "had helped"], 0, "Đảo ngữ điều kiện loại 3: Had + S + V3, S + would have + V3."],
+  ["Đảo ngữ điều kiện", "Were I you, I ___ the offer.", ["would accept", "will accept", "accepted", "would have accepted"], 0, "Were I you tương đương If I were you → điều kiện loại 2."],
+  ["Đảo ngữ điều kiện", "Should you need help, ___ me.", ["call", "called", "calling", "to call"], 0, "Should + S + V có thể thay cho If + S + should + V trong điều kiện."],
+  ["Phần đảo ngữ", "Not only ___, but she also offered to help.", ["did she apologize", "she apologized", "had she apologized", "she did apologized"], 0, "Not only ở đầu câu → đảo trợ động từ: Not only did + S + V."],
+  ["Phần đảo ngữ", "Seldom ___ about his workload.", ["does he complain", "he complains", "did he complained", "he does complains"], 0, "Seldom mang nghĩa hiếm khi; khi đứng đầu câu phải đảo trợ động từ."],
+  ["Phần đảo ngữ", "On no account ___ the password.", ["should you reveal", "you should reveal", "should reveal you", "you reveal should"], 0, "On no account là cụm phủ định/hạn định → dùng đảo ngữ."],
+  ["Phần đảo ngữ", "Only by working together ___ the problem.", ["can we solve", "we can solve", "could we solved", "we solve can"], 0, "Only by + V-ing ở đầu câu → can + S + V."],
+  ["Phần đảo ngữ", "So quickly ___ that everyone was surprised.", ["did she answer", "she answered", "had she answered", "she did answered"], 0, "So + adverb ở đầu câu có thể dùng đảo ngữ với did + S + V."],
+  ["Phần đảo ngữ", "Neither ___ the answer.", ["did I know", "I knew", "had I knew", "I did knew"], 0, "Neither + trợ động từ + chủ ngữ dùng để đồng tình với ý phủ định."],
+  ["Phần đảo ngữ", "Nowhere else ___ a view like this.", ["can you find", "you can find", "could you found", "you find can"], 0, "Nowhere else ở đầu câu → đảo trợ động từ: can + S + V."],
+  ["Phần đảo ngữ", "Only after reading the report ___ the problem.", ["did we understand", "we understood", "had we understood", "we did understood"], 0, "Only after + cụm từ ở đầu câu → đảo trợ động từ ở mệnh đề chính."],
+  ["Phần đảo ngữ", "At no time ___ confidential data.", ["should employees share", "employees should share", "should share employees", "employees share should"], 0, "At no time là cụm phủ định/hạn định → should + S + V."],
+  ["Phần đảo ngữ", "Barely ___ when the lights went out.", ["had the show begun", "the show had begun", "did the show begin", "the show began"], 0, "Barely...when... dùng quá khứ hoàn thành và đảo ngữ: Barely had + S + V3."],
 ];
 
 const EN_THUC_GIA_DINH = [
@@ -2717,7 +2730,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,25000);
       addStat(g,"energy",-8);
-      addStat(g,"skill",1);
+      addStat(g,"skill",4);
       addCompetition(g,2);
     }
   },
@@ -2733,7 +2746,7 @@ const JOBS = [
       addMoney(g,30000);
       addStat(g,"energy",-12);
       addStat(g,"mood",-2);
-      addStat(g,"skill",2);
+      addStat(g,"skill",5);
       addCompetition(g,2);
     }
   },
@@ -2748,7 +2761,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,50000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",2);
+      addStat(g,"skill",5);
       addCompetition(g,4);
     }
   },
@@ -2764,7 +2777,7 @@ const JOBS = [
       addMoney(g,100000);
       addStat(g,"energy",-20);
       addStat(g,"reputation",3);
-      addStat(g,"skill",4);
+      addStat(g,"skill",7);
       addCompetition(g,6);
     }
   },
@@ -2779,7 +2792,7 @@ const JOBS = [
     apply:g=>{
       addMoney(g,150000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",3);
+      addStat(g,"skill",6);
       addCompetition(g,7);
     }
   },
@@ -2795,7 +2808,7 @@ const JOBS = [
       addMoney(g,200000);
       addStat(g,"energy",-10);
       addStat(g,"reputation",4);
-      addStat(g,"skill",5);
+      addStat(g,"skill",9);
       addCompetition(g,8);
     }
   }
@@ -2816,7 +2829,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,70000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",5);
+      addStat(g,"skill",9);
       addStat(g,"reputation",2);
       addCompetition(g,4);
     }
@@ -2832,7 +2845,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,60000);
       addStat(g,"energy",-12);
-      addStat(g,"skill",3);
+      addStat(g,"skill",6);
       addStat(g,"friends",2);
       addCompetition(g,3);
     }
@@ -2848,7 +2861,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,90000);
       addStat(g,"energy",-10);
-      addStat(g,"skill",6);
+      addStat(g,"skill",8);
       addStat(g,"reputation",3);
       addCompetition(g,5);
     }
@@ -2864,7 +2877,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,130000);
       addStat(g,"energy",-12);
-      addStat(g,"skill",7);
+      addStat(g,"skill",10);
       addStat(g,"reputation",4);
       addCompetition(g,6);
     }
@@ -2880,7 +2893,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,220000);
       addStat(g,"energy",-14);
-      addStat(g,"skill",9);
+      addStat(g,"skill",12);
       addStat(g,"reputation",5);
       addCompetition(g,8);
     }
@@ -2896,7 +2909,7 @@ const EXTRA_JOBS = [
     apply:g=>{
       addMoney(g,180000);
       addStat(g,"energy",-14);
-      addStat(g,"skill",8);
+      addStat(g,"skill",10);
       addStat(g,"reputation",4);
       addCompetition(g,7);
     }
