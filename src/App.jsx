@@ -43,7 +43,6 @@ const SUPABASE_KEY = String(
 );
 
 const ONLINE_TABLE = "player_scores";
-const GAME_SEASON = "season_2";
 const ONLINE_SESSION_KEY = "thanh_xuan_ruc_ro_supabase_session_season_2";
 const ONLINE_HEARTBEAT_MS = 10000;
 const ONLINE_POLL_MS = 5000;
